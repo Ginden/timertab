@@ -1,0 +1,12 @@
+# timertab-managed: true
+# timertab-uid: 1000
+# timertab-job-id: npm-cache-verify
+[Unit]
+Description="timertab timer npm-cache-verify"
+
+[Timer]
+Unit=timertab-u1000-npm-cache-verify-3e70124b9a.service
+OnCalendar=*-*-* *:00:00
+
+[Install]
+WantedBy=timers.target

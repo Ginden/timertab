@@ -1,0 +1,21 @@
+# Binaries
+bin/
+dist/
+timertab
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go build artifacts
+*.test
+*.out
+coverage.txt
+
+# IDE/editor
+.idea/
+.vscode/
+
+# Local runtime state (development only)
+*.log

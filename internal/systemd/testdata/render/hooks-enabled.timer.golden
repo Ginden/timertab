@@ -1,0 +1,12 @@
+# timertab-managed: true
+# timertab-uid: 1001
+# timertab-job-id: journal-scan
+[Unit]
+Description="timertab timer journal-scan"
+
+[Timer]
+Unit=timertab-u1001-journal-scan-c03dc4fac9.service
+OnCalendar=Mon,Tue,Wed,Thu,Fri *-*-* 02:15:00
+
+[Install]
+WantedBy=timers.target

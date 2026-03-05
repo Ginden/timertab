@@ -1,0 +1,10 @@
+# timertab-managed: true
+# timertab-uid: 1000
+# timertab-job-id: npm-cache-verify
+[Unit]
+Description="timertab job npm-cache-verify"
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -lc 'npm --global cache verify'
+ExecStopPost=/bin/sh -lc 'TIMERTAB_JOB_ID='"'"'npm-cache-verify'"'"'; TIMERTAB_UNIT='"'"'timertab-u1000-npm-cache-verify-3e70124b9a.service'"'"'; export TIMERTAB_JOB_ID TIMERTAB_UNIT SERVICE_RESULT EXIT_CODE EXIT_STATUS; if [ "${SERVICE_RESULT:-}" = "success" ]; then :; fi; if [ "${SERVICE_RESULT:-}" != "success" ]; then :; fi'

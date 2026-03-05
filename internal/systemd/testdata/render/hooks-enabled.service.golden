@@ -1,0 +1,13 @@
+# timertab-managed: true
+# timertab-uid: 1001
+# timertab-job-id: journal-scan
+[Unit]
+Description="timertab job journal-scan"
+
+[Service]
+Type=oneshot
+WorkingDirectory="/var/lib/timertab jobs"
+Environment="LANG=C.UTF-8"
+Environment="TZ=UTC"
+ExecStart=/bin/sh -lc 'echo run && date'
+ExecStopPost=/bin/sh -lc 'TIMERTAB_JOB_ID='"'"'journal-scan'"'"'; TIMERTAB_UNIT='"'"'timertab-u1001-journal-scan-c03dc4fac9.service'"'"'; export TIMERTAB_JOB_ID TIMERTAB_UNIT SERVICE_RESULT EXIT_CODE EXIT_STATUS; if [ "${SERVICE_RESULT:-}" = "success" ]; then OK='"'"'yes'"'"' /bin/sh -lc '"'"'echo success'"'"'; fi; if [ "${SERVICE_RESULT:-}" != "success" ]; then FAIL_REASON='"'"'job failed'"'"' /bin/sh -lc '"'"'journalctl -u "$TIMERTAB_UNIT" -n 100 --no-pager'"'"'; fi'
