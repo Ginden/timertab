@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,12 +12,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ginden/timertab/internal/config"
-	"github.com/ginden/timertab/internal/systemctl"
 )
 
-var runSystemctlApply = func(ctx context.Context, executor systemctl.Executor) error {
-	return systemctl.RunPlan(ctx, executor, systemctl.Plan{})
-}
+var runSystemctlApply = applyEditedConfig
 
 func listConfig(cmd *cobra.Command, cfgPath string) error {
 	data, err := os.ReadFile(cfgPath)
@@ -43,7 +39,7 @@ func listConfig(cmd *cobra.Command, cfgPath string) error {
 	return nil
 }
 
-func editConfig(cmd *cobra.Command, cfgPath string, noApply bool) error {
+func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply bool) error {
 	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
 		return err
 	}
@@ -116,12 +112,12 @@ func editConfig(cmd *cobra.Command, cfgPath string, noApply bool) error {
 			return nil
 		}
 
-		if err := runSystemctlApply(cmd.Context(), systemctl.NewCommandExecutor()); err != nil {
+		if err := runSystemctlApply(cmd.Context(), loaded, targetUser); err != nil {
 			return err
 		}
 
 		cmd.Printf("timertab: saved %s\n", cfgPath)
-		cmd.Println("timertab: reconcile not implemented yet")
+		cmd.Println("timertab: applied systemd reconcile")
 		return nil
 	}
 }

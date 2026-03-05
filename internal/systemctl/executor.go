@@ -59,7 +59,7 @@ func (e *CommandExecutor) run(ctx context.Context, args ...string) error {
 		return nil
 	}
 
-	cmdText := "systemctl " + strings.Join(args, " ")
+	cmdText := "systemctl --user " + strings.Join(args, " ")
 	msg := strings.TrimSpace(stderr)
 	if msg == "" {
 		return fmt.Errorf("%s failed: %w", cmdText, err)
@@ -68,7 +68,8 @@ func (e *CommandExecutor) run(ctx context.Context, args ...string) error {
 }
 
 func runSystemctl(ctx context.Context, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "systemctl", args...)
+	systemctlArgs := append([]string{"--user"}, args...)
+	cmd := exec.CommandContext(ctx, "systemctl", systemctlArgs...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	err := cmd.Run()

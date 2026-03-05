@@ -4,7 +4,14 @@
 
 ## Status
 
-Bootstrap phase. Core scaffolding, v1 schema, and design contract are in place.
+Core v1 pipeline is implemented:
+
+- runtime schema + semantic validation
+- schedule compiler (`when` -> `OnCalendar`)
+- native unit renderer (`.service` / `.timer`)
+- reconcile planner with managed-only prune safety
+- target-user permission checks (`-u`)
+- end-to-end `timertab -e` flow (edit, validate, persist IDs, reconcile units, run `systemctl --user`)
 
 ## Why
 
@@ -41,20 +48,19 @@ Full v1 contract:
 - [schema/v1.json](schema/v1.json)
 - [docs/libraries.md](docs/libraries.md)
 
-## CLI (current bootstrap)
+## CLI (current state)
 
 - `timertab -l` list the source config content
-- `timertab -e` edit + validate + normalize IDs, then save
+- `timertab -e` edit + validate + normalize IDs, then reconcile/apply
+- `timertab -e --no-apply` edit + validate + normalize IDs, save only
 - `timertab --print-path` print resolved config path
 - `timertab validate --config <path>` validate file
-
-Reconcile/apply to `systemd` is intentionally not implemented yet.
 
 ## Chosen Libraries
 
 - `github.com/spf13/cobra`: CLI framework
 - `gopkg.in/yaml.v3`: YAML parsing/marshalling
-- `github.com/santhosh-tekuri/jsonschema/v5`: JSON Schema validation (planned wiring in next step)
+- `github.com/santhosh-tekuri/jsonschema/v6`: JSON Schema validation
 
 ## Development
 
@@ -100,8 +106,5 @@ make run
 
 ## Planned Milestones
 
-1. Wire `schema/v1.json` validation into runtime loader.
-2. Implement compiler from jobs -> `.service`/`.timer`.
-3. Implement reconcile (create/update/prune) with safety markers.
-4. Implement `-u` privilege checks and user scope behavior.
-5. Add integration tests with `systemd-run`/containerized systemd harness.
+1. Add integration tests with `systemd-run`/containerized systemd harness.
+2. Harden cross-user apply behavior for privileged `-u` operations in environments without active user sessions.

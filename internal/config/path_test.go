@@ -126,3 +126,76 @@ func TestValidateTargetUserPermissionEmptyTargetSkipsLookup(t *testing.T) {
 		t.Fatalf("validateTargetUserPermission() called lookup for empty target")
 	}
 }
+
+func TestResolveSystemdUserUnitDirUsesTargetUserHome(t *testing.T) {
+	dir, err := resolveSystemdUserUnitDir(
+		"  alice  ",
+		func(string) string {
+			t.Fatalf("resolveSystemdUserUnitDir() should not read XDG_CONFIG_HOME for explicit target user")
+			return ""
+		},
+		func() (string, error) {
+			t.Fatalf("resolveSystemdUserUnitDir() should not resolve caller home for explicit target user")
+			return "", nil
+		},
+		func(name string) (*user.User, error) {
+			if name != "alice" {
+				t.Fatalf("lookup user name = %q, want %q", name, "alice")
+			}
+			return &user.User{
+				Username: "alice",
+				Uid:      "1001",
+				HomeDir:  "/home/alice",
+			}, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("resolveSystemdUserUnitDir() error = %v", err)
+	}
+
+	want := filepath.Join("/home/alice", ".config", "systemd", "user")
+	if dir != want {
+		t.Fatalf("resolveSystemdUserUnitDir() = %q, want %q", dir, want)
+	}
+}
+
+func TestResolveTargetUIDCurrentAndTargetUser(t *testing.T) {
+	t.Run("current uid when target user is empty", func(t *testing.T) {
+		uid, err := resolveTargetUID(
+			" ",
+			func() int { return 1000 },
+			func(string) (*user.User, error) {
+				t.Fatalf("resolveTargetUID() should not call lookup for empty target user")
+				return nil, nil
+			},
+		)
+		if err != nil {
+			t.Fatalf("resolveTargetUID() error = %v", err)
+		}
+		if uid != 1000 {
+			t.Fatalf("resolveTargetUID() = %d, want %d", uid, 1000)
+		}
+	})
+
+	t.Run("target uid from lookup", func(t *testing.T) {
+		uid, err := resolveTargetUID(
+			"bob",
+			func() int {
+				t.Fatalf("resolveTargetUID() should not call getuid for explicit target user")
+				return 0
+			},
+			func(name string) (*user.User, error) {
+				if name != "bob" {
+					t.Fatalf("lookup user name = %q, want %q", name, "bob")
+				}
+				return &user.User{Username: "bob", Uid: "1001"}, nil
+			},
+		)
+		if err != nil {
+			t.Fatalf("resolveTargetUID() error = %v", err)
+		}
+		if uid != 1001 {
+			t.Fatalf("resolveTargetUID() = %d, want %d", uid, 1001)
+		}
+	})
+}

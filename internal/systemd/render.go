@@ -25,6 +25,31 @@ type RenderedUnits struct {
 	TimerContent   string
 }
 
+func IsManagedUnitContentForUID(content string, targetUID uint32) bool {
+	var (
+		hasManagedMarker bool
+		hasUIDMarker     bool
+		hasJobIDMarker   bool
+	)
+
+	targetUIDString := fmt.Sprintf("%d", targetUID)
+	for _, rawLine := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(rawLine)
+		switch {
+		case line == managedMarkerLine:
+			hasManagedMarker = true
+		case strings.HasPrefix(line, uidMarkerPrefix):
+			uidValue := strings.TrimSpace(strings.TrimPrefix(line, uidMarkerPrefix))
+			hasUIDMarker = uidValue == targetUIDString
+		case strings.HasPrefix(line, jobIDMarkerPrefix):
+			jobIDValue := strings.TrimSpace(strings.TrimPrefix(line, jobIDMarkerPrefix))
+			hasJobIDMarker = jobIDValue != ""
+		}
+	}
+
+	return hasManagedMarker && hasUIDMarker && hasJobIDMarker
+}
+
 func RenderJobUnits(targetUID uint32, job config.Job) (RenderedUnits, error) {
 	if strings.TrimSpace(job.ID) == "" {
 		return RenderedUnits{}, fmt.Errorf("job id is required")

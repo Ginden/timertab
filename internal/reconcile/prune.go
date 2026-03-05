@@ -3,6 +3,7 @@ package reconcile
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 // ApplyRequest carries all inputs required for a guarded reconcile pass.
@@ -72,11 +73,15 @@ func ExecutePrune(ctx context.Context, targetUID uint32, units []string, mutator
 			return fmt.Errorf("refusing to prune unmanaged or foreign unit %q", unit)
 		}
 
-		if err := mutator.DisableUnit(ctx, unit); err != nil {
-			return fmt.Errorf("disable stale unit %q: %w", unit, err)
-		}
-		if err := mutator.StopUnit(ctx, unit); err != nil {
-			return fmt.Errorf("stop stale unit %q: %w", unit, err)
+		// Disable/stop are timer-specific operations; services are removed
+		// directly after file removal and daemon-reload.
+		if strings.HasSuffix(unit, ".timer") {
+			if err := mutator.DisableUnit(ctx, unit); err != nil {
+				return fmt.Errorf("disable stale unit %q: %w", unit, err)
+			}
+			if err := mutator.StopUnit(ctx, unit); err != nil {
+				return fmt.Errorf("stop stale unit %q: %w", unit, err)
+			}
 		}
 		if err := mutator.RemoveUnitFile(unit); err != nil {
 			return fmt.Errorf("remove stale unit file %q: %w", unit, err)

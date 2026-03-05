@@ -50,7 +50,7 @@ func NewRootCommand() *cobra.Command {
 						return err
 					}
 				}
-				return editConfig(cmd, cfgPath, opts.NoApply)
+				return editConfig(cmd, cfgPath, opts.User, opts.NoApply)
 			default:
 				return cmd.Help()
 			}

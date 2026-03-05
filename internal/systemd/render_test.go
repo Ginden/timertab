@@ -119,6 +119,28 @@ func TestRenderJobUnitsErrors(t *testing.T) {
 	}
 }
 
+func TestIsManagedUnitContentForUID(t *testing.T) {
+	t.Parallel()
+
+	content := strings.Join([]string{
+		"# timertab-managed: true",
+		"# timertab-uid: 1000",
+		"# timertab-job-id: sample",
+		"[Unit]",
+		"Description=sample",
+	}, "\n")
+
+	if !IsManagedUnitContentForUID(content, 1000) {
+		t.Fatalf("IsManagedUnitContentForUID() = false, want true")
+	}
+	if IsManagedUnitContentForUID(content, 1001) {
+		t.Fatalf("IsManagedUnitContentForUID() = true for wrong uid")
+	}
+	if IsManagedUnitContentForUID(strings.Replace(content, "# timertab-job-id: sample", "# timertab-job-id: ", 1), 1000) {
+		t.Fatalf("IsManagedUnitContentForUID() = true for empty job id marker")
+	}
+}
+
 func readRenderGolden(t *testing.T, name string) string {
 	t.Helper()
 

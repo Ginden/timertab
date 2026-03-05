@@ -32,8 +32,6 @@ func TestApplyPrunesOnlyManagedUnitsForTargetUID(t *testing.T) {
 		"disable:timertab-u1000-stale-a.timer",
 		"stop:timertab-u1000-stale-a.timer",
 		"remove:timertab-u1000-stale-a.timer",
-		"disable:timertab-u1000-stale-b.service",
-		"stop:timertab-u1000-stale-b.service",
 		"remove:timertab-u1000-stale-b.service",
 	}
 	if !slices.Equal(mutator.calls, wantCalls) {

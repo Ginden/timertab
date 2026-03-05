@@ -9,9 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ginden/timertab/internal/config"
 	"github.com/spf13/cobra"
-
-	"github.com/ginden/timertab/internal/systemctl"
 )
 
 func TestEditConfigApplyRunsSystemctlPipeline(t *testing.T) {
@@ -21,10 +20,13 @@ func TestEditConfigApplyRunsSystemctlPipeline(t *testing.T) {
 	})
 
 	var callCount int
-	runSystemctlApply = func(_ context.Context, executor systemctl.Executor) error {
+	runSystemctlApply = func(_ context.Context, loaded *config.File, targetUser string) error {
 		callCount++
-		if executor == nil {
-			t.Fatalf("executor = nil, want non-nil")
+		if loaded == nil {
+			t.Fatalf("loaded config = nil")
+		}
+		if targetUser != "" {
+			t.Fatalf("targetUser = %q, want empty", targetUser)
 		}
 		return nil
 	}
@@ -37,7 +39,7 @@ func TestEditConfigApplyRunsSystemctlPipeline(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	if err := editConfig(cmd, cfgPath, false); err != nil {
+	if err := editConfig(cmd, cfgPath, "", false); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 	if callCount != 1 {
@@ -52,7 +54,7 @@ func TestEditConfigApplyReturnsSystemctlPipelineErrors(t *testing.T) {
 	})
 
 	pipelineErr := errors.New("systemctl apply failed")
-	runSystemctlApply = func(_ context.Context, _ systemctl.Executor) error {
+	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) error {
 		return pipelineErr
 	}
 
@@ -64,7 +66,7 @@ func TestEditConfigApplyReturnsSystemctlPipelineErrors(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	err := editConfig(cmd, cfgPath, false)
+	err := editConfig(cmd, cfgPath, "", false)
 	if !errors.Is(err, pipelineErr) {
 		t.Fatalf("editConfig() error = %v, want %v", err, pipelineErr)
 	}
@@ -76,7 +78,7 @@ func TestEditConfigNoApplySkipsSystemctlPipeline(t *testing.T) {
 		runSystemctlApply = originalApply
 	})
 
-	runSystemctlApply = func(_ context.Context, _ systemctl.Executor) error {
+	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) error {
 		return errors.New("systemctl pipeline should not run for --no-apply")
 	}
 
@@ -88,7 +90,7 @@ func TestEditConfigNoApplySkipsSystemctlPipeline(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	if err := editConfig(cmd, cfgPath, true); err != nil {
+	if err := editConfig(cmd, cfgPath, "", true); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 }
@@ -111,7 +113,7 @@ jobs:
 	}
 
 	var applyCallCount int
-	runSystemctlApply = func(_ context.Context, _ systemctl.Executor) error {
+	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) error {
 		applyCallCount++
 
 		saved, err := os.ReadFile(cfgPath)
@@ -167,7 +169,7 @@ EOF
 	stderr := &bytes.Buffer{}
 	cmd.SetErr(stderr)
 
-	if err := editConfig(cmd, cfgPath, false); err != nil {
+	if err := editConfig(cmd, cfgPath, "", false); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 
@@ -220,7 +222,7 @@ jobs:
 	}
 
 	var applyCallCount int
-	runSystemctlApply = func(_ context.Context, _ systemctl.Executor) error {
+	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) error {
 		applyCallCount++
 		return nil
 	}
@@ -262,7 +264,7 @@ exit 1
 	stderr := &bytes.Buffer{}
 	cmd.SetErr(stderr)
 
-	err := editConfig(cmd, cfgPath, false)
+	err := editConfig(cmd, cfgPath, "", false)
 	if err == nil {
 		t.Fatalf("editConfig() error = nil, want non-nil")
 	}
