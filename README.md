@@ -175,6 +175,17 @@ If validation fails at step 2, nothing else happens — no partial writes, no or
 make build    # compile
 make test     # run tests
 make run      # run without building
+make install-hooks  # enable local git hooks (.githooks)
+```
+
+Git hooks include:
+- `pre-commit`: checks staged Go files with `gofmt` and lints changed workflow files with `actionlint`.
+- `pre-push`: runs `go vet`, `go build ./cmd/timertab`, and `go test ./...`.
+
+Install `actionlint` once if you edit workflows:
+
+```bash
+go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.4
 ```
 
 ## Releases

@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${TIMERTAB_SKIP_GIT_HOOKS:-}" == "1" ]]; then
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "${repo_root}"
+
+staged_go_files=()
+while IFS= read -r path; do
+  [[ -n "${path}" ]] && staged_go_files+=("${path}")
+done < <(git diff --cached --name-only --diff-filter=ACMR -- '*.go')
+
+if [[ ${#staged_go_files[@]} -gt 0 ]]; then
+  unformatted="$(gofmt -l "${staged_go_files[@]}")"
+  if [[ -n "${unformatted}" ]]; then
+    echo "pre-commit: gofmt found unformatted staged files:"
+    echo "${unformatted}"
+    echo "Run: gofmt -w ${unformatted//$'\n'/ }"
+    exit 1
+  fi
+fi
+
+if [[ "${TIMERTAB_SKIP_ACTIONLINT:-}" == "1" ]]; then
+  exit 0
+fi
+
+staged_workflows=()
+while IFS= read -r path; do
+  [[ -n "${path}" ]] && staged_workflows+=("${path}")
+done < <(git diff --cached --name-only --diff-filter=ACMR -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
+
+if [[ ${#staged_workflows[@]} -eq 0 ]]; then
+  exit 0
+fi
+
+actionlint_bin=""
+if command -v actionlint >/dev/null 2>&1; then
+  actionlint_bin="$(command -v actionlint)"
+elif command -v go >/dev/null 2>&1; then
+  gopath_bin="$(go env GOPATH)/bin/actionlint"
+  if [[ -x "${gopath_bin}" ]]; then
+    actionlint_bin="${gopath_bin}"
+  fi
+fi
+
+if [[ -z "${actionlint_bin}" ]]; then
+  echo "pre-commit: workflow files changed, but actionlint is not installed."
+  echo "Install with:"
+  echo "  go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.4"
+  echo "Skip once with:"
+  echo "  TIMERTAB_SKIP_ACTIONLINT=1 git commit ..."
+  exit 1
+fi
+
+"${actionlint_bin}" "${staged_workflows[@]}"

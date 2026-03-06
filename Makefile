@@ -20,3 +20,13 @@ test:
 .PHONY: fmt
 fmt:
 	gofmt -w cmd/timertab/main.go internal/cli/*.go internal/config/*.go internal/version/*.go
+
+.PHONY: install-hooks
+install-hooks:
+	chmod +x .githooks/pre-commit .githooks/pre-push
+	git config core.hooksPath .githooks
+
+.PHONY: run-hooks
+run-hooks:
+	.githooks/pre-commit
+	.githooks/pre-push
