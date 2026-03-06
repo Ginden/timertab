@@ -6,9 +6,9 @@
 
 v1 focuses on:
 
-- `timertab -l` (list)
-- `timertab -e` (edit + validate + apply)
-- `timertab -u <user>` (target another user when privileges allow)
+- `timertab list` / `timertab print-config` (with `-l` shorthand)
+- `timertab edit` (with `-e` shorthand)
+- `timertab <command> -u <user>` (target another user when privileges allow)
 - `on_success` and `on_failure` hooks
 
 ## 2. Compatibility Baseline
@@ -164,7 +164,7 @@ Safety rule:
 
 ## 9. CLI Behavior
 
-- `timertab -l`: list current jobs from source-of-truth config
-- `timertab -e`: open editor, validate, persist IDs, apply on success
-- `timertab -u <user>`: target another user (privilege gated)
-- `sudo timertab -e`: root context by default
+- `timertab list` (or `timertab -l`): list current jobs from source-of-truth config
+- `timertab edit` (or `timertab -e`): open editor, validate, persist IDs, apply on success
+- `timertab <command> -u <user>`: target another user (privilege gated)
+- `sudo timertab edit` (or `sudo timertab -e`): root context by default

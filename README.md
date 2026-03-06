@@ -95,9 +95,9 @@ jobs:
 
 | Command | What it does |
 |---|---|
-| `timertab -e` | Edit config, validate, and apply (generate and start timers) |
-| `timertab -e --no-apply` | Edit and validate only, don't touch systemd |
-| `timertab -l` / `timertab --print-config` | Print current config |
+| `timertab edit` (or `timertab -e`) | Edit config, validate, and apply (generate and start timers) |
+| `timertab edit --no-apply` (or `timertab -e --no-apply`) | Edit and validate only, don't touch systemd |
+| `timertab list` / `timertab print-config` (or `timertab -l`) | Print current config |
 | `timertab status` / `timertab status --json` | Show last run, next trigger, and result for each job |
 | `timertab add` (or `+1`) | Append a single new job through your editor |
 | `timertab eject <id>` | Stop managing a job — its units stay and keep running |
@@ -106,8 +106,8 @@ jobs:
 | `timertab diff` | Preview create/modify/delete reconcile operations |
 | `timertab import` | Convert crontab entries into timertab YAML |
 | `timertab validate --config <path>` | Validate a config file without applying |
-| `timertab --print-path` | Show where the config file lives |
-| `timertab -u <user> ...` | Operate on another user's timers (requires privileges) |
+| `timertab print-path` (or `timertab --print-path`) | Show where the config file lives |
+| `timertab <command> -u <user>` | Operate on another user's timers (requires privileges) |
 
 Config file location: `${XDG_CONFIG_HOME:-$HOME/.config}/timertab/timertab.yaml`
 
@@ -152,7 +152,7 @@ loginctl enable-linger "$USER"
 
 ## How it works
 
-When you run `timertab -e`, here's what happens:
+When you run `timertab edit` (or `timertab -e`), here's what happens:
 
 1. Your editor opens the YAML config.
 2. On save, `timertab` validates the config against the schema and semantic rules.

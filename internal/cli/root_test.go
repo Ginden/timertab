@@ -26,7 +26,7 @@ func TestRootCommandEditApplyChecksSystemdVersionOnce(t *testing.T) {
 	}
 
 	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"--edit", "--config", filepath.Join(t.TempDir(), "timertab.yaml")})
+	cmd.SetArgs([]string{"edit", "--config", filepath.Join(t.TempDir(), "timertab.yaml")})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -52,7 +52,7 @@ func TestRootCommandEditNoApplySkipsSystemdCheck(t *testing.T) {
 	t.Setenv("EDITOR", "true")
 
 	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"--edit", "--no-apply", "--config", filepath.Join(t.TempDir(), "timertab.yaml")})
+	cmd.SetArgs([]string{"edit", "--no-apply", "--config", filepath.Join(t.TempDir(), "timertab.yaml")})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -79,7 +79,7 @@ func TestRootCommandEditDryRunSkipsSystemdCheck(t *testing.T) {
 	t.Setenv("EDITOR", "true")
 
 	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"--edit", "--dry-run", "--config", filepath.Join(t.TempDir(), "timertab.yaml")})
+	cmd.SetArgs([]string{"edit", "--dry-run", "--config", filepath.Join(t.TempDir(), "timertab.yaml")})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -111,7 +111,7 @@ func TestRootCommandRejectsUnauthorizedTargetUser(t *testing.T) {
 	}
 
 	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"--print-path", "--user", "alice"})
+	cmd.SetArgs([]string{"print-path", "--user", "alice"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -142,7 +142,7 @@ func TestRootCommandPrintConfigAliasListsConfig(t *testing.T) {
 
 	stdout := &bytes.Buffer{}
 	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"--print-config"})
+	cmd.SetArgs([]string{"print-config"})
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -159,9 +159,9 @@ func TestRootCommandPrintConfigAliasListsConfig(t *testing.T) {
 	}
 }
 
-func TestRootCommandRejectsNoCommitWithoutEdit(t *testing.T) {
+func TestEditCommandRejectsDryRunWithNoApply(t *testing.T) {
 	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"--no-commit"})
+	cmd.SetArgs([]string{"edit", "--dry-run", "--no-apply"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
@@ -169,8 +169,75 @@ func TestRootCommandRejectsNoCommitWithoutEdit(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Execute() error = nil, want non-nil")
 	}
-	if !strings.Contains(err.Error(), "--no-commit can only be used with -e") {
-		t.Fatalf("error = %q, want --no-commit validation error", err.Error())
+	if !strings.Contains(err.Error(), "--dry-run cannot be combined with --no-apply") {
+		t.Fatalf("error = %q, want dry-run/no-apply validation error", err.Error())
+	}
+}
+
+func TestRewriteLegacyRootArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		args    []string
+		want    []string
+		wantErr string
+	}{
+		{
+			name: "rewrite edit shorthand",
+			args: []string{"-e", "--no-apply", "--config", "/tmp/timertab.yaml"},
+			want: []string{"edit", "--no-apply", "--config", "/tmp/timertab.yaml"},
+		},
+		{
+			name: "rewrite list shorthand",
+			args: []string{"--list", "--config", "/tmp/timertab.yaml"},
+			want: []string{"list", "--config", "/tmp/timertab.yaml"},
+		},
+		{
+			name: "rewrite print config shorthand",
+			args: []string{"--print-config"},
+			want: []string{"list"},
+		},
+		{
+			name: "rewrite print path shorthand",
+			args: []string{"--print-path"},
+			want: []string{"print-path"},
+		},
+		{
+			name: "leave explicit subcommand unchanged",
+			args: []string{"status", "--json"},
+			want: []string{"status", "--json"},
+		},
+		{
+			name:    "reject mutually exclusive legacy shorthands",
+			args:    []string{"-e", "-l"},
+			wantErr: "mutually exclusive",
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := rewriteLegacyRootArgs(tc.args)
+			if tc.wantErr != "" {
+				if err == nil {
+					t.Fatalf("rewriteLegacyRootArgs() error = nil, want substring %q", tc.wantErr)
+				}
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("rewriteLegacyRootArgs() error = %q, want substring %q", err.Error(), tc.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("rewriteLegacyRootArgs() error = %v", err)
+			}
+			if strings.Join(got, "\x00") != strings.Join(tc.want, "\x00") {
+				t.Fatalf("rewriteLegacyRootArgs() = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 
