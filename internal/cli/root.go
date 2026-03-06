@@ -45,12 +45,12 @@ func NewRootCommand() *cobra.Command {
 			case opts.List:
 				return listConfig(cmd, cfgPath)
 			case opts.Edit:
-				if !opts.NoApply {
+				if !opts.NoApply && !opts.DryRun {
 					if err := ensureSystemdBaseline(); err != nil {
 						return err
 					}
 				}
-				return editConfig(cmd, cfgPath, opts.User, opts.NoApply)
+				return editConfig(cmd, cfgPath, opts.User, opts.NoApply, opts.DryRun)
 			default:
 				return cmd.Help()
 			}
@@ -65,6 +65,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&opts.User, "user", "u", "", "Operate on a specific user")
 	cmd.Flags().StringVar(&opts.Config, "config", "", "Override config path")
 	cmd.Flags().BoolVar(&opts.NoApply, "no-apply", false, "Validate and save edits, but do not reconcile systemd units")
+	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Preview reconcile changes from edited config without writing anything")
 	cmd.Flags().BoolVar(&opts.PrintPath, "print-path", false, "Print resolved config path")
 
 	cmd.Version = fmt.Sprintf("%s (%s, %s)", version.Version, version.Commit, version.Date)
@@ -75,6 +76,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newEjectCommand())
 	cmd.AddCommand(newStatusCommand())
 	cmd.AddCommand(newLogsCommand())
+	cmd.AddCommand(newDiffCommand())
 
 	return cmd
 }

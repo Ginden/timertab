@@ -39,7 +39,7 @@ func TestEditConfigApplyRunsSystemctlPipeline(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	if err := editConfig(cmd, cfgPath, "", false); err != nil {
+	if err := editConfig(cmd, cfgPath, "", false, false); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 	if callCount != 1 {
@@ -77,7 +77,7 @@ func TestEditConfigApplyPrintsChangedOperationsOnly(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	if err := editConfig(cmd, cfgPath, "", false); err != nil {
+	if err := editConfig(cmd, cfgPath, "", false, false); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 
@@ -133,7 +133,7 @@ func TestEditConfigApplyReturnsSystemctlPipelineErrors(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	err := editConfig(cmd, cfgPath, "", false)
+	err := editConfig(cmd, cfgPath, "", false, false)
 	if !errors.Is(err, pipelineErr) {
 		t.Fatalf("editConfig() error = %v, want %v", err, pipelineErr)
 	}
@@ -157,8 +157,75 @@ func TestEditConfigNoApplySkipsSystemctlPipeline(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	if err := editConfig(cmd, cfgPath, "", true); err != nil {
+	if err := editConfig(cmd, cfgPath, "", true, false); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
+	}
+}
+
+func TestEditConfigDryRunPrintsPlanWithoutMutatingConfigOrApplying(t *testing.T) {
+	originalApply := runSystemctlApply
+	originalDryRunPlan := runDryRunPlan
+	t.Cleanup(func() {
+		runSystemctlApply = originalApply
+		runDryRunPlan = originalDryRunPlan
+	})
+
+	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+		return applyReport{}, errors.New("apply should not run for dry-run")
+	}
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	initial := []byte(`version: 1
+jobs:
+  - id: existing
+    when: "@daily"
+    run: "echo old"
+`)
+	if err := os.WriteFile(cfgPath, initial, 0o644); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", cfgPath, err)
+	}
+
+	var dryRunCalls int
+	runDryRunPlan = func(_ context.Context, loaded *config.File, _ string) (applyReport, error) {
+		dryRunCalls++
+		if loaded == nil || len(loaded.Jobs) != 1 || loaded.Jobs[0].ID != "existing" {
+			t.Fatalf("loaded config not passed to dry-run plan: %#v", loaded)
+		}
+		return applyReport{
+			Created:  []string{"/tmp/new.service"},
+			Modified: []string{"/tmp/existing.timer"},
+			Deleted:  []string{"/tmp/old.service"},
+		}, nil
+	}
+
+	t.Setenv("EDITOR", "true")
+
+	stdout := &bytes.Buffer{}
+	cmd := &cobra.Command{}
+	cmd.SetIn(bytes.NewBuffer(nil))
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+
+	if err := editConfig(cmd, cfgPath, "", false, true); err != nil {
+		t.Fatalf("editConfig() error = %v", err)
+	}
+	if dryRunCalls != 1 {
+		t.Fatalf("dry-run plan calls = %d, want 1", dryRunCalls)
+	}
+
+	if out := stdout.String(); !strings.Contains(out, "would create /tmp/new.service\n") ||
+		!strings.Contains(out, "would modify /tmp/existing.timer\n") ||
+		!strings.Contains(out, "would delete /tmp/old.service\n") ||
+		!strings.Contains(out, "summary: create=1 modify=1 delete=1\n") {
+		t.Fatalf("stdout missing dry-run report, got:\n%s", out)
+	}
+
+	after, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", cfgPath, err)
+	}
+	if !bytes.Equal(after, initial) {
+		t.Fatalf("config changed in dry-run mode; got:\n%s\nwant:\n%s", after, initial)
 	}
 }
 
@@ -236,7 +303,7 @@ EOF
 	stderr := &bytes.Buffer{}
 	cmd.SetErr(stderr)
 
-	if err := editConfig(cmd, cfgPath, "", false); err != nil {
+	if err := editConfig(cmd, cfgPath, "", false, false); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 
@@ -331,7 +398,7 @@ exit 1
 	stderr := &bytes.Buffer{}
 	cmd.SetErr(stderr)
 
-	err := editConfig(cmd, cfgPath, "", false)
+	err := editConfig(cmd, cfgPath, "", false, false)
 	if err == nil {
 		t.Fatalf("editConfig() error = nil, want non-nil")
 	}

@@ -108,4 +108,3 @@ func newLogsCommand() *cobra.Command {
 
 	return cmd
 }
-

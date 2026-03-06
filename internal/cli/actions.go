@@ -15,6 +15,7 @@ import (
 )
 
 var runSystemctlApply = applyEditedConfig
+var runDryRunPlan = previewEditedConfig
 
 const warningPrefix = "⚠️"
 const errorPrefix = "🚨"
@@ -42,7 +43,7 @@ func listConfig(cmd *cobra.Command, cfgPath string) error {
 	return nil
 }
 
-func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply bool) error {
+func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply, dryRun bool) error {
 	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
 		return err
 	}
@@ -106,6 +107,15 @@ func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply bool) er
 			return err
 		}
 
+		if dryRun {
+			report, err := runDryRunPlan(cmd.Context(), loaded, targetUser)
+			if err != nil {
+				return err
+			}
+			printDryRunReport(cmd, report)
+			return nil
+		}
+
 		if err := os.WriteFile(cfgPath, out, 0o644); err != nil {
 			return err
 		}
@@ -124,6 +134,20 @@ func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply bool) er
 		printApplyReport(cmd, report)
 		return nil
 	}
+}
+
+func printDryRunReport(cmd *cobra.Command, report applyReport) {
+	for _, path := range report.Created {
+		cmd.Printf("would create %s\n", path)
+	}
+	for _, path := range report.Modified {
+		cmd.Printf("would modify %s\n", path)
+	}
+	for _, path := range report.Deleted {
+		cmd.Printf("would delete %s\n", path)
+	}
+
+	cmd.Printf("summary: create=%d modify=%d delete=%d\n", len(report.Created), len(report.Modified), len(report.Deleted))
 }
 
 func printApplyReport(cmd *cobra.Command, report applyReport) {

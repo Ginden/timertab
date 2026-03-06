@@ -101,6 +101,54 @@ func applyEditedConfig(ctx context.Context, cfg *config.File, targetUser string)
 	return report, nil
 }
 
+func previewEditedConfig(_ context.Context, cfg *config.File, targetUser string) (applyReport, error) {
+	if cfg == nil {
+		return applyReport{}, fmt.Errorf("config is required")
+	}
+
+	targetUID, err := resolveTargetUID(targetUser)
+	if err != nil {
+		return applyReport{}, err
+	}
+
+	unitDir, err := resolveSystemdUserUnitDir(targetUser)
+	if err != nil {
+		return applyReport{}, err
+	}
+
+	desiredState, err := buildDesiredState(targetUID, cfg.Jobs)
+	if err != nil {
+		return applyReport{}, err
+	}
+
+	existing, err := discoverExistingUnits(unitDir, targetUID)
+	if err != nil {
+		return applyReport{}, err
+	}
+
+	plan, err := reconcile.BuildPlan(targetUID, desiredState.units, existing)
+	if err != nil {
+		return applyReport{}, fmt.Errorf("reconcile build plan: %w", err)
+	}
+
+	report := applyReport{
+		Created:  make([]string, 0, len(plan.Create)),
+		Modified: make([]string, 0, len(plan.Update)),
+		Deleted:  make([]string, 0, len(plan.Remove)),
+	}
+	for _, unit := range plan.Create {
+		report.Created = append(report.Created, filepath.Join(unitDir, unit.Name))
+	}
+	for _, unit := range plan.Update {
+		report.Modified = append(report.Modified, filepath.Join(unitDir, unit.Name))
+	}
+	for _, unitName := range plan.Remove {
+		report.Deleted = append(report.Deleted, filepath.Join(unitDir, unitName))
+	}
+
+	return report, nil
+}
+
 func buildDesiredState(targetUID uint32, jobs []config.Job) (applyDesiredState, error) {
 	state := applyDesiredState{
 		units:          make([]reconcile.DesiredUnit, 0, len(jobs)*2),

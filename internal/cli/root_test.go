@@ -2,11 +2,14 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ginden/timertab/internal/config"
 )
 
 func TestRootCommandEditApplyChecksSystemdVersionOnce(t *testing.T) {
@@ -55,6 +58,33 @@ func TestRootCommandEditNoApplySkipsSystemdCheck(t *testing.T) {
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() returned error for --no-apply: %v", err)
+	}
+}
+
+func TestRootCommandEditDryRunSkipsSystemdCheck(t *testing.T) {
+	originalCheck := ensureSystemdBaseline
+	originalDryRunPlan := runDryRunPlan
+	t.Cleanup(func() {
+		ensureSystemdBaseline = originalCheck
+		runDryRunPlan = originalDryRunPlan
+	})
+
+	ensureSystemdBaseline = func() error {
+		return errors.New("systemd check should not run for --dry-run")
+	}
+	runDryRunPlan = func(context.Context, *config.File, string) (applyReport, error) {
+		return applyReport{}, nil
+	}
+
+	t.Setenv("EDITOR", "true")
+
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"--edit", "--dry-run", "--config", filepath.Join(t.TempDir(), "timertab.yaml")})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() returned error for --dry-run: %v", err)
 	}
 }
 
