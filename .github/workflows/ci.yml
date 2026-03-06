@@ -23,7 +23,14 @@ jobs:
 
       - name: Verify gofmt
         run: |
-          unformatted="$(gofmt -l cmd internal)"
+          targets=()
+          [ -d cmd ] && targets+=("cmd")
+          [ -d internal ] && targets+=("internal")
+          if [ "${#targets[@]}" -eq 0 ]; then
+            exit 0
+          fi
+
+          unformatted="$(gofmt -l "${targets[@]}")"
           if [ -n "${unformatted}" ]; then
             echo "Unformatted files:"
             echo "${unformatted}"
@@ -88,4 +95,6 @@ jobs:
         run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.4
 
       - name: Lint GitHub workflows
-        run: $(go env GOPATH)/bin/actionlint
+        run: |
+          actionlint_bin="$(go env GOPATH)/bin/actionlint"
+          "${actionlint_bin}"

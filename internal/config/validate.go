@@ -26,7 +26,6 @@ import (
 var (
 	validID           = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 	validEnv          = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
-	cronToken         = regexp.MustCompile(`^\S+$`)
 	validMemoryMax    = regexp.MustCompile(`^(?i:infinity|[0-9]+(?:[KMGTPE])?)$`)
 	validCPUQuota     = regexp.MustCompile(`^[0-9]+(?:\.[0-9]+)?%$`)
 	compiledSchema    *jsonschema.Schema
@@ -446,23 +445,10 @@ func validateSchedule(v string) error {
 	if value == "" {
 		return fmt.Errorf("when item cannot be empty")
 	}
-	if strings.HasPrefix(value, "@") {
-		if _, ok := allowedShorthand[value]; !ok {
-			return fmt.Errorf("unsupported shorthand %q", value)
-		}
-		return nil
+	_, err := compileScheduleToTimerDirectives(value)
+	if err != nil {
+		return err
 	}
-
-	parts := strings.Fields(value)
-	if len(parts) != 5 {
-		return fmt.Errorf("cron expression must have exactly 5 fields")
-	}
-	for _, part := range parts {
-		if !cronToken.MatchString(part) {
-			return fmt.Errorf("invalid cron token %q", part)
-		}
-	}
-
 	return nil
 }
 
