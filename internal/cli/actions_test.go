@@ -162,6 +162,77 @@ func TestEditConfigNoApplySkipsSystemctlPipeline(t *testing.T) {
 	}
 }
 
+func TestEditConfigNoApplyPreservesCommentsWhenIDsPresent(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	initial := []byte(`# top-level comment
+version: 1
+jobs:
+  # important comment
+  - id: keep-id
+    name: keep
+    when: "@daily"
+    run: "echo old" # inline comment
+`)
+	if err := os.WriteFile(cfgPath, initial, 0o644); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", cfgPath, err)
+	}
+
+	t.Setenv("EDITOR", "true")
+
+	cmd := &cobra.Command{}
+	cmd.SetIn(bytes.NewBuffer(nil))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	if err := editConfig(cmd, cfgPath, "", true, false, true); err != nil {
+		t.Fatalf("editConfig() error = %v, want nil", err)
+	}
+
+	after, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", cfgPath, err)
+	}
+	if !bytes.Equal(after, initial) {
+		t.Fatalf("config comments/format changed unexpectedly; got:\n%s\nwant:\n%s", after, initial)
+	}
+}
+
+func TestEditConfigNoApplyKeepsCommentsWhenGeneratingMissingIDs(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	initial := []byte(`version: 1
+jobs:
+  # keep this comment
+  - name: sample job
+    when: "@daily"
+    run: "echo old"
+`)
+	if err := os.WriteFile(cfgPath, initial, 0o644); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", cfgPath, err)
+	}
+
+	t.Setenv("EDITOR", "true")
+
+	cmd := &cobra.Command{}
+	cmd.SetIn(bytes.NewBuffer(nil))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	if err := editConfig(cmd, cfgPath, "", true, false, true); err != nil {
+		t.Fatalf("editConfig() error = %v, want nil", err)
+	}
+
+	after, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error = %v", cfgPath, err)
+	}
+	if !bytes.Contains(after, []byte("# keep this comment")) {
+		t.Fatalf("config should preserve comments while adding ids, got:\n%s", after)
+	}
+	if !bytes.Contains(after, []byte("id: sample-job")) {
+		t.Fatalf("config should include generated id, got:\n%s", after)
+	}
+}
+
 func TestEditConfigDryRunPrintsPlanWithoutMutatingConfigOrApplying(t *testing.T) {
 	originalApply := runSystemctlApply
 	originalDryRunPlan := runDryRunPlan
@@ -333,7 +404,7 @@ EOF
 	if !bytes.Contains(saved, []byte("id: sample-job")) {
 		t.Fatalf("saved config missing normalized id:\n%s", saved)
 	}
-	if !bytes.Contains(saved, []byte("run: echo new")) {
+	if !bytes.Contains(saved, []byte("run: \"echo new\"")) && !bytes.Contains(saved, []byte("run: echo new")) {
 		t.Fatalf("saved config missing valid edited job:\n%s", saved)
 	}
 }

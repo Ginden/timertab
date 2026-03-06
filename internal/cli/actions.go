@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/ginden/timertab/internal/config"
 )
@@ -94,20 +95,15 @@ func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply, dryRun,
 			return fmt.Errorf("editor failed: %w", err)
 		}
 
-		loaded, err := config.LoadFromFile(tmpName)
-		if err != nil {
-			printEditValidationError(cmd, err)
-			continue
-		}
-
-		if err := loaded.NormalizeIDs(); err != nil {
-			printEditValidationError(cmd, err)
-			continue
-		}
-
-		out, err := loaded.MarshalYAML()
+		editedRaw, err := os.ReadFile(tmpName)
 		if err != nil {
 			return err
+		}
+
+		loaded, out, err := prepareEditedConfigForSave(editedRaw)
+		if err != nil {
+			printEditValidationError(cmd, err)
+			continue
 		}
 
 		configChanged := !bytes.Equal(existing, out)
@@ -144,6 +140,122 @@ func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply, dryRun,
 
 		return nil
 	}
+}
+
+func prepareEditedConfigForSave(raw []byte) (*config.File, []byte, error) {
+	loaded, err := config.LoadFromBytes(raw)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	originalIDs := snapshotJobIDs(loaded.Jobs)
+	if err := loaded.NormalizeIDs(); err != nil {
+		return nil, nil, err
+	}
+
+	if !jobIDsChanged(originalIDs, loaded.Jobs) {
+		// Keep exact user formatting/comments when IDs are already present.
+		return loaded, raw, nil
+	}
+
+	out, err := injectGeneratedIDsIntoYAML(raw, loaded)
+	if err == nil {
+		return loaded, out, nil
+	}
+
+	// Fallback to canonical marshaling if node-based patching fails.
+	out, marshalErr := loaded.MarshalYAML()
+	if marshalErr != nil {
+		return nil, nil, marshalErr
+	}
+
+	return loaded, out, nil
+}
+
+func snapshotJobIDs(jobs []config.Job) []string {
+	ids := make([]string, len(jobs))
+	for idx, job := range jobs {
+		ids[idx] = job.ID
+	}
+	return ids
+}
+
+func jobIDsChanged(before []string, after []config.Job) bool {
+	if len(before) != len(after) {
+		return true
+	}
+	for idx, job := range after {
+		if before[idx] != job.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func injectGeneratedIDsIntoYAML(raw []byte, normalized *config.File) ([]byte, error) {
+	var root yaml.Node
+	if err := yaml.Unmarshal(raw, &root); err != nil {
+		return nil, fmt.Errorf("parse yaml: %w", err)
+	}
+	if root.Kind != yaml.DocumentNode || len(root.Content) != 1 {
+		return nil, fmt.Errorf("invalid yaml document structure")
+	}
+
+	doc := root.Content[0]
+	if doc.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("yaml root must be a mapping")
+	}
+
+	jobsNode := mappingNodeValue(doc, "jobs")
+	if jobsNode == nil {
+		return nil, fmt.Errorf("jobs key not found")
+	}
+	if jobsNode.Kind != yaml.SequenceNode {
+		return nil, fmt.Errorf("jobs must be a sequence")
+	}
+	if len(jobsNode.Content) != len(normalized.Jobs) {
+		return nil, fmt.Errorf("jobs length mismatch")
+	}
+
+	for idx, jobNode := range jobsNode.Content {
+		if jobNode.Kind != yaml.MappingNode {
+			return nil, fmt.Errorf("jobs[%d] must be a mapping", idx)
+		}
+		if mappingNodeValue(jobNode, "id") != nil {
+			continue
+		}
+
+		jobNode.Content = append(jobNode.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "id"},
+			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: normalized.Jobs[idx].ID},
+		)
+	}
+
+	var out bytes.Buffer
+	encoder := yaml.NewEncoder(&out)
+	encoder.SetIndent(2)
+	if err := encoder.Encode(&root); err != nil {
+		_ = encoder.Close()
+		return nil, fmt.Errorf("encode yaml: %w", err)
+	}
+	if err := encoder.Close(); err != nil {
+		return nil, err
+	}
+
+	return out.Bytes(), nil
+}
+
+func mappingNodeValue(node *yaml.Node, key string) *yaml.Node {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return nil
+	}
+	for idx := 0; idx+1 < len(node.Content); idx += 2 {
+		keyNode := node.Content[idx]
+		if keyNode.Kind == yaml.ScalarNode && keyNode.Value == key {
+			return node.Content[idx+1]
+		}
+	}
+	return nil
 }
 
 func parseConfigForAutoCommit(buf []byte) *config.File {
