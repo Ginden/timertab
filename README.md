@@ -1,138 +1,143 @@
 # timertab
 
-`timertab` is `crontab` ergonomics on top of native `systemd --user` timers.
+**Cron jobs done right — one YAML file, real systemd timers under the hood.**
 
-You keep jobs in one YAML file, `timertab` generates normal `.service` and `.timer` units.
+If you've ever wished `crontab -e` gave you systemd timers instead of 1970s cron, this is that tool. You write a simple YAML config, `timertab` turns it into proper `.service` and `.timer` units. No daemon, no lock-in — just plain systemd.
 
-## Why timertab
+## Why not just use crontab?
 
-- Thin wrapper, no lock-in: output is just standard systemd units.
-- Near-zero sunk cost: eject a job and keep running it without `timertab`.
-- Modern scheduling model: no 40-year cron compatibility baggage.
-- Safer reconcile: mutates only timertab-managed units for the target UID.
+Systemd timers are better than cron in almost every way: structured logging through journald, resource controls, dependency ordering, per-user isolation. But managing them by hand means writing two unit files per job and juggling `systemctl enable`, `daemon-reload`, and cleanup yourself.
 
-## Requirements
+`timertab` takes care of all of that. You get the simplicity of crontab with the power of systemd timers.
 
-- Linux with `systemd >= 247`.
-- Go `1.24+` (for building/installing from source).
-- A working user manager (`systemctl --user`).
-- For non-root users: enable lingering if jobs should run while logged out.
+## Why not just write unit files?
 
-```bash
-loginctl enable-linger "$USER"
-```
+You absolutely can — and `timertab` won't stop you. In fact, that's the point: the generated units are standard systemd, human-readable, and work without `timertab` installed. If you ever want to stop using this tool, run `timertab eject <id>` and your timer keeps running on its own.
 
-## Install
+## Features
 
-Install from this repository clone:
+- **One YAML file** — all your scheduled jobs in one place, version-control friendly.
+- **Success and failure hooks** — run a command when a job succeeds or fails (send a notification, dump logs, trigger another script).
+- **Cron syntax you already know** — `@hourly`, `@daily`, or standard 5-field cron expressions.
+- **Multiple schedules per job** — `when` accepts a list, so one job can fire at different times.
+- **Zero lock-in** — eject any job and it keeps running as a standalone systemd timer.
+- **Per-user isolation** — units are scoped to your UID; `timertab` never touches units it didn't create.
+- **JSON Schema** — get autocomplete and validation in editors that support it.
+- **Safe reconcile** — if your config is invalid, nothing gets written or pruned. No partial state.
 
-```bash
-make install
-```
+## Quick start
 
-Equivalent direct Go command:
-
-```bash
-go install ./cmd/timertab
-```
-
-Install from module path:
+### Install
 
 ```bash
 go install github.com/ginden/timertab/cmd/timertab@latest
 ```
 
-If needed, add Go bin directory to `PATH`:
+Or from a local clone:
 
 ```bash
-export PATH="$(go env GOPATH)/bin:$PATH"
+make install
 ```
 
-## Quick start
-
-Open terminal and apply:
+### Create your first job
 
 ```bash
 timertab -e
 ```
 
-Append one job (alias: `+1`) in your editor:
-
-```bash
-timertab add
-```
-
-Stop managing a job, keep its units:
-
-```bash
-timertab eject <id>
-```
-
-Edit config without applying:
-
-```bash
-timertab -e --no-apply
-```
-
-Print config:
-
-```bash
-timertab -l
-```
-
-## Example config
-
-Default config path:
-
-- `${XDG_CONFIG_HOME:-$HOME/.config}/timertab/timertab.yaml`
-
-Example:
+This opens your `$EDITOR` with the config file. Add a job:
 
 ```yaml
 $schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
 version: 1
 jobs:
-  - name: example hourly job
-    when: "@hourly"
-    run: "echo hello from timertab"
+  - name: clean temp files
+    when: "@daily"
+    run: "find /tmp -user $USER -mtime +7 -delete"
 ```
 
-`id` is optional in input and is auto-generated/persisted on save.
+Save and close — `timertab` validates the config, generates the systemd units, and starts the timer. That's it.
 
-## Command summary
+### A more complete example
 
-- `timertab -l` show current config file contents.
-- `timertab -e` edit, validate, persist normalized config, reconcile/apply.
-- `timertab -e --no-apply` edit, validate, persist only.
-- `timertab add` open editor with a single-job config template (`$schema` + `version` + one `jobs` entry), append it, apply.
-- `timertab +1` alias for `add`.
-- `timertab eject <id>` remove one job from config and unmanage its generated units.
-- `timertab --print-path` print resolved config path.
-- `timertab -u <user> ...` operate on specific user (root can target others).
-- `timertab validate --config <path>` validate YAML against schema and semantics.
+```yaml
+$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
+version: 1
+jobs:
+  - name: NPM cache verify
+    when: "@hourly"
+    run: "npm --global cache verify"
+    env:
+      NPM_CONFIG_PREFIX: "/home/user/.npm-global"
+    on_success:
+      command: "echo ok"
+    on_failure:
+      command: 'journalctl -u "$TIMERTAB_UNIT" -n 100 --no-pager'
+
+  - name: backup documents
+    when:
+      - "0 9 * * *"
+      - "0 18 * * *"
+    run: "rsync -a ~/Documents /mnt/backup/"
+    cwd: "/home/user"
+    on_failure:
+      command: 'notify-send "Backup failed"'
+```
+
+## Usage
+
+| Command | What it does |
+|---|---|
+| `timertab -e` | Edit config, validate, and apply (generate and start timers) |
+| `timertab -e --no-apply` | Edit and validate only, don't touch systemd |
+| `timertab -l` / `timertab --print-config` | Print current config |
+| `timertab add` (or `+1`) | Append a single new job through your editor |
+| `timertab eject <id>` | Stop managing a job — its units stay and keep running |
+| `timertab validate --config <path>` | Validate a config file without applying |
+| `timertab --print-path` | Show where the config file lives |
+| `timertab -u <user> ...` | Operate on another user's timers (requires privileges) |
+
+Config file location: `${XDG_CONFIG_HOME:-$HOME/.config}/timertab/timertab.yaml`
+
+## Requirements
+
+- Linux with **systemd ≥ 247**
+- **Go 1.24+** (build-time only)
+- A running user session (`systemctl --user` must work)
+
+If you need timers to fire while you're logged out:
+
+```bash
+loginctl enable-linger "$USER"
+```
+
+## How it works
+
+When you run `timertab -e`, here's what happens:
+
+1. Your editor opens the YAML config.
+2. On save, `timertab` validates the config against the schema and semantic rules.
+3. Missing job `id` fields are auto-generated and persisted back to the file.
+4. For each job, a `.service` and `.timer` unit is rendered.
+5. Stale units (from removed jobs) are stopped, disabled, and deleted.
+6. New/changed units are written, `daemon-reload` is called, and timers are started.
+
+If validation fails at step 2, nothing else happens — no partial writes, no orphaned units.
 
 ## Spec and schema
 
-- [docs/spec-v1.md](docs/spec-v1.md)
-- [schema/v1.json](schema/v1.json)
-- [docs/libraries.md](docs/libraries.md)
+- [v1 Specification](docs/spec-v1.md) — full behavioral spec
+- [JSON Schema](schema/v1.json) — for editor integration and validation
+- [Libraries](docs/libraries.md) — third-party dependencies
 
 ## Development
 
-Build:
-
 ```bash
-make build
+make build    # compile
+make test     # run tests
+make run      # run without building
 ```
 
-Run tests:
+## License
 
-```bash
-make test
-```
-
-Run help without building:
-
-```bash
-make run
-```
+[MIT](LICENSE) © Michał Wadas

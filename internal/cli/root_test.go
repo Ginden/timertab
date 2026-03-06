@@ -3,7 +3,9 @@ package cli
 import (
 	"bytes"
 	"errors"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -89,5 +91,40 @@ func TestRootCommandRejectsUnauthorizedTargetUser(t *testing.T) {
 	}
 	if resolveCalled {
 		t.Fatalf("ResolvePath was called despite target user validation failure")
+	}
+}
+
+func TestRootCommandPrintConfigAliasListsConfig(t *testing.T) {
+	originalResolveConfigPath := resolveConfigPath
+	t.Cleanup(func() {
+		resolveConfigPath = originalResolveConfigPath
+	})
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	content := []byte("$schema: test\nversion: 1\njobs: []\n")
+	if err := os.WriteFile(cfgPath, content, 0o644); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", cfgPath, err)
+	}
+
+	resolveConfigPath = func(string, string) (string, error) {
+		return cfgPath, nil
+	}
+
+	stdout := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"--print-config"})
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "# "+cfgPath+"\n") {
+		t.Fatalf("stdout missing config header, got:\n%s", out)
+	}
+	if !strings.Contains(out, string(content)) {
+		t.Fatalf("stdout missing config body, got:\n%s", out)
 	}
 }

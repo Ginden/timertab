@@ -59,7 +59,8 @@ func NewRootCommand() *cobra.Command {
 
 	cmd.SetErrPrefix("timertab")
 
-	cmd.Flags().BoolVarP(&opts.List, "list", "l", false, "List current timertab jobs")
+	cmd.Flags().BoolVarP(&opts.List, "list", "l", false, "Print current timertab config")
+	cmd.Flags().BoolVar(&opts.List, "print-config", false, "Print current timertab config")
 	cmd.Flags().BoolVarP(&opts.Edit, "edit", "e", false, "Edit timertab config and apply")
 	cmd.Flags().StringVarP(&opts.User, "user", "u", "", "Operate on a specific user")
 	cmd.Flags().StringVar(&opts.Config, "config", "", "Override config path")

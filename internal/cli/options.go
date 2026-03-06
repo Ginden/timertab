@@ -15,7 +15,7 @@ type Options struct {
 
 func (o *Options) Validate() error {
 	if o.List && o.Edit {
-		return errors.New("flags -l and -e are mutually exclusive")
+		return errors.New("flags -l/--print-config and -e are mutually exclusive")
 	}
 
 	if o.NoApply && !o.Edit {
@@ -23,7 +23,7 @@ func (o *Options) Validate() error {
 	}
 
 	if o.PrintPath && (o.List || o.Edit) {
-		return errors.New("--print-path cannot be combined with -l or -e")
+		return errors.New("--print-path cannot be combined with -l/--print-config or -e")
 	}
 
 	return nil
