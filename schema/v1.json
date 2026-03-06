@@ -38,7 +38,7 @@
     "schedule": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^(?:@(?:hourly|daily|weekly|monthly|yearly|annually)|\\S+\\s+\\S+\\s+\\S+\\s+\\S+\\s+\\S+)$"
+      "pattern": "^(?:@(?:hourly|daily|weekly|monthly|yearly|annually|reboot)|\\S+\\s+\\S+\\s+\\S+\\s+\\S+\\s+\\S+)$"
     },
     "hook": {
       "type": "object",

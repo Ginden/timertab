@@ -115,33 +115,45 @@ func CompileTimerDirectives(when ScheduleList) ([]string, error) {
 
 	out := make([]string, 0, len(when))
 	for idx, schedule := range when {
-		calendars, err := compileScheduleToOnCalendar(schedule)
+		directives, err := compileScheduleToTimerDirectives(schedule)
 		if err != nil {
 			return nil, fmt.Errorf("when[%d] %q: %w", idx, schedule, err)
 		}
-		for _, calendar := range calendars {
-			out = append(out, "OnCalendar="+calendar)
-		}
+		out = append(out, directives...)
 	}
 
 	return out, nil
 }
 
-func compileScheduleToOnCalendar(value string) ([]string, error) {
+func compileScheduleToTimerDirectives(value string) ([]string, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return nil, fmt.Errorf("when item cannot be empty")
 	}
 
 	if strings.HasPrefix(trimmed, "@") {
+		if trimmed == "@reboot" {
+			return []string{"OnBootSec=0"}, nil
+		}
+
 		calendar, ok := shorthandOnCalendar[trimmed]
 		if !ok {
 			return nil, fmt.Errorf("unsupported shorthand %q", trimmed)
 		}
-		return []string{calendar}, nil
+		return []string{"OnCalendar=" + calendar}, nil
 	}
 
-	return compileCronExpression(trimmed)
+	calendars, err := compileCronExpression(trimmed)
+	if err != nil {
+		return nil, err
+	}
+
+	directives := make([]string, 0, len(calendars))
+	for _, calendar := range calendars {
+		directives = append(directives, "OnCalendar="+calendar)
+	}
+
+	return directives, nil
 }
 
 func compileCronExpression(value string) ([]string, error) {

@@ -76,7 +76,6 @@ Supported values:
 
 Unsupported in v1:
 
-- `@reboot`
 - cron seconds/year extensions
 - `CRON_TZ`
 

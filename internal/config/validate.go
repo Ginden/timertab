@@ -38,6 +38,7 @@ var allowedShorthand = map[string]struct{}{
 	"@monthly":  {},
 	"@yearly":   {},
 	"@annually": {},
+	"@reboot":   {},
 }
 
 type SchemaViolation struct {

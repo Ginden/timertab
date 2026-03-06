@@ -111,11 +111,31 @@ func TestRenderJobUnitsErrors(t *testing.T) {
 
 	_, err = RenderJobUnits(1000, config.Job{
 		ID:   "ok-id",
-		When: config.ScheduleList{"@reboot"},
+		When: config.ScheduleList{"@every-second"},
 		Run:  "echo hi",
 	})
 	if err == nil {
-		t.Fatalf("RenderJobUnits() error = nil for invalid schedule")
+		t.Fatalf("RenderJobUnits() error = nil for unsupported shorthand")
+	}
+}
+
+func TestRenderJobUnitsUsesOnBootSecForRebootSchedule(t *testing.T) {
+	t.Parallel()
+
+	units, err := RenderJobUnits(1000, config.Job{
+		ID:   "reboot-job",
+		When: config.ScheduleList{"@reboot"},
+		Run:  "echo hi",
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if !strings.Contains(units.TimerContent, "OnBootSec=0\n") {
+		t.Fatalf("TimerContent missing OnBootSec=0:\n%s", units.TimerContent)
+	}
+	if strings.Contains(units.TimerContent, "OnCalendar=@reboot") {
+		t.Fatalf("TimerContent should not use OnCalendar for @reboot:\n%s", units.TimerContent)
 	}
 }
 

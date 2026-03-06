@@ -4,3 +4,4 @@ OnCalendar=Mon *-*-* 00:00:00
 OnCalendar=*-*-01 00:00:00
 OnCalendar=*-01-01 00:00:00
 OnCalendar=*-01-01 00:00:00
+OnBootSec=0

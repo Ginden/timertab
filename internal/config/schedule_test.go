@@ -24,6 +24,7 @@ func TestCompileTimerDirectivesGolden(t *testing.T) {
 				"@monthly",
 				"@yearly",
 				"@annually",
+				"@reboot",
 			},
 			golden: "all-shorthands.golden",
 		},
@@ -75,8 +76,8 @@ func TestCompileTimerDirectivesErrors(t *testing.T) {
 	}{
 		{
 			name:    "unsupported shorthand",
-			when:    ScheduleList{"@reboot"},
-			wantErr: `unsupported shorthand "@reboot"`,
+			when:    ScheduleList{"@foobar"},
+			wantErr: `unsupported shorthand "@foobar"`,
 		},
 		{
 			name:    "invalid field count",
@@ -100,8 +101,8 @@ func TestCompileTimerDirectivesErrors(t *testing.T) {
 		},
 		{
 			name:    "no partial output on failure",
-			when:    ScheduleList{"@daily", "@reboot"},
-			wantErr: `unsupported shorthand "@reboot"`,
+			when:    ScheduleList{"@daily", "@foobar"},
+			wantErr: `unsupported shorthand "@foobar"`,
 		},
 	}
 
