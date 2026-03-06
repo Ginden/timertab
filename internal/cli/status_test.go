@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -157,5 +158,88 @@ func TestStatusCommandReturnsErrorForSystemctlFailure(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "transport endpoint down") {
 		t.Fatalf("error = %q, want systemctl stderr details", err.Error())
+	}
+}
+
+func TestStatusCommandJSONOutput(t *testing.T) {
+	originalValidateTargetUserPermission := validateTargetUserPermission
+	originalResolveConfigPath := resolveConfigPath
+	originalResolveTargetUID := resolveTargetUID
+	originalRunSystemctlShow := runSystemctlShow
+	t.Cleanup(func() {
+		validateTargetUserPermission = originalValidateTargetUserPermission
+		resolveConfigPath = originalResolveConfigPath
+		resolveTargetUID = originalResolveTargetUID
+		runSystemctlShow = originalRunSystemctlShow
+	})
+
+	validateTargetUserPermission = func(string) error { return nil }
+	resolveTargetUID = func(string) (uint32, error) { return 1000, nil }
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	cfg := &config.File{
+		Version: 1,
+		Jobs: []config.Job{{
+			ID:   "alpha",
+			When: config.ScheduleList{"@hourly"},
+			Run:  "echo alpha",
+		}},
+	}
+	if err := saveConfig(cfgPath, cfg); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	resolveConfigPath = func(_, override string) (string, error) {
+		if override != cfgPath {
+			t.Fatalf("override = %q, want %q", override, cfgPath)
+		}
+		return cfgPath, nil
+	}
+
+	rendered, err := systemd.RenderJobUnits(1000, cfg.Jobs[0])
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
+		unit := args[2]
+		switch unit {
+		case rendered.TimerName:
+			return "LastTriggerUSec=Fri 2026-03-06 10:00:00 CET\nNextElapseUSecRealtime=Fri 2026-03-06 11:00:00 CET\n", "", nil
+		case rendered.ServiceName:
+			return "Result=success\n", "", nil
+		default:
+			return "", "", fmt.Errorf("unexpected unit %q", unit)
+		}
+	}
+
+	stdout := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"status", "--json", "--config", cfgPath})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	var payload statusJSONPayload
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("json.Unmarshal(stdout) error = %v\nstdout:\n%s", err, stdout.String())
+	}
+	if len(payload.Jobs) != 1 {
+		t.Fatalf("jobs count = %d, want 1", len(payload.Jobs))
+	}
+	if payload.Jobs[0].ID != "alpha" {
+		t.Fatalf("job id = %q, want %q", payload.Jobs[0].ID, "alpha")
+	}
+	if payload.Jobs[0].LastRun != "Fri 2026-03-06 10:00:00 CET" {
+		t.Fatalf("last_run = %q", payload.Jobs[0].LastRun)
+	}
+	if payload.Jobs[0].NextTrigger != "Fri 2026-03-06 11:00:00 CET" {
+		t.Fatalf("next_trigger = %q", payload.Jobs[0].NextTrigger)
+	}
+	if payload.Jobs[0].Result != "pass" {
+		t.Fatalf("result = %q, want %q", payload.Jobs[0].Result, "pass")
 	}
 }

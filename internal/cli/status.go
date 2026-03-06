@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -16,10 +17,14 @@ import (
 )
 
 type statusRow struct {
-	ID          string
-	LastRun     string
-	NextTrigger string
-	Result      string
+	ID          string `json:"id"`
+	LastRun     string `json:"last_run"`
+	NextTrigger string `json:"next_trigger"`
+	Result      string `json:"result"`
+}
+
+type statusJSONPayload struct {
+	Jobs []statusRow `json:"jobs"`
 }
 
 var runSystemctlShow = func(ctx context.Context, args ...string) (string, string, error) {
@@ -36,6 +41,7 @@ func newStatusCommand() *cobra.Command {
 	var (
 		targetUser   string
 		overridePath string
+		outputJSON   bool
 	)
 
 	cmd := &cobra.Command{
@@ -74,6 +80,10 @@ func newStatusCommand() *cobra.Command {
 				return err
 			}
 
+			if outputJSON {
+				return printStatusJSON(cmd, rows)
+			}
+
 			printStatusTable(cmd, rows)
 			return nil
 		},
@@ -81,6 +91,7 @@ func newStatusCommand() *cobra.Command {
 
 	cmd.Flags().StringVarP(&targetUser, "user", "u", "", "Operate on a specific user")
 	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
+	cmd.Flags().BoolVar(&outputJSON, "json", false, "Print machine-readable JSON output")
 
 	return cmd
 }
@@ -121,6 +132,12 @@ func printStatusTable(cmd *cobra.Command, rows []statusRow) {
 		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", row.ID, row.LastRun, row.NextTrigger, row.Result)
 	}
 	_ = tw.Flush()
+}
+
+func printStatusJSON(cmd *cobra.Command, rows []statusRow) error {
+	encoder := json.NewEncoder(cmd.OutOrStdout())
+	encoder.SetEscapeHTML(false)
+	return encoder.Encode(statusJSONPayload{Jobs: rows})
 }
 
 func showUnitProperties(ctx context.Context, unit string, properties ...string) (map[string]string, bool, error) {

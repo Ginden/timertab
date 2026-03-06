@@ -91,9 +91,13 @@ jobs:
 | `timertab -e` | Edit config, validate, and apply (generate and start timers) |
 | `timertab -e --no-apply` | Edit and validate only, don't touch systemd |
 | `timertab -l` / `timertab --print-config` | Print current config |
+| `timertab status` / `timertab status --json` | Show last run, next trigger, and result for each job |
 | `timertab add` (or `+1`) | Append a single new job through your editor |
 | `timertab eject <id>` | Stop managing a job — its units stay and keep running |
 | `timertab enable <id>` / `timertab disable <id>` | Toggle one job on/off without removing it |
+| `timertab logs <id>` | Tail/query journald logs for one job |
+| `timertab diff` | Preview create/modify/delete reconcile operations |
+| `timertab import` | Convert crontab entries into timertab YAML |
 | `timertab validate --config <path>` | Validate a config file without applying |
 | `timertab --print-path` | Show where the config file lives |
 | `timertab -u <user> ...` | Operate on another user's timers (requires privileges) |
