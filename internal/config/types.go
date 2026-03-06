@@ -16,8 +16,15 @@ type Job struct {
 	Enabled    *bool             `yaml:"enabled,omitempty"`
 	Persistent *bool             `yaml:"persistent,omitempty"`
 	Jitter     string            `yaml:"jitter,omitempty"`
+	Limits     *Limits           `yaml:"limits,omitempty"`
 	OnSuccess  *Hook             `yaml:"on_success,omitempty"`
 	OnFailure  *Hook             `yaml:"on_failure,omitempty"`
+}
+
+type Limits struct {
+	MemoryMax string `yaml:"MemoryMax,omitempty"`
+	CPUQuota  string `yaml:"CPUQuota,omitempty"`
+	IOWeight  *int   `yaml:"IOWeight,omitempty"`
 }
 
 type Hook struct {

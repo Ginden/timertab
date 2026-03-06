@@ -27,6 +27,8 @@ var (
 	validID           = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 	validEnv          = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	cronToken         = regexp.MustCompile(`^\S+$`)
+	validMemoryMax    = regexp.MustCompile(`^(?i:infinity|[0-9]+(?:[KMGTPE])?)$`)
+	validCPUQuota     = regexp.MustCompile(`^[0-9]+(?:\.[0-9]+)?%$`)
 	compiledSchema    *jsonschema.Schema
 	compiledSchemaMu  sync.Once
 	compiledSchemaErr error
@@ -353,6 +355,9 @@ func validateJob(job Job) error {
 	if err := validateJitter(job.Jitter); err != nil {
 		return fmt.Errorf("jitter: %w", err)
 	}
+	if err := validateLimits(job.Limits); err != nil {
+		return fmt.Errorf("limits: %w", err)
+	}
 	if job.OnSuccess != nil {
 		if err := validateHook(*job.OnSuccess); err != nil {
 			return fmt.Errorf("on_success: %w", err)
@@ -378,6 +383,40 @@ func validateJitter(value string) error {
 	}
 	if duration <= 0 {
 		return fmt.Errorf("must be greater than 0")
+	}
+
+	return nil
+}
+
+func validateLimits(limits *Limits) error {
+	if limits == nil {
+		return nil
+	}
+
+	if trimmed := strings.TrimSpace(limits.MemoryMax); trimmed != "" {
+		if !validMemoryMax.MatchString(trimmed) {
+			return fmt.Errorf("MemoryMax must be an integer with optional unit (K/M/G/T/P/E) or \"infinity\"")
+		}
+	}
+
+	if trimmed := strings.TrimSpace(limits.CPUQuota); trimmed != "" {
+		if !validCPUQuota.MatchString(trimmed) {
+			return fmt.Errorf("CPUQuota must be a percentage such as \"50%%\"")
+		}
+
+		quota, err := strconv.ParseFloat(strings.TrimSuffix(trimmed, "%"), 64)
+		if err != nil {
+			return fmt.Errorf("CPUQuota must be a percentage such as \"50%%\": %w", err)
+		}
+		if quota <= 0 {
+			return fmt.Errorf("CPUQuota must be greater than 0%%")
+		}
+	}
+
+	if limits.IOWeight != nil {
+		if *limits.IOWeight < 1 || *limits.IOWeight > 10000 {
+			return fmt.Errorf("IOWeight must be between 1 and 10000")
+		}
 	}
 
 	return nil

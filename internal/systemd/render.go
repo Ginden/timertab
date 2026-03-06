@@ -99,6 +99,7 @@ func renderServiceContent(targetUID uint32, job config.Job, serviceName string) 
 	}
 
 	appendEnvironmentLines(&b, job.Env)
+	appendServiceLimits(&b, job.Limits)
 
 	b.WriteString("ExecStart=/bin/sh -lc ")
 	b.WriteString(systemdQuoted(job.Run))
@@ -160,6 +161,28 @@ func appendEnvironmentLines(b *strings.Builder, env map[string]string) {
 	for _, key := range keys {
 		b.WriteString("Environment=")
 		b.WriteString(systemdQuoted(key + "=" + env[key]))
+		b.WriteString("\n")
+	}
+}
+
+func appendServiceLimits(b *strings.Builder, limits *config.Limits) {
+	if limits == nil {
+		return
+	}
+
+	if trimmed := strings.TrimSpace(limits.MemoryMax); trimmed != "" {
+		b.WriteString("MemoryMax=")
+		b.WriteString(trimmed)
+		b.WriteString("\n")
+	}
+	if trimmed := strings.TrimSpace(limits.CPUQuota); trimmed != "" {
+		b.WriteString("CPUQuota=")
+		b.WriteString(trimmed)
+		b.WriteString("\n")
+	}
+	if limits.IOWeight != nil {
+		b.WriteString("IOWeight=")
+		b.WriteString(fmt.Sprintf("%d", *limits.IOWeight))
 		b.WriteString("\n")
 	}
 }

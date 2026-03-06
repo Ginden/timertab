@@ -193,6 +193,35 @@ func TestRenderJobUnitsIncludesRandomizedDelaySecWhenJitterIsSet(t *testing.T) {
 	}
 }
 
+func TestRenderJobUnitsIncludesServiceLimits(t *testing.T) {
+	t.Parallel()
+
+	ioWeight := 500
+	units, err := RenderJobUnits(1000, config.Job{
+		ID:   "limited-job",
+		When: config.ScheduleList{"@daily"},
+		Run:  "echo hi",
+		Limits: &config.Limits{
+			MemoryMax: "512M",
+			CPUQuota:  "60%",
+			IOWeight:  &ioWeight,
+		},
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if !strings.Contains(units.ServiceContent, "MemoryMax=512M\n") {
+		t.Fatalf("ServiceContent missing MemoryMax=512M:\n%s", units.ServiceContent)
+	}
+	if !strings.Contains(units.ServiceContent, "CPUQuota=60%\n") {
+		t.Fatalf("ServiceContent missing CPUQuota=60%%:\n%s", units.ServiceContent)
+	}
+	if !strings.Contains(units.ServiceContent, "IOWeight=500\n") {
+		t.Fatalf("ServiceContent missing IOWeight=500:\n%s", units.ServiceContent)
+	}
+}
+
 func TestIsManagedUnitContentForUID(t *testing.T) {
 	t.Parallel()
 

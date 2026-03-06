@@ -187,6 +187,97 @@ func TestLoadFromBytesRejectsInvalidJitter(t *testing.T) {
 	}
 }
 
+func TestLoadFromBytesSchemaValidLimits(t *testing.T) {
+	input := strings.Join([]string{
+		"version: 1",
+		"jobs:",
+		"  - id: bounded",
+		"    when: '@daily'",
+		"    run: 'echo run'",
+		"    limits:",
+		"      MemoryMax: '1G'",
+		"      CPUQuota: '75%'",
+		"      IOWeight: 600",
+	}, "\n")
+
+	loaded, err := LoadFromBytes([]byte(input))
+	if err != nil {
+		t.Fatalf("LoadFromBytes() error = %v", err)
+	}
+	if len(loaded.Jobs) != 1 || loaded.Jobs[0].Limits == nil {
+		t.Fatalf("expected one job with limits, got %#v", loaded.Jobs)
+	}
+	if loaded.Jobs[0].Limits.MemoryMax != "1G" {
+		t.Fatalf("MemoryMax = %q, want %q", loaded.Jobs[0].Limits.MemoryMax, "1G")
+	}
+	if loaded.Jobs[0].Limits.CPUQuota != "75%" {
+		t.Fatalf("CPUQuota = %q, want %q", loaded.Jobs[0].Limits.CPUQuota, "75%")
+	}
+	if loaded.Jobs[0].Limits.IOWeight == nil || *loaded.Jobs[0].Limits.IOWeight != 600 {
+		t.Fatalf("IOWeight = %#v, want 600", loaded.Jobs[0].Limits.IOWeight)
+	}
+}
+
+func TestLoadFromBytesRejectsInvalidLimits(t *testing.T) {
+	tests := []struct {
+		name    string
+		yaml    string
+		wantErr string
+	}{
+		{
+			name: "invalid MemoryMax",
+			yaml: strings.Join([]string{
+				"version: 1",
+				"jobs:",
+				"  - id: x",
+				"    when: '@daily'",
+				"    run: 'echo run'",
+				"    limits:",
+				"      MemoryMax: 'xx'",
+			}, "\n"),
+			wantErr: "MemoryMax",
+		},
+		{
+			name: "invalid CPUQuota",
+			yaml: strings.Join([]string{
+				"version: 1",
+				"jobs:",
+				"  - id: x",
+				"    when: '@daily'",
+				"    run: 'echo run'",
+				"    limits:",
+				"      CPUQuota: 'foo'",
+			}, "\n"),
+			wantErr: "CPUQuota",
+		},
+		{
+			name: "invalid IOWeight",
+			yaml: strings.Join([]string{
+				"version: 1",
+				"jobs:",
+				"  - id: x",
+				"    when: '@daily'",
+				"    run: 'echo run'",
+				"    limits:",
+				"      IOWeight: 0",
+			}, "\n"),
+			wantErr: "IOWeight",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := LoadFromBytes([]byte(tt.yaml))
+			if err == nil {
+				t.Fatalf("LoadFromBytes() error = nil, want non-nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
 func requireSchemaValidationError(t *testing.T, err error) *SchemaValidationError {
 	t.Helper()
 	if err == nil {
