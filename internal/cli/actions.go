@@ -133,6 +133,24 @@ func printApplyReport(cmd *cobra.Command, report applyReport) {
 	for _, path := range report.Deleted {
 		cmd.Printf("deleted %s\n", path)
 	}
+	for _, unit := range report.DisabledTimers {
+		cmd.Printf("disabled %s\n", unit)
+	}
+	for _, unit := range report.StoppedTimers {
+		cmd.Printf("stopped %s\n", unit)
+	}
+	if report.ReloadedDaemon {
+		cmd.Println("reloaded systemd --user daemon")
+	}
+	for _, unit := range report.EnabledTimers {
+		cmd.Printf("enabled %s\n", unit)
+	}
+	for _, unit := range report.StartedTimers {
+		cmd.Printf("started %s\n", unit)
+	}
+	for _, warning := range report.Warnings {
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), warning)
+	}
 }
 
 func printEditValidationError(cmd *cobra.Command, err error) {

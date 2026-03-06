@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"os"
+	"os/user"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -66,6 +67,11 @@ func TestApplyEditedConfigReconcilesUnitsAndRunsSystemctl(t *testing.T) {
 			filepath.Join(unitDir, staleService),
 			filepath.Join(unitDir, staleTimer),
 		},
+		ReloadedDaemon: true,
+		DisabledTimers: nil,
+		StoppedTimers:  nil,
+		EnabledTimers:  []string{rendered.TimerName},
+		StartedTimers:  []string{rendered.TimerName},
 	}
 	if !reflect.DeepEqual(report, wantReport) {
 		t.Fatalf("apply report = %#v, want %#v", report, wantReport)
@@ -124,8 +130,18 @@ func TestApplyEditedConfigDisablesExistingTimersForDisabledJobs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("applyEditedConfig() error = %v", err)
 	}
-	if len(report.Created) != 0 || len(report.Modified) != 0 || len(report.Deleted) != 0 {
-		t.Fatalf("apply report = %#v, want no file operations", report)
+	wantReport := applyReport{
+		Created:        []string{},
+		Modified:       []string{},
+		Deleted:        []string{},
+		ReloadedDaemon: false,
+		DisabledTimers: []string{rendered.TimerName},
+		StoppedTimers:  []string{rendered.TimerName},
+		EnabledTimers:  nil,
+		StartedTimers:  nil,
+	}
+	if !reflect.DeepEqual(report, wantReport) {
+		t.Fatalf("apply report = %#v, want %#v", report, wantReport)
 	}
 
 	wantCalls := []string{
@@ -174,15 +190,65 @@ func stubApplyDeps(t *testing.T, targetUID uint32, unitDir string, executor syst
 	originalResolveTargetUID := resolveTargetUID
 	originalResolveSystemdUserUnitDir := resolveSystemdUserUnitDir
 	originalNewSystemctlExecutor := newSystemctlExecutor
+	originalLookupUserByName := lookupUserByName
+	originalLookupUserByUID := lookupUserByUID
+	originalStatPath := statPath
 
 	resolveTargetUID = func(string) (uint32, error) { return targetUID, nil }
 	resolveSystemdUserUnitDir = func(string) (string, error) { return unitDir, nil }
 	newSystemctlExecutor = func() systemctl.Executor { return executor }
+	lookupUserByName = func(name string) (*user.User, error) {
+		return &user.User{Username: name, Uid: strconv.FormatUint(uint64(targetUID), 10)}, nil
+	}
+	lookupUserByUID = func(uid string) (*user.User, error) {
+		return &user.User{Username: "test-user", Uid: uid}, nil
+	}
+	statPath = func(string) (os.FileInfo, error) {
+		return os.Stat(unitDir)
+	}
 
 	return func() {
 		resolveTargetUID = originalResolveTargetUID
 		resolveSystemdUserUnitDir = originalResolveSystemdUserUnitDir
 		newSystemctlExecutor = originalNewSystemctlExecutor
+		lookupUserByName = originalLookupUserByName
+		lookupUserByUID = originalLookupUserByUID
+		statPath = originalStatPath
+	}
+}
+
+func TestLingeringWarningForTargetSkipsRoot(t *testing.T) {
+	if warning := lingeringWarningForTarget(0, ""); warning != "" {
+		t.Fatalf("lingeringWarningForTarget() = %q, want empty warning for root", warning)
+	}
+}
+
+func TestLingeringWarningForTargetWarnsWhenLingerFileMissing(t *testing.T) {
+	originalLookupUserByName := lookupUserByName
+	originalLookupUserByUID := lookupUserByUID
+	originalStatPath := statPath
+	t.Cleanup(func() {
+		lookupUserByName = originalLookupUserByName
+		lookupUserByUID = originalLookupUserByUID
+		statPath = originalStatPath
+	})
+
+	lookupUserByName = func(name string) (*user.User, error) {
+		return &user.User{Username: name, Uid: "1000"}, nil
+	}
+	lookupUserByUID = func(uid string) (*user.User, error) {
+		return &user.User{Username: "test-user", Uid: uid}, nil
+	}
+	statPath = func(string) (os.FileInfo, error) {
+		return nil, os.ErrNotExist
+	}
+
+	warning := lingeringWarningForTarget(1000, "alice")
+	if !strings.Contains(warning, `warning: lingering is not enabled for user "alice"`) {
+		t.Fatalf("warning = %q, want lingering warning for alice", warning)
+	}
+	if !strings.Contains(warning, "loginctl enable-linger alice") {
+		t.Fatalf("warning = %q, want enable-linger hint", warning)
 	}
 }
 

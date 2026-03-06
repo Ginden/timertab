@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/ginden/timertab/internal/config"
@@ -20,6 +22,9 @@ var (
 	resolveSystemdUserUnitDir = config.ResolveSystemdUserUnitDir
 	renderJobUnits            = systemd.RenderJobUnits
 	newSystemctlExecutor      = func() systemctl.Executor { return systemctl.NewCommandExecutor() }
+	lookupUserByName          = user.Lookup
+	lookupUserByUID           = user.LookupId
+	statPath                  = os.Stat
 )
 
 type applyDesiredState struct {
@@ -29,9 +34,15 @@ type applyDesiredState struct {
 }
 
 type applyReport struct {
-	Created  []string
-	Modified []string
-	Deleted  []string
+	Created        []string
+	Modified       []string
+	Deleted        []string
+	ReloadedDaemon bool
+	DisabledTimers []string
+	StoppedTimers  []string
+	EnabledTimers  []string
+	StartedTimers  []string
+	Warnings       []string
 }
 
 func applyEditedConfig(ctx context.Context, cfg *config.File, targetUser string) (applyReport, error) {
@@ -79,9 +90,12 @@ func applyEditedConfig(ctx context.Context, cfg *config.File, targetUser string)
 		return applyReport{}, err
 	}
 
-	report, err := buildApplyReport(unitDir, plan)
+	report, err := buildApplyReport(unitDir, plan, systemctlPlan)
 	if err != nil {
 		return applyReport{}, err
+	}
+	if warning := lingeringWarningForTarget(targetUID, targetUser); warning != "" {
+		report.Warnings = append(report.Warnings, warning)
 	}
 
 	return report, nil
@@ -292,11 +306,16 @@ func sortedUniqueStrings(values []string) []string {
 	return unique
 }
 
-func buildApplyReport(unitDir string, plan reconcile.Plan) (applyReport, error) {
+func buildApplyReport(unitDir string, plan reconcile.Plan, systemctlPlan systemctl.Plan) (applyReport, error) {
 	report := applyReport{
-		Created:  make([]string, 0, len(plan.Create)),
-		Modified: make([]string, 0, len(plan.Update)),
-		Deleted:  make([]string, 0, len(plan.Remove)),
+		Created:        make([]string, 0, len(plan.Create)),
+		Modified:       make([]string, 0, len(plan.Update)),
+		Deleted:        make([]string, 0, len(plan.Remove)),
+		DisabledTimers: append([]string(nil), systemctlPlan.TimersToDisable...),
+		StoppedTimers:  append([]string(nil), systemctlPlan.TimersToDisable...),
+		EnabledTimers:  append([]string(nil), systemctlPlan.TimersToEnable...),
+		StartedTimers:  append([]string(nil), systemctlPlan.TimersToEnable...),
+		ReloadedDaemon: len(systemctlPlan.TimersToEnable) > 0,
 	}
 
 	for _, unit := range plan.Create {
@@ -324,4 +343,45 @@ func buildApplyReport(unitDir string, plan reconcile.Plan) (applyReport, error) 
 	}
 
 	return report, nil
+}
+
+func lingeringWarningForTarget(targetUID uint32, targetUser string) string {
+	if targetUID == 0 {
+		return ""
+	}
+
+	username, err := resolveTargetUsername(targetUID, targetUser)
+	if err != nil || strings.TrimSpace(username) == "" {
+		return ""
+	}
+
+	lingerPath := filepath.Join("/var/lib/systemd/linger", username)
+	if _, err := statPath(lingerPath); err == nil {
+		return ""
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return ""
+	}
+
+	return fmt.Sprintf(
+		"warning: lingering is not enabled for user %q; timers may not run without an active login session (enable with: loginctl enable-linger %s)",
+		username,
+		username,
+	)
+}
+
+func resolveTargetUsername(targetUID uint32, targetUser string) (string, error) {
+	normalizedTargetUser := strings.TrimSpace(targetUser)
+	if normalizedTargetUser != "" {
+		u, err := lookupUserByName(normalizedTargetUser)
+		if err != nil {
+			return "", err
+		}
+		return u.Username, nil
+	}
+
+	u, err := lookupUserByUID(strconv.FormatUint(uint64(targetUID), 10))
+	if err != nil {
+		return "", err
+	}
+	return u.Username, nil
 }

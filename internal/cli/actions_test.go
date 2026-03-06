@@ -55,19 +55,26 @@ func TestEditConfigApplyPrintsChangedOperationsOnly(t *testing.T) {
 
 	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
 		return applyReport{
-			Created:  []string{"/units/a.service"},
-			Modified: []string{"/units/b.service"},
-			Deleted:  []string{"/units/c.timer"},
+			Created:        []string{"/units/a.service"},
+			Modified:       []string{"/units/b.service"},
+			Deleted:        []string{"/units/c.timer"},
+			ReloadedDaemon: true,
+			DisabledTimers: []string{"old.timer"},
+			StoppedTimers:  []string{"old.timer"},
+			EnabledTimers:  []string{"new.timer"},
+			StartedTimers:  []string{"new.timer"},
+			Warnings:       []string{"warning: lingering is not enabled"},
 		}, nil
 	}
 
 	t.Setenv("EDITOR", "true")
 
 	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
 	cmd := &cobra.Command{}
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(stdout)
-	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetErr(stderr)
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
 	if err := editConfig(cmd, cfgPath, "", false); err != nil {
@@ -84,8 +91,26 @@ func TestEditConfigApplyPrintsChangedOperationsOnly(t *testing.T) {
 	if !strings.Contains(output, "deleted /units/c.timer\n") {
 		t.Fatalf("stdout missing deleted entry, got:\n%s", output)
 	}
+	if !strings.Contains(output, "disabled old.timer\n") {
+		t.Fatalf("stdout missing disabled entry, got:\n%s", output)
+	}
+	if !strings.Contains(output, "stopped old.timer\n") {
+		t.Fatalf("stdout missing stopped entry, got:\n%s", output)
+	}
+	if !strings.Contains(output, "reloaded systemd --user daemon\n") {
+		t.Fatalf("stdout missing daemon-reload entry, got:\n%s", output)
+	}
+	if !strings.Contains(output, "enabled new.timer\n") {
+		t.Fatalf("stdout missing enabled entry, got:\n%s", output)
+	}
+	if !strings.Contains(output, "started new.timer\n") {
+		t.Fatalf("stdout missing started entry, got:\n%s", output)
+	}
 	if strings.Contains(output, "applied systemd reconcile") {
 		t.Fatalf("stdout should not include generic apply line, got:\n%s", output)
+	}
+	if !strings.Contains(stderr.String(), "warning: lingering is not enabled\n") {
+		t.Fatalf("stderr missing warning line, got:\n%s", stderr.String())
 	}
 }
 
