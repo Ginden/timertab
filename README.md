@@ -93,21 +93,6 @@ jobs:
 
 `id` is optional in input and is auto-generated/persisted on save.
 
-## Apply output
-
-Successful apply prints only concrete changes:
-
-- `created <path>`
-- `modified <path>`
-- `deleted <path>`
-- `disabled <timer>`
-- `stopped <timer>`
-- `reloaded systemd --user daemon`
-- `enabled <timer>`
-- `started <timer>`
-
-If lingering is not enabled for a non-root target user, a warning is printed to stderr.
-
 ## Command summary
 
 - `timertab -l` show current config file contents.
