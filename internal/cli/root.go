@@ -77,6 +77,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newStatusCommand())
 	cmd.AddCommand(newLogsCommand())
 	cmd.AddCommand(newDiffCommand())
+	cmd.AddCommand(newImportCommand())
 
 	return cmd
 }
