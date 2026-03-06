@@ -1,7 +1,7 @@
 # Binaries
 bin/
 dist/
-timertab
+/timertab
 *.exe
 *.exe~
 *.dll
