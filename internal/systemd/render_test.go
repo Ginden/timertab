@@ -141,6 +141,42 @@ func TestIsManagedUnitContentForUID(t *testing.T) {
 	}
 }
 
+func TestRenderJobUnitsSupportsMultilineCommandWithoutBreakingDirectiveLine(t *testing.T) {
+	t.Parallel()
+
+	units, err := RenderJobUnits(1000, config.Job{
+		ID:   "trim-test",
+		When: config.ScheduleList{"@hourly"},
+		Run:  "echo hello\n",
+		OnSuccess: &config.Hook{
+			Command: "echo ok\n",
+		},
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if strings.Contains(units.ServiceContent, "ExecStart=/bin/sh -lc \"echo hello\n\"") {
+		t.Fatalf("service content contains raw newline in ExecStart directive: %q", units.ServiceContent)
+	}
+	if !strings.Contains(units.ServiceContent, "ExecStart=/bin/sh -lc \"echo hello\\n\"") {
+		t.Fatalf("service content missing escaped multiline ExecStart command: %q", units.ServiceContent)
+	}
+	if !strings.Contains(units.ServiceContent, "echo ok\\n") {
+		t.Fatalf("service content missing escaped multiline hook command: %q", units.ServiceContent)
+	}
+}
+
+func TestSystemdQuotedEscapesControlCharacters(t *testing.T) {
+	t.Parallel()
+
+	got := systemdQuoted("line1\nline2\ttab")
+	want := "\"line1\\nline2\\ttab\""
+	if got != want {
+		t.Fatalf("systemdQuoted() = %q, want %q", got, want)
+	}
+}
+
 func readRenderGolden(t *testing.T, name string) string {
 	t.Helper()
 

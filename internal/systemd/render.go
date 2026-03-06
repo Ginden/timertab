@@ -101,11 +101,11 @@ func renderServiceContent(targetUID uint32, job config.Job, serviceName string) 
 	appendEnvironmentLines(&b, job.Env)
 
 	b.WriteString("ExecStart=/bin/sh -lc ")
-	b.WriteString(shellQuoted(job.Run))
+	b.WriteString(systemdQuoted(job.Run))
 	b.WriteString("\n")
 
 	b.WriteString("ExecStopPost=/bin/sh -lc ")
-	b.WriteString(shellQuoted(hookDispatchScript(serviceName, job)))
+	b.WriteString(systemdQuoted(hookDispatchScript(serviceName, job)))
 	b.WriteString("\n")
 
 	return b.String()
@@ -187,6 +187,9 @@ func hookCommand(hook *config.Hook) string {
 	if hook == nil {
 		return ":"
 	}
+	if strings.TrimSpace(hook.Command) == "" {
+		return ":"
+	}
 
 	prefix := hookEnvPrefix(hook.Env)
 	if prefix != "" {
@@ -261,6 +264,12 @@ func shellQuoted(value string) string {
 }
 
 func systemdQuoted(value string) string {
-	replacer := strings.NewReplacer(`\`, `\\`, `"`, `\"`)
+	replacer := strings.NewReplacer(
+		`\`, `\\`,
+		`"`, `\"`,
+		"\n", `\n`,
+		"\r", `\r`,
+		"\t", `\t`,
+	)
 	return `"` + replacer.Replace(value) + `"`
 }
