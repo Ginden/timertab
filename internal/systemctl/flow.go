@@ -8,6 +8,13 @@ import (
 
 var errMissingExecutor = errors.New("systemctl executor is required")
 
+type batchExecutor interface {
+	EnableTimers(ctx context.Context, timerUnits []string) error
+	StartTimers(ctx context.Context, timerUnits []string) error
+	DisableTimers(ctx context.Context, timerUnits []string) error
+	StopTimers(ctx context.Context, timerUnits []string) error
+}
+
 // Plan captures ordered timer operations that must be executed via systemctl.
 type Plan struct {
 	TimersToDisable []string
@@ -38,6 +45,16 @@ func EnableAndStartTimers(ctx context.Context, executor Executor, timerUnits []s
 		return fmt.Errorf("failed to daemon-reload before enabling timers: %w", err)
 	}
 
+	if batch, ok := executor.(batchExecutor); ok {
+		if err := batch.EnableTimers(ctx, timerUnits); err != nil {
+			return fmt.Errorf("failed to enable timers: %w", err)
+		}
+		if err := batch.StartTimers(ctx, timerUnits); err != nil {
+			return fmt.Errorf("failed to start timers: %w", err)
+		}
+		return nil
+	}
+
 	for _, timerUnit := range timerUnits {
 		if err := executor.EnableTimer(ctx, timerUnit); err != nil {
 			return fmt.Errorf("failed to enable timer %q: %w", timerUnit, err)
@@ -54,6 +71,20 @@ func EnableAndStartTimers(ctx context.Context, executor Executor, timerUnits []s
 func DisableAndStopTimers(ctx context.Context, executor Executor, timerUnits []string) error {
 	if executor == nil {
 		return errMissingExecutor
+	}
+
+	if len(timerUnits) == 0 {
+		return nil
+	}
+
+	if batch, ok := executor.(batchExecutor); ok {
+		if err := batch.DisableTimers(ctx, timerUnits); err != nil {
+			return fmt.Errorf("failed to disable timers: %w", err)
+		}
+		if err := batch.StopTimers(ctx, timerUnits); err != nil {
+			return fmt.Errorf("failed to stop timers: %w", err)
+		}
+		return nil
 	}
 
 	for _, timerUnit := range timerUnits {

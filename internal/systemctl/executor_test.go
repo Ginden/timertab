@@ -50,3 +50,25 @@ func TestCommandExecutorStopTimerWithoutStderrKeepsErrorReadable(t *testing.T) {
 		t.Fatalf("StopTimer() error = %q, want %q", got, want)
 	}
 }
+
+func TestCommandExecutorEnableTimersRunsSingleCommand(t *testing.T) {
+	expectedArgs := []string{"enable", "sample-a.timer", "sample-b.timer"}
+	invoked := 0
+
+	executor := &CommandExecutor{
+		invoke: func(_ context.Context, args ...string) (string, error) {
+			invoked++
+			if !reflect.DeepEqual(args, expectedArgs) {
+				t.Fatalf("args = %v, want %v", args, expectedArgs)
+			}
+			return "", nil
+		},
+	}
+
+	if err := executor.EnableTimers(context.Background(), []string{"sample-a.timer", "sample-b.timer"}); err != nil {
+		t.Fatalf("EnableTimers() error = %v, want nil", err)
+	}
+	if invoked != 1 {
+		t.Fatalf("invoke count = %d, want 1", invoked)
+	}
+}

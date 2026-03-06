@@ -41,6 +41,26 @@ func (f *fakeExecutor) record(call string) error {
 	return f.failures[call]
 }
 
+type fakeBatchExecutor struct {
+	fakeExecutor
+}
+
+func (f *fakeBatchExecutor) EnableTimers(_ context.Context, timerUnits []string) error {
+	return f.record("enable-batch " + strings.Join(timerUnits, " "))
+}
+
+func (f *fakeBatchExecutor) StartTimers(_ context.Context, timerUnits []string) error {
+	return f.record("start-batch " + strings.Join(timerUnits, " "))
+}
+
+func (f *fakeBatchExecutor) DisableTimers(_ context.Context, timerUnits []string) error {
+	return f.record("disable-batch " + strings.Join(timerUnits, " "))
+}
+
+func (f *fakeBatchExecutor) StopTimers(_ context.Context, timerUnits []string) error {
+	return f.record("stop-batch " + strings.Join(timerUnits, " "))
+}
+
 func TestEnableAndStartTimersCommandOrder(t *testing.T) {
 	executor := &fakeExecutor{}
 
@@ -117,5 +137,40 @@ func TestRunPlanStopsOnFailureAndReturnsActionableError(t *testing.T) {
 	}
 	if !strings.Contains(msg, "exit status 1") {
 		t.Fatalf("error %q missing underlying failure", msg)
+	}
+}
+
+func TestEnableAndStartTimersUsesBatchExecutorWhenAvailable(t *testing.T) {
+	executor := &fakeBatchExecutor{}
+
+	err := EnableAndStartTimers(context.Background(), executor, []string{"alpha.timer", "beta.timer"})
+	if err != nil {
+		t.Fatalf("EnableAndStartTimers() error = %v, want nil", err)
+	}
+
+	wantCalls := []string{
+		"daemon-reload",
+		"enable-batch alpha.timer beta.timer",
+		"start-batch alpha.timer beta.timer",
+	}
+	if !reflect.DeepEqual(executor.calls, wantCalls) {
+		t.Fatalf("calls = %v, want %v", executor.calls, wantCalls)
+	}
+}
+
+func TestDisableAndStopTimersUsesBatchExecutorWhenAvailable(t *testing.T) {
+	executor := &fakeBatchExecutor{}
+
+	err := DisableAndStopTimers(context.Background(), executor, []string{"old-a.timer", "old-b.timer"})
+	if err != nil {
+		t.Fatalf("DisableAndStopTimers() error = %v, want nil", err)
+	}
+
+	wantCalls := []string{
+		"disable-batch old-a.timer old-b.timer",
+		"stop-batch old-a.timer old-b.timer",
+	}
+	if !reflect.DeepEqual(executor.calls, wantCalls) {
+		t.Fatalf("calls = %v, want %v", executor.calls, wantCalls)
 	}
 }
