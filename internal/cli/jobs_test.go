@@ -14,6 +14,8 @@ import (
 	"github.com/ginden/timertab/internal/systemd"
 )
 
+const wantDefaultTemplateRun = "echo 'timertab executes commands via /bin/sh -lc'\necho 'direct executable mode is planned for v2'"
+
 func TestAddCommandNoApplyAppendsJob(t *testing.T) {
 	originalCheck := ensureSystemdBaseline
 	originalApply := runSystemctlApply
@@ -55,8 +57,8 @@ func TestAddCommandNoApplyAppendsJob(t *testing.T) {
 	if loaded.Jobs[0].Name != "example" {
 		t.Fatalf("job name = %q, want %q", loaded.Jobs[0].Name, "example")
 	}
-	if loaded.Jobs[0].Run != "echo hello from timertab" {
-		t.Fatalf("job run = %q, want %q", loaded.Jobs[0].Run, "echo hello from timertab")
+	if loaded.Jobs[0].Run != wantDefaultTemplateRun {
+		t.Fatalf("job run = %q, want %q", loaded.Jobs[0].Run, wantDefaultTemplateRun)
 	}
 	if len(loaded.Jobs[0].When) != 1 || loaded.Jobs[0].When[0] != "@daily" {
 		t.Fatalf("job when = %#v, want [\"@daily\"]", loaded.Jobs[0].When)
@@ -247,8 +249,8 @@ func TestParseEditedJobAcceptsSingleJobConfigTemplate(t *testing.T) {
 	if len(job.When) != 1 || job.When[0] != "@daily" {
 		t.Fatalf("job when = %#v, want [\"@daily\"]", job.When)
 	}
-	if job.Run != "echo hello from timertab" {
-		t.Fatalf("job run = %q, want %q", job.Run, "echo hello from timertab")
+	if job.Run != wantDefaultTemplateRun {
+		t.Fatalf("job run = %q, want %q", job.Run, wantDefaultTemplateRun)
 	}
 	if strings.TrimSpace(job.ID) == "" {
 		t.Fatalf("job id was not normalized")

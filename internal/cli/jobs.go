@@ -21,7 +21,9 @@ version: 1
 jobs:
   - name: "example"
     when: "@daily"
-    run: "echo hello from timertab"
+    run: |-
+      echo 'timertab executes commands via /bin/sh -lc'
+      echo 'direct executable mode is planned for v2'
 `
 
 func newAddCommand() *cobra.Command {
