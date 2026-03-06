@@ -22,7 +22,14 @@ jobs:
 
       - name: Verify gofmt
         run: |
-          unformatted="$(gofmt -l cmd internal)"
+          targets=()
+          [ -d cmd ] && targets+=("cmd")
+          [ -d internal ] && targets+=("internal")
+          if [ "${#targets[@]}" -eq 0 ]; then
+            exit 0
+          fi
+
+          unformatted="$(gofmt -l "${targets[@]}")"
           if [ -n "${unformatted}" ]; then
             echo "Unformatted files:"
             echo "${unformatted}"
@@ -37,8 +44,12 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
-      - name: Build binary
-        run: go build ./cmd/timertab
+      - name: Build binaries (linux/amd64, linux/arm64)
+        run: |
+          for arch in amd64 arm64; do
+            echo "Building linux/${arch}"
+            GOOS=linux GOARCH="${arch}" CGO_ENABLED=0 go build -o "/tmp/timertab-${arch}" ./cmd/timertab
+          done
 
       - name: Run tests
         run: go test ./...

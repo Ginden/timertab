@@ -12,6 +12,7 @@ import (
 
 	"github.com/ginden/timertab/internal/config"
 	"github.com/ginden/timertab/internal/systemd"
+	"github.com/spf13/cobra"
 )
 
 const wantDefaultTemplateRun = "echo 'timertab executes commands via /bin/sh -lc'\necho 'direct executable mode is planned for v2'"
@@ -235,6 +236,52 @@ func TestEjectCommandReturnsNotFound(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `job "missing" not found`) {
 		t.Fatalf("error = %v, want not-found message", err)
+	}
+}
+
+func TestEjectCommandCompletesKnownJobIDs(t *testing.T) {
+	originalValidateTargetUserPermission := validateTargetUserPermission
+	originalResolveConfigPath := resolveConfigPath
+	t.Cleanup(func() {
+		validateTargetUserPermission = originalValidateTargetUserPermission
+		resolveConfigPath = originalResolveConfigPath
+	})
+
+	validateTargetUserPermission = func(string) error { return nil }
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	if err := saveConfig(cfgPath, &config.File{
+		Version: 1,
+		Jobs: []config.Job{
+			{ID: "alpha", When: config.ScheduleList{"@daily"}, Run: "echo alpha"},
+			{ID: "beta", When: config.ScheduleList{"@hourly"}, Run: "echo beta"},
+		},
+	}); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	resolveConfigPath = func(_, override string) (string, error) {
+		if override != cfgPath {
+			t.Fatalf("override = %q, want %q", override, cfgPath)
+		}
+		return cfgPath, nil
+	}
+
+	root := NewRootCommand()
+	ejectCmd, _, err := root.Find([]string{"eject"})
+	if err != nil {
+		t.Fatalf("Find(eject) error = %v", err)
+	}
+	if err := ejectCmd.Flags().Set("config", cfgPath); err != nil {
+		t.Fatalf("Flags().Set(config) error = %v", err)
+	}
+
+	completions, directive := ejectCmd.ValidArgsFunction(ejectCmd, []string{}, "b")
+	if directive != cobra.ShellCompDirectiveNoFileComp {
+		t.Fatalf("directive = %v, want NoFileComp", directive)
+	}
+	if len(completions) != 1 || completions[0] != "beta" {
+		t.Fatalf("completions = %v, want [beta]", completions)
 	}
 }
 
