@@ -198,7 +198,7 @@ func appendRawDirectives(b *strings.Builder, overrides *config.Systemd, timer bo
 	if timer {
 		directives = overrides.Timer.Directives()
 	} else {
-		directives = overrides.Unit.Directives()
+		directives = overrides.Service.Directives()
 	}
 	if len(directives) == 0 {
 		return

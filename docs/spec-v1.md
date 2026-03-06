@@ -102,14 +102,14 @@ Each job MAY include raw native directive overrides:
 
 ```yaml
 systemd:
-  unit:
+  service:
     Restart: "on-failure"
     RestartSec: "30s"
   timer:
     AccuracySec: "1m"
 ```
 
-`unit` and `timer` accept either:
+`service` and `timer` accept either:
 
 - object map form (`Record<string, string>`)
 - ordered list form (`[{name, value}]`)

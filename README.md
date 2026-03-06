@@ -82,7 +82,7 @@ jobs:
     run: "rsync -a ~/Documents /mnt/backup/"
     cwd: "/home/user"
     systemd:
-      unit:
+      service:
         Restart: "on-failure"
         RestartSec: "30s"
       timer:

@@ -230,7 +230,7 @@ func TestRenderJobUnitsIncludesRawSystemdOverridesFromMap(t *testing.T) {
 		When: config.ScheduleList{"@daily"},
 		Run:  "echo hi",
 		Systemd: &config.Systemd{
-			Unit: &config.SystemdDirectiveSet{
+			Service: &config.SystemdDirectiveSet{
 				Map: map[string]string{
 					"Restart":    "on-failure",
 					"RestartSec": "20s",
@@ -270,7 +270,7 @@ func TestRenderJobUnitsPreservesRawSystemdOverrideOrderForList(t *testing.T) {
 		When: config.ScheduleList{"@daily"},
 		Run:  "echo hi",
 		Systemd: &config.Systemd{
-			Unit: &config.SystemdDirectiveSet{
+			Service: &config.SystemdDirectiveSet{
 				Items: []config.SystemdDirective{
 					{Name: "RestartSec", Value: "20s"},
 					{Name: "Restart", Value: "on-failure"},
@@ -291,7 +291,7 @@ func TestRenderJobUnitsPreservesRawSystemdOverrideOrderForList(t *testing.T) {
 	restartSecIdx := strings.Index(units.ServiceContent, "RestartSec=20s\n")
 	restartIdx := strings.Index(units.ServiceContent, "Restart=on-failure\n")
 	if restartSecIdx < 0 || restartIdx < 0 || restartSecIdx > restartIdx {
-		t.Fatalf("ServiceContent does not preserve provided unit override order:\n%s", units.ServiceContent)
+		t.Fatalf("ServiceContent does not preserve provided service override order:\n%s", units.ServiceContent)
 	}
 
 	wakeSystemIdx := strings.Index(units.TimerContent, "WakeSystem=false\n")

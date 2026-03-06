@@ -126,7 +126,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "unit": {
+        "service": {
           "$ref": "#/$defs/systemd_directive_set"
         },
         "timer": {

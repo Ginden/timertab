@@ -41,8 +41,8 @@ type Limits struct {
 }
 
 type Systemd struct {
-	Unit  *SystemdDirectiveSet `yaml:"unit,omitempty"`
-	Timer *SystemdDirectiveSet `yaml:"timer,omitempty"`
+	Service *SystemdDirectiveSet `yaml:"service,omitempty"`
+	Timer   *SystemdDirectiveSet `yaml:"timer,omitempty"`
 }
 
 type SystemdDirectiveSet struct {

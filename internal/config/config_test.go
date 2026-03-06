@@ -306,7 +306,7 @@ func TestLoadFromBytesSchemaValidSystemdOverridesAsMap(t *testing.T) {
 		"    when: '@daily'",
 		"    run: 'echo run'",
 		"    systemd:",
-		"      unit:",
+		"      service:",
 		"        Restart: on-failure",
 		"        RestartSec: 30s",
 		"      timer:",
@@ -322,14 +322,14 @@ func TestLoadFromBytesSchemaValidSystemdOverridesAsMap(t *testing.T) {
 	if systemd == nil {
 		t.Fatalf("jobs[0].systemd = nil")
 	}
-	if systemd.Unit == nil {
-		t.Fatalf("jobs[0].systemd.unit = nil")
+	if systemd.Service == nil {
+		t.Fatalf("jobs[0].systemd.service = nil")
 	}
-	if got := systemd.Unit.Map["Restart"]; got != "on-failure" {
-		t.Fatalf("jobs[0].systemd.unit.Restart = %q, want %q", got, "on-failure")
+	if got := systemd.Service.Map["Restart"]; got != "on-failure" {
+		t.Fatalf("jobs[0].systemd.service.Restart = %q, want %q", got, "on-failure")
 	}
-	if got := systemd.Unit.Map["RestartSec"]; got != "30s" {
-		t.Fatalf("jobs[0].systemd.unit.RestartSec = %q, want %q", got, "30s")
+	if got := systemd.Service.Map["RestartSec"]; got != "30s" {
+		t.Fatalf("jobs[0].systemd.service.RestartSec = %q, want %q", got, "30s")
 	}
 	if systemd.Timer == nil {
 		t.Fatalf("jobs[0].systemd.timer = nil")
@@ -347,7 +347,7 @@ func TestLoadFromBytesSchemaValidSystemdOverridesAsList(t *testing.T) {
 		"    when: '@daily'",
 		"    run: 'echo run'",
 		"    systemd:",
-		"      unit:",
+		"      service:",
 		"        - name: Restart",
 		"          value: on-failure",
 		"        - name: RestartSec",
@@ -366,17 +366,17 @@ func TestLoadFromBytesSchemaValidSystemdOverridesAsList(t *testing.T) {
 	if systemd == nil {
 		t.Fatalf("jobs[0].systemd = nil")
 	}
-	if systemd.Unit == nil {
-		t.Fatalf("jobs[0].systemd.unit = nil")
+	if systemd.Service == nil {
+		t.Fatalf("jobs[0].systemd.service = nil")
 	}
-	if len(systemd.Unit.Items) != 2 {
-		t.Fatalf("len(jobs[0].systemd.unit) = %d, want 2", len(systemd.Unit.Items))
+	if len(systemd.Service.Items) != 2 {
+		t.Fatalf("len(jobs[0].systemd.service) = %d, want 2", len(systemd.Service.Items))
 	}
-	if systemd.Unit.Items[0].Name != "Restart" || systemd.Unit.Items[0].Value != "on-failure" {
-		t.Fatalf("jobs[0].systemd.unit[0] = %#v, want Restart=on-failure", systemd.Unit.Items[0])
+	if systemd.Service.Items[0].Name != "Restart" || systemd.Service.Items[0].Value != "on-failure" {
+		t.Fatalf("jobs[0].systemd.service[0] = %#v, want Restart=on-failure", systemd.Service.Items[0])
 	}
-	if systemd.Unit.Items[1].Name != "RestartSec" || systemd.Unit.Items[1].Value != "30s" {
-		t.Fatalf("jobs[0].systemd.unit[1] = %#v, want RestartSec=30s", systemd.Unit.Items[1])
+	if systemd.Service.Items[1].Name != "RestartSec" || systemd.Service.Items[1].Value != "30s" {
+		t.Fatalf("jobs[0].systemd.service[1] = %#v, want RestartSec=30s", systemd.Service.Items[1])
 	}
 	if systemd.Timer == nil || len(systemd.Timer.Items) != 1 {
 		t.Fatalf("jobs[0].systemd.timer = %#v, want one item", systemd.Timer)
