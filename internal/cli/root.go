@@ -70,6 +70,8 @@ func NewRootCommand() *cobra.Command {
 	cmd.SetVersionTemplate("{{printf \"%s\\n\" .Version}}")
 
 	cmd.AddCommand(newValidateCommand())
+	cmd.AddCommand(newAddCommand())
+	cmd.AddCommand(newEjectCommand())
 
 	return cmd
 }

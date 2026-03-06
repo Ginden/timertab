@@ -1,15 +1,15 @@
 # timertab
 
-`timertab` is a `crontab -e` style CLI for native `systemd --user` timers.
+`timertab` is `crontab` ergonomics on top of native `systemd --user` timers.
 
-It keeps jobs in one YAML file, renders `.service` and `.timer` units, and reconciles them safely.
+You keep jobs in one YAML file, `timertab` generates normal `.service` and `.timer` units.
 
 ## Why timertab
 
-- Keep the simple edit/apply workflow from `crontab`.
-- Use native `systemd` timers and journald logs.
-- Keep generated units runnable without `timertab` installed.
-- Reconcile only timertab-managed units for the target UID.
+- Thin wrapper, no lock-in: output is just standard systemd units.
+- Near-zero sunk cost: eject a job and keep running it without `timertab`.
+- Modern scheduling model: no 40-year cron compatibility baggage.
+- Safer reconcile: mutates only timertab-managed units for the target UID.
 
 ## Requirements
 
@@ -50,28 +50,38 @@ export PATH="$(go env GOPATH)/bin:$PATH"
 
 ## Quick start
 
-Print config path:
-
-```bash
-timertab --print-path
-```
-
-Edit config and apply:
+Open editor and apply:
 
 ```bash
 timertab -e
 ```
 
-Edit config without applying systemd changes:
+Append one job (alias: `+1`):
+
+```bash
+timertab add "@hourly" "echo hello"
+```
+
+```bash
+timertab +1 "0 9 * * 1-5" "notify-send 'standup'"
+```
+
+Stop managing a job, keep its units:
+
+```bash
+timertab eject <id>
+```
+
+Edit config without applying:
 
 ```bash
 timertab -e --no-apply
 ```
 
-Validate a file:
+Print config:
 
 ```bash
-timertab validate --config /path/to/timertab.yaml
+timertab -l
 ```
 
 ## Example config
@@ -98,6 +108,9 @@ jobs:
 - `timertab -l` show current config file contents.
 - `timertab -e` edit, validate, persist normalized config, reconcile/apply.
 - `timertab -e --no-apply` edit, validate, persist only.
+- `timertab add <when> <run>` append one job to config and apply.
+- `timertab +1 <when> <run>` alias for `add`.
+- `timertab eject <id>` remove one job from config and unmanage its generated units.
 - `timertab --print-path` print resolved config path.
 - `timertab -u <user> ...` operate on specific user (root can target others).
 - `timertab validate --config <path>` validate YAML against schema and semantics.
