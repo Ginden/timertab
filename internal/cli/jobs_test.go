@@ -33,12 +33,10 @@ func TestAddCommandNoApplyAppendsJob(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
+	t.Setenv("EDITOR", "true")
 	cmd.SetArgs([]string{
 		"add",
-		"@hourly",
-		"echo hello",
 		"--config", cfgPath,
-		"--name", "Hello Job",
 		"--no-apply",
 	})
 
@@ -53,14 +51,14 @@ func TestAddCommandNoApplyAppendsJob(t *testing.T) {
 	if len(loaded.Jobs) != 1 {
 		t.Fatalf("len(jobs) = %d, want 1", len(loaded.Jobs))
 	}
-	if loaded.Jobs[0].Name != "Hello Job" {
-		t.Fatalf("job name = %q, want %q", loaded.Jobs[0].Name, "Hello Job")
+	if loaded.Jobs[0].Name != "example" {
+		t.Fatalf("job name = %q, want %q", loaded.Jobs[0].Name, "example")
 	}
-	if loaded.Jobs[0].Run != "echo hello" {
-		t.Fatalf("job run = %q, want %q", loaded.Jobs[0].Run, "echo hello")
+	if loaded.Jobs[0].Run != "echo hello from timertab" {
+		t.Fatalf("job run = %q, want %q", loaded.Jobs[0].Run, "echo hello from timertab")
 	}
-	if len(loaded.Jobs[0].When) != 1 || loaded.Jobs[0].When[0] != "@hourly" {
-		t.Fatalf("job when = %#v, want [\"@hourly\"]", loaded.Jobs[0].When)
+	if len(loaded.Jobs[0].When) != 1 || loaded.Jobs[0].When[0] != "@daily" {
+		t.Fatalf("job when = %#v, want [\"@daily\"]", loaded.Jobs[0].When)
 	}
 	if strings.TrimSpace(loaded.Jobs[0].ID) == "" {
 		t.Fatalf("job id was not normalized")
@@ -100,10 +98,9 @@ func TestAddCommandAppliesByDefault(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
+	t.Setenv("EDITOR", "true")
 	cmd.SetArgs([]string{
 		"+1",
-		"0 5 * * *",
-		"echo applied",
 		"--config", cfgPath,
 	})
 

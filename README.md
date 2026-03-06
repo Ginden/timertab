@@ -50,20 +50,16 @@ export PATH="$(go env GOPATH)/bin:$PATH"
 
 ## Quick start
 
-Open editor and apply:
+Open terminal and apply:
 
 ```bash
 timertab -e
 ```
 
-Append one job (alias: `+1`):
+Append one job (alias: `+1`) in your editor:
 
 ```bash
-timertab add "@hourly" "echo hello"
-```
-
-```bash
-timertab +1 "0 9 * * 1-5" "notify-send 'standup'"
+timertab add
 ```
 
 Stop managing a job, keep its units:
@@ -108,8 +104,8 @@ jobs:
 - `timertab -l` show current config file contents.
 - `timertab -e` edit, validate, persist normalized config, reconcile/apply.
 - `timertab -e --no-apply` edit, validate, persist only.
-- `timertab add <when> <run>` append one job to config and apply.
-- `timertab +1 <when> <run>` alias for `add`.
+- `timertab add` open editor with a single job object, append it, apply.
+- `timertab +1` alias for `add`.
 - `timertab eject <id>` remove one job from config and unmanage its generated units.
 - `timertab --print-path` print resolved config path.
 - `timertab -u <user> ...` operate on specific user (root can target others).
