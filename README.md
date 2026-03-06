@@ -1,110 +1,144 @@
 # timertab
 
-`timertab` is a `crontab`-like CLI for managing native `systemd` timers from one YAML file.
+`timertab` is a `crontab -e` style CLI for native `systemd --user` timers.
 
-## Status
+It keeps jobs in one YAML file, renders `.service` and `.timer` units, and reconciles them safely.
 
-Core v1 pipeline is implemented:
+## Why timertab
 
-- runtime schema + semantic validation
-- schedule compiler (`when` -> `OnCalendar`)
-- native unit renderer (`.service` / `.timer`)
-- reconcile planner with managed-only prune safety
-- target-user permission checks (`-u`)
-- end-to-end `timertab -e` flow (edit, validate, persist IDs, reconcile units, run `systemctl --user`)
+- Keep the simple edit/apply workflow from `crontab`.
+- Use native `systemd` timers and journald logs.
+- Keep generated units runnable without `timertab` installed.
+- Reconcile only timertab-managed units for the target UID.
 
-## Why
+## Requirements
 
-- Keep the simple `crontab -e` workflow
-- Use native `systemd` timers/services
-- Preserve proper journald logs and `systemd` failure states
-- Allow generated units to keep working even if `timertab` is uninstalled
+- Linux with `systemd >= 247`.
+- Go `1.24+` (for building/installing from source).
+- A working user manager (`systemctl --user`).
+- For non-root users: enable lingering if jobs should run while logged out.
 
-## Compatibility
+```bash
+loginctl enable-linger "$USER"
+```
 
-- Linux with `systemd >= 247`
-- Mainstream architectures (x86_64, arm64, riscv64 expected)
-- Single static binary is a first-class packaging target
+## Install
 
-## Config
+Install from this repository clone:
+
+```bash
+make install
+```
+
+Equivalent direct Go command:
+
+```bash
+go install ./cmd/timertab
+```
+
+Install from module path:
+
+```bash
+go install github.com/ginden/timertab/cmd/timertab@latest
+```
+
+If needed, add Go bin directory to `PATH`:
+
+```bash
+export PATH="$(go env GOPATH)/bin:$PATH"
+```
+
+## Quick start
+
+Print config path:
+
+```bash
+timertab --print-path
+```
+
+Edit config and apply:
+
+```bash
+timertab -e
+```
+
+Edit config without applying systemd changes:
+
+```bash
+timertab -e --no-apply
+```
+
+Validate a file:
+
+```bash
+timertab validate --config /path/to/timertab.yaml
+```
+
+## Example config
 
 Default config path:
 
 - `${XDG_CONFIG_HOME:-$HOME/.config}/timertab/timertab.yaml`
 
-Minimal config:
+Example:
 
 ```yaml
 $schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
 version: 1
 jobs:
-  - when: "@hourly"
-    run: "npm --global cache verify"
+  - name: example hourly job
+    when: "@hourly"
+    run: "echo hello from timertab"
 ```
 
-Full v1 contract:
+`id` is optional in input and is auto-generated/persisted on save.
+
+## Apply output
+
+Successful apply prints only concrete changes:
+
+- `created <path>`
+- `modified <path>`
+- `deleted <path>`
+- `disabled <timer>`
+- `stopped <timer>`
+- `reloaded systemd --user daemon`
+- `enabled <timer>`
+- `started <timer>`
+
+If lingering is not enabled for a non-root target user, a warning is printed to stderr.
+
+## Command summary
+
+- `timertab -l` show current config file contents.
+- `timertab -e` edit, validate, persist normalized config, reconcile/apply.
+- `timertab -e --no-apply` edit, validate, persist only.
+- `timertab --print-path` print resolved config path.
+- `timertab -u <user> ...` operate on specific user (root can target others).
+- `timertab validate --config <path>` validate YAML against schema and semantics.
+
+## Spec and schema
 
 - [docs/spec-v1.md](docs/spec-v1.md)
 - [schema/v1.json](schema/v1.json)
 - [docs/libraries.md](docs/libraries.md)
 
-## CLI (current state)
-
-- `timertab -l` list the source config content
-- `timertab -e` edit + validate + normalize IDs, then reconcile/apply
-- `timertab -e --no-apply` edit + validate + normalize IDs, save only
-- `timertab --print-path` print resolved config path
-- `timertab validate --config <path>` validate file
-
-## Chosen Libraries
-
-- `github.com/spf13/cobra`: CLI framework
-- `gopkg.in/yaml.v3`: YAML parsing/marshalling
-- `github.com/santhosh-tekuri/jsonschema/v6`: JSON Schema validation
-
 ## Development
 
-Requirements:
-
-- Go 1.24+
-
-Compile:
+Build:
 
 ```bash
-# from repository root
 make build
 ```
 
-Binary output:
-
-- `./bin/timertab`
-
-Compile without Makefile:
-
-```bash
-mkdir -p ./bin
-go build -o ./bin/timertab ./cmd/timertab
-```
-
-Test:
+Run tests:
 
 ```bash
 make test
 ```
 
-Run compiled binary:
-
-```bash
-./bin/timertab --help
-```
-
-Quick run without compiling:
+Run help without building:
 
 ```bash
 make run
 ```
-
-## Planned Milestones
-
-1. Add integration tests with `systemd-run`/containerized systemd harness.
-2. Harden cross-user apply behavior for privileged `-u` operations in environments without active user sessions.

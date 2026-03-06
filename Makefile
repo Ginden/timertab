@@ -5,6 +5,10 @@ PKG := ./cmd/timertab
 build:
 	go build -o ./bin/$(BINARY) $(PKG)
 
+.PHONY: install
+install:
+	go install $(PKG)
+
 .PHONY: run
 run:
 	go run $(PKG) --help
