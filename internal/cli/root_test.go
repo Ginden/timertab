@@ -173,3 +173,17 @@ func TestRootCommandRejectsNoCommitWithoutEdit(t *testing.T) {
 		t.Fatalf("error = %q, want --no-commit validation error", err.Error())
 	}
 }
+
+func TestRootCommandRegistersCompletionCommand(t *testing.T) {
+	cmd := NewRootCommand()
+	completionCmd, _, err := cmd.Find([]string{"completion"})
+	if err != nil {
+		t.Fatalf("Find(completion) error = %v", err)
+	}
+	if completionCmd == nil {
+		t.Fatalf("completion command was not registered")
+	}
+	if got := completionCmd.Name(); got != "completion" {
+		t.Fatalf("completion command name = %q, want %q", got, "completion")
+	}
+}

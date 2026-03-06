@@ -12,6 +12,7 @@ import (
 
 	"github.com/ginden/timertab/internal/config"
 	"github.com/ginden/timertab/internal/systemd"
+	"github.com/spf13/cobra"
 )
 
 func TestLogsCommandResolvesJobAndRunsJournalctl(t *testing.T) {
@@ -127,5 +128,51 @@ func TestLogsCommandReturnsClearErrorForUnknownID(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `job "missing" not found`) {
 		t.Fatalf("error = %q, want not-found message", err.Error())
+	}
+}
+
+func TestLogsCommandCompletesKnownJobIDs(t *testing.T) {
+	originalValidateTargetUserPermission := validateTargetUserPermission
+	originalResolveConfigPath := resolveConfigPath
+	t.Cleanup(func() {
+		validateTargetUserPermission = originalValidateTargetUserPermission
+		resolveConfigPath = originalResolveConfigPath
+	})
+
+	validateTargetUserPermission = func(string) error { return nil }
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	if err := saveConfig(cfgPath, &config.File{
+		Version: 1,
+		Jobs: []config.Job{
+			{ID: "alpha", When: config.ScheduleList{"@daily"}, Run: "echo alpha"},
+			{ID: "beta", When: config.ScheduleList{"@hourly"}, Run: "echo beta"},
+		},
+	}); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	resolveConfigPath = func(_, override string) (string, error) {
+		if override != cfgPath {
+			t.Fatalf("override = %q, want %q", override, cfgPath)
+		}
+		return cfgPath, nil
+	}
+
+	root := NewRootCommand()
+	logsCmd, _, err := root.Find([]string{"logs"})
+	if err != nil {
+		t.Fatalf("Find(logs) error = %v", err)
+	}
+	if err := logsCmd.Flags().Set("config", cfgPath); err != nil {
+		t.Fatalf("Flags().Set(config) error = %v", err)
+	}
+
+	completions, directive := logsCmd.ValidArgsFunction(logsCmd, []string{}, "a")
+	if directive != cobra.ShellCompDirectiveNoFileComp {
+		t.Fatalf("directive = %v, want NoFileComp", directive)
+	}
+	if len(completions) != 1 || completions[0] != "alpha" {
+		t.Fatalf("completions = %v, want [alpha]", completions)
 	}
 }

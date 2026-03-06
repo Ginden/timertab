@@ -58,6 +58,7 @@ func NewRootCommand() *cobra.Command {
 	}
 
 	cmd.SetErrPrefix("timertab")
+	cmd.CompletionOptions.DisableDefaultCmd = false
 
 	cmd.Flags().BoolVarP(&opts.List, "list", "l", false, "Print current timertab config")
 	cmd.Flags().BoolVar(&opts.List, "print-config", false, "Print current timertab config")
@@ -79,6 +80,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newLogsCommand())
 	cmd.AddCommand(newDiffCommand())
 	cmd.AddCommand(newImportCommand())
+	cmd.InitDefaultCompletionCmd()
 
 	return cmd
 }

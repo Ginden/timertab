@@ -35,6 +35,12 @@ func newLogsCommand() *cobra.Command {
 		Use:   "logs <id>",
 		Short: "Show journal logs for a configured job",
 		Args:  cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) > 0 {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			return completeJobIDs(targetUser, overridePath, toComplete)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jobID := strings.TrimSpace(args[0])
 			if jobID == "" {

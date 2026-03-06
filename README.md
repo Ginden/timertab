@@ -99,6 +99,33 @@ jobs:
 
 Config file location: `${XDG_CONFIG_HOME:-$HOME/.config}/timertab/timertab.yaml`
 
+### Shell Completions
+
+Generate completions with `timertab completion <shell>`.
+
+**bash**
+
+```bash
+mkdir -p ~/.local/share/bash-completion/completions
+timertab completion bash > ~/.local/share/bash-completion/completions/timertab
+```
+
+**zsh**
+
+```bash
+mkdir -p ~/.zfunc
+timertab completion zsh > ~/.zfunc/_timertab
+```
+
+Then make sure `~/.zfunc` is on your `fpath`.
+
+**fish**
+
+```bash
+mkdir -p ~/.config/fish/completions
+timertab completion fish > ~/.config/fish/completions/timertab.fish
+```
+
 ## Requirements
 
 - Linux with **systemd ≥ 247**
