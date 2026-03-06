@@ -22,6 +22,7 @@ You absolutely can — and `timertab` won't stop you. In fact, that's the point:
 - **Multiple schedules per job** — `when` accepts a list, so one job can fire at different times.
 - **Zero lock-in** — eject any job and it keeps running as a standalone systemd timer.
 - **Per-user isolation** — units are scoped to your UID; `timertab` never touches units it didn't create.
+- **Raw systemd overrides when needed** — set extra `[Service]` / `[Timer]` directives per job.
 - **JSON Schema** — get autocomplete and validation in editors that support it.
 - **Safe reconcile** — if your config is invalid, nothing gets written or pruned. No partial state.
 
@@ -80,6 +81,12 @@ jobs:
       - "0 18 * * *"
     run: "rsync -a ~/Documents /mnt/backup/"
     cwd: "/home/user"
+    systemd:
+      unit:
+        Restart: "on-failure"
+        RestartSec: "30s"
+      timer:
+        AccuracySec: "1m"
     on_failure:
       command: 'notify-send "Backup failed"'
 ```

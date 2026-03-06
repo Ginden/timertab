@@ -85,6 +85,55 @@
         }
       }
     },
+    "systemd_directive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "systemd_directive_set": {
+      "oneOf": [
+        {
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/systemd_directive"
+          }
+        }
+      ]
+    },
+    "systemd_overrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "unit": {
+          "$ref": "#/$defs/systemd_directive_set"
+        },
+        "timer": {
+          "$ref": "#/$defs/systemd_directive_set"
+        }
+      }
+    },
     "job": {
       "type": "object",
       "additionalProperties": false,
@@ -140,6 +189,9 @@
         },
         "limits": {
           "$ref": "#/$defs/limits"
+        },
+        "systemd": {
+          "$ref": "#/$defs/systemd_overrides"
         },
         "on_success": {
           "$ref": "#/$defs/hook"

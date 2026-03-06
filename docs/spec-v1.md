@@ -47,7 +47,7 @@ jobs:
 Job fields:
 
 - required: `when`, `run`
-- optional: `id`, `name`, `env`, `cwd`, `enabled`, `on_success`, `on_failure`
+- optional: `id`, `name`, `env`, `cwd`, `enabled`, `persistent`, `jitter`, `limits`, `systemd`, `on_success`, `on_failure`
 
 ### 4.1 `id`
 
@@ -95,6 +95,24 @@ Hook environment includes:
 - `SERVICE_RESULT`
 - `EXIT_CODE`
 - `EXIT_STATUS`
+
+## 5.1 Raw `systemd` directives
+
+Each job MAY include raw native directive overrides:
+
+```yaml
+systemd:
+  unit:
+    Restart: "on-failure"
+    RestartSec: "30s"
+  timer:
+    AccuracySec: "1m"
+```
+
+`unit` and `timer` accept either:
+
+- object map form (`Record<string, string>`)
+- ordered list form (`[{name, value}]`)
 
 ## 6. Native systemd Integration Model
 

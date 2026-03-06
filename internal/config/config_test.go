@@ -298,6 +298,94 @@ func TestLoadFromBytesGitAutoCommitToggle(t *testing.T) {
 	}
 }
 
+func TestLoadFromBytesSchemaValidSystemdOverridesAsMap(t *testing.T) {
+	input := strings.Join([]string{
+		"version: 1",
+		"jobs:",
+		"  - id: map-systemd",
+		"    when: '@daily'",
+		"    run: 'echo run'",
+		"    systemd:",
+		"      unit:",
+		"        Restart: on-failure",
+		"        RestartSec: 30s",
+		"      timer:",
+		"        AccuracySec: 1m",
+	}, "\n")
+
+	loaded, err := LoadFromBytes([]byte(input))
+	if err != nil {
+		t.Fatalf("LoadFromBytes() error = %v", err)
+	}
+
+	systemd := loaded.Jobs[0].Systemd
+	if systemd == nil {
+		t.Fatalf("jobs[0].systemd = nil")
+	}
+	if systemd.Unit == nil {
+		t.Fatalf("jobs[0].systemd.unit = nil")
+	}
+	if got := systemd.Unit.Map["Restart"]; got != "on-failure" {
+		t.Fatalf("jobs[0].systemd.unit.Restart = %q, want %q", got, "on-failure")
+	}
+	if got := systemd.Unit.Map["RestartSec"]; got != "30s" {
+		t.Fatalf("jobs[0].systemd.unit.RestartSec = %q, want %q", got, "30s")
+	}
+	if systemd.Timer == nil {
+		t.Fatalf("jobs[0].systemd.timer = nil")
+	}
+	if got := systemd.Timer.Map["AccuracySec"]; got != "1m" {
+		t.Fatalf("jobs[0].systemd.timer.AccuracySec = %q, want %q", got, "1m")
+	}
+}
+
+func TestLoadFromBytesSchemaValidSystemdOverridesAsList(t *testing.T) {
+	input := strings.Join([]string{
+		"version: 1",
+		"jobs:",
+		"  - id: list-systemd",
+		"    when: '@daily'",
+		"    run: 'echo run'",
+		"    systemd:",
+		"      unit:",
+		"        - name: Restart",
+		"          value: on-failure",
+		"        - name: RestartSec",
+		"          value: 30s",
+		"      timer:",
+		"        - name: AccuracySec",
+		"          value: 1m",
+	}, "\n")
+
+	loaded, err := LoadFromBytes([]byte(input))
+	if err != nil {
+		t.Fatalf("LoadFromBytes() error = %v", err)
+	}
+
+	systemd := loaded.Jobs[0].Systemd
+	if systemd == nil {
+		t.Fatalf("jobs[0].systemd = nil")
+	}
+	if systemd.Unit == nil {
+		t.Fatalf("jobs[0].systemd.unit = nil")
+	}
+	if len(systemd.Unit.Items) != 2 {
+		t.Fatalf("len(jobs[0].systemd.unit) = %d, want 2", len(systemd.Unit.Items))
+	}
+	if systemd.Unit.Items[0].Name != "Restart" || systemd.Unit.Items[0].Value != "on-failure" {
+		t.Fatalf("jobs[0].systemd.unit[0] = %#v, want Restart=on-failure", systemd.Unit.Items[0])
+	}
+	if systemd.Unit.Items[1].Name != "RestartSec" || systemd.Unit.Items[1].Value != "30s" {
+		t.Fatalf("jobs[0].systemd.unit[1] = %#v, want RestartSec=30s", systemd.Unit.Items[1])
+	}
+	if systemd.Timer == nil || len(systemd.Timer.Items) != 1 {
+		t.Fatalf("jobs[0].systemd.timer = %#v, want one item", systemd.Timer)
+	}
+	if systemd.Timer.Items[0].Name != "AccuracySec" || systemd.Timer.Items[0].Value != "1m" {
+		t.Fatalf("jobs[0].systemd.timer[0] = %#v, want AccuracySec=1m", systemd.Timer.Items[0])
+	}
+}
+
 func requireSchemaValidationError(t *testing.T, err error) *SchemaValidationError {
 	t.Helper()
 	if err == nil {

@@ -100,6 +100,7 @@ func renderServiceContent(targetUID uint32, job config.Job, serviceName string) 
 
 	appendEnvironmentLines(&b, job.Env)
 	appendServiceLimits(&b, job.Limits)
+	appendRawDirectives(&b, job.Systemd, false)
 
 	b.WriteString("ExecStart=/bin/sh -lc ")
 	b.WriteString(systemdQuoted(job.Run))
@@ -133,6 +134,7 @@ func renderTimerContent(targetUID uint32, job config.Job, serviceName string, ti
 		b.WriteString(strings.TrimSpace(job.Jitter))
 		b.WriteString("\n")
 	}
+	appendRawDirectives(&b, job.Systemd, true)
 	for _, directive := range timerDirectives {
 		b.WriteString(directive)
 		b.WriteString("\n")
@@ -183,6 +185,29 @@ func appendServiceLimits(b *strings.Builder, limits *config.Limits) {
 	if limits.IOWeight != nil {
 		b.WriteString("IOWeight=")
 		b.WriteString(fmt.Sprintf("%d", *limits.IOWeight))
+		b.WriteString("\n")
+	}
+}
+
+func appendRawDirectives(b *strings.Builder, overrides *config.Systemd, timer bool) {
+	if overrides == nil {
+		return
+	}
+
+	var directives []config.SystemdDirective
+	if timer {
+		directives = overrides.Timer.Directives()
+	} else {
+		directives = overrides.Unit.Directives()
+	}
+	if len(directives) == 0 {
+		return
+	}
+
+	for _, directive := range directives {
+		b.WriteString(directive.Name)
+		b.WriteString("=")
+		b.WriteString(directive.Value)
 		b.WriteString("\n")
 	}
 }

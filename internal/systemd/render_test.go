@@ -222,6 +222,85 @@ func TestRenderJobUnitsIncludesServiceLimits(t *testing.T) {
 	}
 }
 
+func TestRenderJobUnitsIncludesRawSystemdOverridesFromMap(t *testing.T) {
+	t.Parallel()
+
+	units, err := RenderJobUnits(1000, config.Job{
+		ID:   "raw-map",
+		When: config.ScheduleList{"@daily"},
+		Run:  "echo hi",
+		Systemd: &config.Systemd{
+			Unit: &config.SystemdDirectiveSet{
+				Map: map[string]string{
+					"Restart":    "on-failure",
+					"RestartSec": "20s",
+				},
+			},
+			Timer: &config.SystemdDirectiveSet{
+				Map: map[string]string{
+					"AccuracySec": "2m",
+					"WakeSystem":  "false",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if !strings.Contains(units.ServiceContent, "Restart=on-failure\n") {
+		t.Fatalf("ServiceContent missing Restart override:\n%s", units.ServiceContent)
+	}
+	if !strings.Contains(units.ServiceContent, "RestartSec=20s\n") {
+		t.Fatalf("ServiceContent missing RestartSec override:\n%s", units.ServiceContent)
+	}
+	if !strings.Contains(units.TimerContent, "AccuracySec=2m\n") {
+		t.Fatalf("TimerContent missing AccuracySec override:\n%s", units.TimerContent)
+	}
+	if !strings.Contains(units.TimerContent, "WakeSystem=false\n") {
+		t.Fatalf("TimerContent missing WakeSystem override:\n%s", units.TimerContent)
+	}
+}
+
+func TestRenderJobUnitsPreservesRawSystemdOverrideOrderForList(t *testing.T) {
+	t.Parallel()
+
+	units, err := RenderJobUnits(1000, config.Job{
+		ID:   "raw-list",
+		When: config.ScheduleList{"@daily"},
+		Run:  "echo hi",
+		Systemd: &config.Systemd{
+			Unit: &config.SystemdDirectiveSet{
+				Items: []config.SystemdDirective{
+					{Name: "RestartSec", Value: "20s"},
+					{Name: "Restart", Value: "on-failure"},
+				},
+			},
+			Timer: &config.SystemdDirectiveSet{
+				Items: []config.SystemdDirective{
+					{Name: "WakeSystem", Value: "false"},
+					{Name: "AccuracySec", Value: "2m"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	restartSecIdx := strings.Index(units.ServiceContent, "RestartSec=20s\n")
+	restartIdx := strings.Index(units.ServiceContent, "Restart=on-failure\n")
+	if restartSecIdx < 0 || restartIdx < 0 || restartSecIdx > restartIdx {
+		t.Fatalf("ServiceContent does not preserve provided unit override order:\n%s", units.ServiceContent)
+	}
+
+	wakeSystemIdx := strings.Index(units.TimerContent, "WakeSystem=false\n")
+	accuracyIdx := strings.Index(units.TimerContent, "AccuracySec=2m\n")
+	if wakeSystemIdx < 0 || accuracyIdx < 0 || wakeSystemIdx > accuracyIdx {
+		t.Fatalf("TimerContent does not preserve provided timer override order:\n%s", units.TimerContent)
+	}
+}
+
 func TestIsManagedUnitContentForUID(t *testing.T) {
 	t.Parallel()
 

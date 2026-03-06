@@ -1,5 +1,12 @@
 package config
 
+import (
+	"fmt"
+	"sort"
+
+	"gopkg.in/yaml.v3"
+)
+
 type File struct {
 	Schema  string `yaml:"$schema,omitempty"`
 	Version int    `yaml:"version"`
@@ -22,6 +29,7 @@ type Job struct {
 	Persistent *bool             `yaml:"persistent,omitempty"`
 	Jitter     string            `yaml:"jitter,omitempty"`
 	Limits     *Limits           `yaml:"limits,omitempty"`
+	Systemd    *Systemd          `yaml:"systemd,omitempty"`
 	OnSuccess  *Hook             `yaml:"on_success,omitempty"`
 	OnFailure  *Hook             `yaml:"on_failure,omitempty"`
 }
@@ -30,6 +38,83 @@ type Limits struct {
 	MemoryMax string `yaml:"MemoryMax,omitempty"`
 	CPUQuota  string `yaml:"CPUQuota,omitempty"`
 	IOWeight  *int   `yaml:"IOWeight,omitempty"`
+}
+
+type Systemd struct {
+	Unit  *SystemdDirectiveSet `yaml:"unit,omitempty"`
+	Timer *SystemdDirectiveSet `yaml:"timer,omitempty"`
+}
+
+type SystemdDirectiveSet struct {
+	Map   map[string]string  `yaml:"-"`
+	Items []SystemdDirective `yaml:"-"`
+}
+
+type SystemdDirective struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
+}
+
+func (s *SystemdDirectiveSet) UnmarshalYAML(value *yaml.Node) error {
+	switch value.Kind {
+	case yaml.MappingNode:
+		var mapped map[string]string
+		if err := value.Decode(&mapped); err != nil {
+			return err
+		}
+		s.Map = mapped
+		s.Items = nil
+		return nil
+	case yaml.SequenceNode:
+		var items []SystemdDirective
+		if err := value.Decode(&items); err != nil {
+			return err
+		}
+		s.Items = items
+		s.Map = nil
+		return nil
+	default:
+		return fmt.Errorf("must be a mapping or array")
+	}
+}
+
+func (s SystemdDirectiveSet) MarshalYAML() (any, error) {
+	if len(s.Items) > 0 {
+		return s.Items, nil
+	}
+	if s.Map != nil {
+		return s.Map, nil
+	}
+	return nil, nil
+}
+
+func (s *SystemdDirectiveSet) Directives() []SystemdDirective {
+	if s == nil {
+		return nil
+	}
+	if len(s.Items) > 0 {
+		out := make([]SystemdDirective, len(s.Items))
+		copy(out, s.Items)
+		return out
+	}
+	if len(s.Map) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(s.Map))
+	for key := range s.Map {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	out := make([]SystemdDirective, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, SystemdDirective{
+			Name:  key,
+			Value: s.Map[key],
+		})
+	}
+	return out
 }
 
 type Hook struct {
