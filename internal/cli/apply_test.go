@@ -244,7 +244,7 @@ func TestLingeringWarningForTargetWarnsWhenLingerFileMissing(t *testing.T) {
 	}
 
 	warning := lingeringWarningForTarget(1000, "alice")
-	if !strings.Contains(warning, `warning: lingering is not enabled for user "alice"`) {
+	if !strings.Contains(warning, `lingering is not enabled for user "alice"`) {
 		t.Fatalf("warning = %q, want lingering warning for alice", warning)
 	}
 	if !strings.Contains(warning, "loginctl enable-linger alice") {

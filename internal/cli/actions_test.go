@@ -63,7 +63,7 @@ func TestEditConfigApplyPrintsChangedOperationsOnly(t *testing.T) {
 			StoppedTimers:  []string{"old.timer"},
 			EnabledTimers:  []string{"new.timer"},
 			StartedTimers:  []string{"new.timer"},
-			Warnings:       []string{"warning: lingering is not enabled"},
+			Warnings:       []string{"lingering is not enabled"},
 		}, nil
 	}
 
@@ -109,7 +109,7 @@ func TestEditConfigApplyPrintsChangedOperationsOnly(t *testing.T) {
 	if strings.Contains(output, "applied systemd reconcile") {
 		t.Fatalf("stdout should not include generic apply line, got:\n%s", output)
 	}
-	if !strings.Contains(stderr.String(), "warning: lingering is not enabled\n") {
+	if !strings.Contains(stderr.String(), "⚠️ lingering is not enabled\n") {
 		t.Fatalf("stderr missing warning line, got:\n%s", stderr.String())
 	}
 }
@@ -252,10 +252,10 @@ EOF
 		t.Fatalf("editor run count = %q, want %q", got, "2")
 	}
 
-	if got := stderr.String(); !strings.Contains(got, "timertab: config is invalid:") {
+	if got := stderr.String(); !strings.Contains(got, "🚨 timertab: config is invalid:") {
 		t.Fatalf("stderr missing validation error, got:\n%s", got)
 	}
-	if got := stderr.String(); !strings.Contains(got, "timertab: reopen editor to fix validation errors") {
+	if got := stderr.String(); !strings.Contains(got, "🚨 timertab: reopen editor to fix validation errors") {
 		t.Fatalf("stderr missing re-edit prompt, got:\n%s", got)
 	}
 
@@ -350,7 +350,7 @@ exit 1
 		t.Fatalf("editor run count = %q, want %q", got, "2")
 	}
 
-	if got := stderr.String(); !strings.Contains(got, "timertab: config is invalid:") {
+	if got := stderr.String(); !strings.Contains(got, "🚨 timertab: config is invalid:") {
 		t.Fatalf("stderr missing validation error, got:\n%s", got)
 	}
 

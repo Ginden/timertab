@@ -79,9 +79,9 @@ func NewRootCommand() *cobra.Command {
 func Execute() {
 	if err := NewRootCommand().Execute(); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			_, _ = fmt.Fprintln(os.Stderr, err)
+			_, _ = fmt.Fprintf(os.Stderr, "%s %v\n", errorPrefix, err)
 		} else {
-			_, _ = fmt.Fprintf(os.Stderr, "timertab: %v\n", err)
+			_, _ = fmt.Fprintf(os.Stderr, "%s timertab: %v\n", errorPrefix, err)
 		}
 		os.Exit(1)
 	}

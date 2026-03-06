@@ -16,6 +16,9 @@ import (
 
 var runSystemctlApply = applyEditedConfig
 
+const warningPrefix = "⚠️"
+const errorPrefix = "🚨"
+
 func listConfig(cmd *cobra.Command, cfgPath string) error {
 	data, err := os.ReadFile(cfgPath)
 	if err != nil {
@@ -149,13 +152,13 @@ func printApplyReport(cmd *cobra.Command, report applyReport) {
 		cmd.Printf("started %s\n", unit)
 	}
 	for _, warning := range report.Warnings {
-		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), warning)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s %s\n", warningPrefix, warning)
 	}
 }
 
 func printEditValidationError(cmd *cobra.Command, err error) {
-	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "timertab: config is invalid: %v\n", err)
-	_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "timertab: reopen editor to fix validation errors")
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s timertab: config is invalid: %v\n", errorPrefix, err)
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s timertab: reopen editor to fix validation errors\n", errorPrefix)
 }
 
 func resolveEditor() (string, error) {

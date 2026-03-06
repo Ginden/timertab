@@ -104,7 +104,7 @@ jobs:
 - `timertab -l` show current config file contents.
 - `timertab -e` edit, validate, persist normalized config, reconcile/apply.
 - `timertab -e --no-apply` edit, validate, persist only.
-- `timertab add` open editor with a single job object, append it, apply.
+- `timertab add` open editor with a single-job config template (`$schema` + `version` + one `jobs` entry), append it, apply.
 - `timertab +1` alias for `add`.
 - `timertab eject <id>` remove one job from config and unmanage its generated units.
 - `timertab --print-path` print resolved config path.

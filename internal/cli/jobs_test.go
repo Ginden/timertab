@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -232,5 +233,44 @@ func TestEjectCommandReturnsNotFound(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `job "missing" not found`) {
 		t.Fatalf("error = %v, want not-found message", err)
+	}
+}
+
+func TestParseEditedJobAcceptsSingleJobConfigTemplate(t *testing.T) {
+	job, err := parseEditedJob([]byte(defaultAddJobTemplate))
+	if err != nil {
+		t.Fatalf("parseEditedJob(defaultAddJobTemplate) error = %v", err)
+	}
+	if job.Name != "example" {
+		t.Fatalf("job name = %q, want %q", job.Name, "example")
+	}
+	if len(job.When) != 1 || job.When[0] != "@daily" {
+		t.Fatalf("job when = %#v, want [\"@daily\"]", job.When)
+	}
+	if job.Run != "echo hello from timertab" {
+		t.Fatalf("job run = %q, want %q", job.Run, "echo hello from timertab")
+	}
+	if strings.TrimSpace(job.ID) == "" {
+		t.Fatalf("job id was not normalized")
+	}
+}
+
+func TestParseEditedJobRejectsMultipleJobs(t *testing.T) {
+	buf := []byte(fmt.Sprintf(`$schema: %q
+version: 1
+jobs:
+  - name: one
+    when: "@daily"
+    run: "echo one"
+  - name: two
+    when: "@hourly"
+    run: "echo two"
+`, defaultSchemaURL))
+	_, err := parseEditedJob(buf)
+	if err == nil {
+		t.Fatalf("parseEditedJob() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "add expects exactly one job in jobs, got 2") {
+		t.Fatalf("parseEditedJob() error = %v, want single-job validation", err)
 	}
 }

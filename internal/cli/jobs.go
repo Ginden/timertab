@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,13 +13,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ginden/timertab/internal/config"
-	"gopkg.in/yaml.v3"
 )
 
 const defaultSchemaURL = "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
-const defaultAddJobTemplate = `name: "example"
-when: "@daily"
-run: "echo hello from timertab"
+const defaultAddJobTemplate = `$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
+version: 1
+jobs:
+  - name: "example"
+    when: "@daily"
+    run: "echo hello from timertab"
 `
 
 func newAddCommand() *cobra.Command {
@@ -169,10 +170,10 @@ func newEjectCommand() *cobra.Command {
 				cmd.Printf("ejected %s\n", timerPath)
 			}
 			if serviceResult.Missing {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: unit file missing: %s\n", servicePath)
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s unit file missing: %s\n", warningPrefix, servicePath)
 			}
 			if timerResult.Missing {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: unit file missing: %s\n", timerPath)
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s unit file missing: %s\n", warningPrefix, timerPath)
 			}
 
 			return nil
@@ -342,24 +343,12 @@ func editSingleJob(ctx context.Context, cmd *cobra.Command) (config.Job, error) 
 }
 
 func parseEditedJob(buf []byte) (config.Job, error) {
-	decoder := yaml.NewDecoder(bytes.NewReader(buf))
-	decoder.KnownFields(true)
-
-	var job config.Job
-	if err := decoder.Decode(&job); err != nil {
-		return config.Job{}, fmt.Errorf("parse yaml: %w", err)
+	cfg, err := config.LoadFromBytes(buf)
+	if err != nil {
+		return config.Job{}, err
 	}
-
-	if strings.TrimSpace(job.ID) != "" {
-		job.ID = strings.TrimSpace(job.ID)
-	}
-	if strings.TrimSpace(job.Name) != "" {
-		job.Name = strings.TrimSpace(job.Name)
-	}
-
-	cfg := &config.File{
-		Version: 1,
-		Jobs:    []config.Job{job},
+	if len(cfg.Jobs) != 1 {
+		return config.Job{}, fmt.Errorf("add expects exactly one job in jobs, got %d", len(cfg.Jobs))
 	}
 	if err := cfg.NormalizeIDs(); err != nil {
 		return config.Job{}, err

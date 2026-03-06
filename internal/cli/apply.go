@@ -363,7 +363,7 @@ func lingeringWarningForTarget(targetUID uint32, targetUser string) string {
 	}
 
 	return fmt.Sprintf(
-		"warning: lingering is not enabled for user %q; timers may not run without an active login session (enable with: loginctl enable-linger %s)",
+		"lingering is not enabled for user %q; timers may not run without an active login session (enable with: loginctl enable-linger %s)",
 		username,
 		username,
 	)
