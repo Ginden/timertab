@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/spf13/cobra"
 
@@ -452,7 +453,11 @@ func parseCrontabEntry(line string) (string, string, bool) {
 
 	if strings.HasPrefix(fields[0], "@") {
 		schedule := fields[0]
-		command := strings.TrimSpace(strings.TrimPrefix(line, schedule))
+		command, ok := commandAfterCrontabFields(line, 1)
+		if !ok {
+			return "", "", false
+		}
+		command = strings.TrimSpace(command)
 		if command == "" {
 			return "", "", false
 		}
@@ -464,12 +469,46 @@ func parseCrontabEntry(line string) (string, string, bool) {
 	}
 
 	schedule := strings.Join(fields[:5], " ")
-	command := strings.TrimSpace(strings.TrimPrefix(line, schedule))
+	command, ok := commandAfterCrontabFields(line, 5)
+	if !ok {
+		return "", "", false
+	}
+	command = strings.TrimSpace(command)
 	if command == "" {
 		return "", "", false
 	}
 
 	return schedule, command, true
+}
+
+func commandAfterCrontabFields(line string, fieldCount int) (string, bool) {
+	if fieldCount <= 0 {
+		return strings.TrimSpace(line), true
+	}
+
+	inField := false
+	fieldsSeen := 0
+	for idx, r := range line {
+		if unicode.IsSpace(r) {
+			if !inField {
+				continue
+			}
+			fieldsSeen++
+			if fieldsSeen == fieldCount {
+				return line[idx:], true
+			}
+			inField = false
+			continue
+		}
+
+		inField = true
+	}
+
+	if inField {
+		fieldsSeen++
+	}
+
+	return "", fieldsSeen >= fieldCount
 }
 
 func cloneEnv(values map[string]string) map[string]string {

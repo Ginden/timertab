@@ -179,6 +179,49 @@ func TestStripCronPercent(t *testing.T) {
 	}
 }
 
+func TestParseCrontabEntryPreservesCommandAfterRepeatedWhitespace(t *testing.T) {
+	tests := []struct {
+		name         string
+		line         string
+		wantSchedule string
+		wantCommand  string
+	}{
+		{
+			name:         "multiple spaces in classic entry",
+			line:         "0  12 * * * /bin/date",
+			wantSchedule: "0 12 * * *",
+			wantCommand:  "/bin/date",
+		},
+		{
+			name:         "tabs before command",
+			line:         "0\t12\t* * *\t/usr/bin/date",
+			wantSchedule: "0 12 * * *",
+			wantCommand:  "/usr/bin/date",
+		},
+		{
+			name:         "multiple spaces after shorthand",
+			line:         "@daily    /usr/local/bin/backup",
+			wantSchedule: "@daily",
+			wantCommand:  "/usr/local/bin/backup",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotSchedule, gotCommand, ok := parseCrontabEntry(tt.line)
+			if !ok {
+				t.Fatalf("parseCrontabEntry(%q) = not ok, want ok", tt.line)
+			}
+			if gotSchedule != tt.wantSchedule {
+				t.Fatalf("schedule = %q, want %q", gotSchedule, tt.wantSchedule)
+			}
+			if gotCommand != tt.wantCommand {
+				t.Fatalf("command = %q, want %q", gotCommand, tt.wantCommand)
+			}
+		})
+	}
+}
+
 func TestImportCrontabCommentAssociation(t *testing.T) {
 	input := strings.Join([]string{
 		"# Nightly database backup",
