@@ -175,6 +175,24 @@ func TestRenderJobUnitsOmitsPersistentByDefault(t *testing.T) {
 	}
 }
 
+func TestRenderJobUnitsIncludesRandomizedDelaySecWhenJitterIsSet(t *testing.T) {
+	t.Parallel()
+
+	units, err := RenderJobUnits(1000, config.Job{
+		ID:     "jitter-job",
+		When:   config.ScheduleList{"@daily"},
+		Run:    "echo hi",
+		Jitter: "5m",
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if !strings.Contains(units.TimerContent, "RandomizedDelaySec=5m\n") {
+		t.Fatalf("TimerContent missing RandomizedDelaySec=5m:\n%s", units.TimerContent)
+	}
+}
+
 func TestIsManagedUnitContentForUID(t *testing.T) {
 	t.Parallel()
 

@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -349,6 +350,9 @@ func validateJob(job Job) error {
 	if err := validateEnv(job.Env); err != nil {
 		return fmt.Errorf("env: %w", err)
 	}
+	if err := validateJitter(job.Jitter); err != nil {
+		return fmt.Errorf("jitter: %w", err)
+	}
 	if job.OnSuccess != nil {
 		if err := validateHook(*job.OnSuccess); err != nil {
 			return fmt.Errorf("on_success: %w", err)
@@ -359,6 +363,23 @@ func validateJob(job Job) error {
 			return fmt.Errorf("on_failure: %w", err)
 		}
 	}
+	return nil
+}
+
+func validateJitter(value string) error {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+
+	duration, err := time.ParseDuration(trimmed)
+	if err != nil {
+		return fmt.Errorf("must be a valid duration such as \"5m\": %w", err)
+	}
+	if duration <= 0 {
+		return fmt.Errorf("must be greater than 0")
+	}
+
 	return nil
 }
 

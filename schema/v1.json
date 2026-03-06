@@ -105,6 +105,10 @@
         "persistent": {
           "type": "boolean"
         },
+        "jitter": {
+          "type": "string",
+          "minLength": 1
+        },
         "on_success": {
           "$ref": "#/$defs/hook"
         },

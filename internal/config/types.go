@@ -15,6 +15,7 @@ type Job struct {
 	Cwd        string            `yaml:"cwd,omitempty"`
 	Enabled    *bool             `yaml:"enabled,omitempty"`
 	Persistent *bool             `yaml:"persistent,omitempty"`
+	Jitter     string            `yaml:"jitter,omitempty"`
 	OnSuccess  *Hook             `yaml:"on_success,omitempty"`
 	OnFailure  *Hook             `yaml:"on_failure,omitempty"`
 }

@@ -146,6 +146,47 @@ func TestLoadFromBytesSchemaValidPersistentJob(t *testing.T) {
 	}
 }
 
+func TestLoadFromBytesSchemaValidJitter(t *testing.T) {
+	input := strings.Join([]string{
+		"version: 1",
+		"jobs:",
+		"  - id: jittered",
+		"    when: '@hourly'",
+		"    run: 'echo run'",
+		"    jitter: '5m'",
+	}, "\n")
+
+	loaded, err := LoadFromBytes([]byte(input))
+	if err != nil {
+		t.Fatalf("LoadFromBytes() error = %v", err)
+	}
+	if len(loaded.Jobs) != 1 {
+		t.Fatalf("jobs count = %d, want 1", len(loaded.Jobs))
+	}
+	if got := loaded.Jobs[0].Jitter; got != "5m" {
+		t.Fatalf("jobs[0].jitter = %q, want %q", got, "5m")
+	}
+}
+
+func TestLoadFromBytesRejectsInvalidJitter(t *testing.T) {
+	input := strings.Join([]string{
+		"version: 1",
+		"jobs:",
+		"  - id: jittered",
+		"    when: '@hourly'",
+		"    run: 'echo run'",
+		"    jitter: 'bad-duration'",
+	}, "\n")
+
+	_, err := LoadFromBytes([]byte(input))
+	if err == nil {
+		t.Fatalf("LoadFromBytes() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "jitter") || !strings.Contains(err.Error(), "valid duration") {
+		t.Fatalf("error = %q, want actionable jitter validation", err.Error())
+	}
+}
+
 func requireSchemaValidationError(t *testing.T, err error) *SchemaValidationError {
 	t.Helper()
 	if err == nil {

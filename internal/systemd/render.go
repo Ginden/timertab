@@ -127,6 +127,11 @@ func renderTimerContent(targetUID uint32, job config.Job, serviceName string, ti
 	if job.Persistent != nil && *job.Persistent {
 		b.WriteString("Persistent=true\n")
 	}
+	if strings.TrimSpace(job.Jitter) != "" {
+		b.WriteString("RandomizedDelaySec=")
+		b.WriteString(strings.TrimSpace(job.Jitter))
+		b.WriteString("\n")
+	}
 	for _, directive := range timerDirectives {
 		b.WriteString(directive)
 		b.WriteString("\n")
