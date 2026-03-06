@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  go-checks:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,5 +21,71 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Verify gofmt
+        run: |
+          unformatted="$(gofmt -l cmd internal)"
+          if [ -n "${unformatted}" ]; then
+            echo "Unformatted files:"
+            echo "${unformatted}"
+            exit 1
+          fi
+
+      - name: Verify go.mod/go.sum are tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Build binary
+        run: go build ./cmd/timertab
+
       - name: Run tests
         run: go test ./...
+
+  race:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Run race tests
+        run: go test -race ./...
+
+  release-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate GoReleaser config
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
+
+  workflow-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.4
+
+      - name: Lint GitHub workflows
+        run: $(go env GOPATH)/bin/actionlint

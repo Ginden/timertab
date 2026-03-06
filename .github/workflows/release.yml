@@ -20,6 +20,26 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Verify gofmt
+        run: |
+          unformatted="$(gofmt -l cmd internal)"
+          if [ -n "${unformatted}" ]; then
+            echo "Unformatted files:"
+            echo "${unformatted}"
+            exit 1
+          fi
+
+      - name: Verify go.mod/go.sum are tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Build binary
+        run: go build ./cmd/timertab
+
       - name: Run tests
         run: go test ./...
 
