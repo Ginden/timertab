@@ -1,0 +1,40 @@
+version: 2
+
+project_name: timertab
+
+builds:
+  - id: timertab
+    binary: timertab
+    main: ./cmd/timertab
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - >-
+        -s -w
+        -X github.com/ginden/timertab/internal/version.Version={{ .Version }}
+        -X github.com/ginden/timertab/internal/version.Commit={{ .Commit }}
+        -X github.com/ginden/timertab/internal/version.Date={{ .Date }}
+
+archives:
+  - id: default
+    ids:
+      - timertab
+    formats:
+      - tar.gz
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github-native
+
+release:
+  prerelease: auto

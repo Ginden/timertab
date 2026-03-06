@@ -170,6 +170,21 @@ make test     # run tests
 make run      # run without building
 ```
 
+## Releases
+
+Tagging `v*` now triggers GitHub Actions release automation:
+
+- Linux binaries via GoReleaser (`amd64`, `arm64`)
+- GitHub-native generated release notes/changelog
+- `checksums.txt` plus GitHub artifact provenance attestations
+
+Example:
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
 ## License
 
 [MIT](LICENSE) © Michał Wadas
