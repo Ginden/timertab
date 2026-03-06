@@ -44,6 +44,13 @@ jobs:
       command: "journalctl -u \"$TIMERTAB_UNIT\" -n 100 --no-pager"
 ```
 
+Top-level optional fields:
+
+- `git.auto_commit`: boolean, default `true`
+- when enabled, successful `timertab edit` apply runs stage and commit the config file
+- if the config directory is not already in a git work tree, `timertab` initializes one before committing
+- `timertab edit --no-commit` disables that behavior for a single run
+
 Job fields:
 
 - required: `when`, `run`
@@ -71,7 +78,7 @@ ID generation:
 
 Supported values:
 
-- shorthands: `@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly`, `@annually`
+- shorthands: `@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly`, `@annually`, `@reboot`
 - 5-field cron expressions
 
 Unsupported in v1:
@@ -166,5 +173,6 @@ Safety rule:
 
 - `timertab list` (or `timertab -l`): list current jobs from source-of-truth config
 - `timertab edit` (or `timertab -e`): open editor, validate, persist IDs, apply on success
+- successful `timertab edit` apply runs auto-commit config changes unless disabled with `--no-commit` or `git.auto_commit: false`
 - `timertab <command> -u <user>`: target another user (privilege gated)
 - `sudo timertab edit` (or `sudo timertab -e`): root context by default

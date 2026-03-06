@@ -97,6 +97,7 @@ jobs:
 |---|---|
 | `timertab edit` (or `timertab -e`) | Edit config, validate, and apply (generate and start timers) |
 | `timertab edit --no-apply` (or `timertab -e --no-apply`) | Edit and validate only, don't touch systemd |
+| `timertab edit --no-commit` | Apply without creating/updating the git history entry for that edit run |
 | `timertab list` / `timertab print-config` (or `timertab -l`) | Print current config |
 | `timertab status` / `timertab status --json` | Show last run, next trigger, and result for each job |
 | `timertab add` (or `+1`) | Append a single new job through your editor |
@@ -162,6 +163,13 @@ When you run `timertab edit` (or `timertab -e`), here's what happens:
 6. New/changed units are written, `daemon-reload` is called, and timers are started.
 
 If validation fails at step 2, nothing else happens — no partial writes, no orphaned units.
+
+Successful `timertab edit` apply runs also auto-commit the config file by default. If the config directory is not already inside a git work tree, `timertab` initializes one first, then stages and commits the config change. Disable that once with `timertab edit --no-commit`, or persistently in config:
+
+```yaml
+git:
+  auto_commit: false
+```
 
 ## Spec and schema
 

@@ -6,12 +6,10 @@
   - CLI flags/subcommands, help output, shell completions.
 - `gopkg.in/yaml.v3`
   - YAML parsing and marshalling for the timertab file.
-
-## Deferred but planned
-
-- `github.com/santhosh-tekuri/jsonschema/v5`
+- `github.com/santhosh-tekuri/jsonschema/v6`
   - Runtime JSON Schema validation against `schema/v1.json`.
-  - Deferred from bootstrap to keep early implementation simple.
+- `golang.org/x/text`
+  - Localized formatting for schema validation errors.
 
 ## Not selected (intentional)
 
