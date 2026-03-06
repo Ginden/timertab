@@ -3,12 +3,10 @@ package config
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +18,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
+	timertabschema "github.com/ginden/timertab/schema"
 	"gopkg.in/yaml.v3"
 )
 
@@ -91,49 +90,28 @@ func validateConfigSchema(raw any) error {
 
 func loadCompiledSchema() (*jsonschema.Schema, error) {
 	compiledSchemaMu.Do(func() {
-		schemaPath, err := resolveSchemaPath()
-		if err != nil {
-			compiledSchemaErr = fmt.Errorf("load schema/v1.json: %w", err)
+		var schemaDoc any
+		if err := json.Unmarshal(timertabschema.V1JSON, &schemaDoc); err != nil {
+			compiledSchemaErr = fmt.Errorf("parse embedded schema/v1.json: %w", err)
 			return
 		}
 
 		compiler := jsonschema.NewCompiler()
-		compiledSchema, compiledSchemaErr = compiler.Compile(schemaPath)
-		if compiledSchemaErr != nil {
-			compiledSchemaErr = fmt.Errorf("compile schema/v1.json: %w", compiledSchemaErr)
+		if err := compiler.AddResource(timertabschema.V1URL, schemaDoc); err != nil {
+			compiledSchemaErr = fmt.Errorf("load embedded schema/v1.json: %w", err)
+			return
+		}
+
+		var err error
+		compiledSchema, err = compiler.Compile(timertabschema.V1URL)
+		if err != nil {
+			compiledSchemaErr = fmt.Errorf("compile embedded schema/v1.json: %w", err)
 		}
 	})
 	if compiledSchemaErr != nil {
 		return nil, compiledSchemaErr
 	}
 	return compiledSchema, nil
-}
-
-func resolveSchemaPath() (string, error) {
-	candidates := make([]string, 0, 2)
-	candidates = append(candidates, filepath.Join("schema", "v1.json"))
-	if _, sourceFile, _, ok := runtime.Caller(0); ok {
-		candidates = append(candidates, filepath.Clean(filepath.Join(filepath.Dir(sourceFile), "..", "..", "schema", "v1.json")))
-	}
-
-	checked := make([]string, 0, len(candidates))
-	for _, candidate := range candidates {
-		absPath := candidate
-		if !filepath.IsAbs(absPath) {
-			var err error
-			absPath, err = filepath.Abs(candidate)
-			if err != nil {
-				continue
-			}
-		}
-		checked = append(checked, absPath)
-
-		info, err := os.Stat(absPath)
-		if err == nil && !info.IsDir() {
-			return absPath, nil
-		}
-	}
-	return "", fmt.Errorf("file not found; looked in %s", strings.Join(checked, ", "))
 }
 
 func toJSONValue(value any) (any, error) {

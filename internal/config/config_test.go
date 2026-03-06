@@ -50,6 +50,28 @@ func TestLoadFromBytesSchemaValidSample(t *testing.T) {
 	}
 }
 
+func TestLoadFromBytesUsesEmbeddedSchemaOutsideRepoRoot(t *testing.T) {
+	t.Chdir(t.TempDir())
+
+	input := strings.Join([]string{
+		"version: 1",
+		"jobs:",
+		"  - when: '@daily'",
+		"    run: 'echo hi'",
+	}, "\n")
+
+	cfg, err := LoadFromBytes([]byte(input))
+	if err != nil {
+		t.Fatalf("LoadFromBytes() error = %v, want nil", err)
+	}
+	if cfg == nil {
+		t.Fatalf("expected parsed config")
+	}
+	if len(cfg.Jobs) != 1 {
+		t.Fatalf("expected one job, got %d", len(cfg.Jobs))
+	}
+}
+
 func TestLoadFromBytesSchemaInvalidSamples(t *testing.T) {
 	tests := []struct {
 		name        string
