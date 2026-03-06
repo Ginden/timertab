@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -302,9 +303,11 @@ func importDryRun(cmd *cobra.Command, cfgPath string, imported *config.File) err
 		return err
 	}
 
-	cmd.Printf("would merge %d job(s) into %s (currently %d job(s)):\n",
-		len(imported.Jobs), cfgPath, len(existing.Jobs))
-	for _, job := range imported.Jobs {
+	merged := mergeImportedJobs(existing.Jobs, imported.Jobs)
+
+	cmd.Printf("would merge %d new job(s) into %s (currently %d job(s), skipping %d duplicate import job(s)):\n",
+		merged.Added, cfgPath, len(existing.Jobs), merged.Skipped)
+	for _, job := range merged.AddedJobs {
 		name := job.Name
 		if name == "" {
 			name = "(no name)"
@@ -389,7 +392,16 @@ func importInteractive(cmd *cobra.Command, cfgPath string, targetUser string, im
 		return err
 	}
 
-	existing.Jobs = append(existing.Jobs, editedConfig.Jobs...)
+	merged := mergeImportedJobs(existing.Jobs, editedConfig.Jobs)
+	if merged.Skipped > 0 {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s skipped %d duplicate import job(s)\n", warningPrefix, merged.Skipped)
+	}
+	if merged.Added == 0 {
+		cmd.Println("timertab: no new jobs to import")
+		return nil
+	}
+
+	existing.Jobs = merged.Jobs
 	if err := existing.NormalizeIDs(); err != nil {
 		return fmt.Errorf("merge failed: %w", err)
 	}
@@ -471,4 +483,79 @@ func cloneEnv(values map[string]string) map[string]string {
 	}
 
 	return cloned
+}
+
+type importMergeResult struct {
+	Jobs      []config.Job
+	AddedJobs []config.Job
+	Added     int
+	Skipped   int
+}
+
+func mergeImportedJobs(existing []config.Job, imported []config.Job) importMergeResult {
+	merged := make([]config.Job, 0, len(existing)+len(imported))
+	merged = append(merged, existing...)
+
+	seen := make(map[string]struct{}, len(existing)+len(imported))
+	for _, job := range existing {
+		seen[importJobIdentity(job)] = struct{}{}
+	}
+
+	addedJobs := make([]config.Job, 0, len(imported))
+	skipped := 0
+	for _, job := range imported {
+		identity := importJobIdentity(job)
+		if _, exists := seen[identity]; exists {
+			skipped++
+			continue
+		}
+		seen[identity] = struct{}{}
+		merged = append(merged, job)
+		addedJobs = append(addedJobs, job)
+	}
+
+	return importMergeResult{
+		Jobs:      merged,
+		AddedJobs: addedJobs,
+		Added:     len(addedJobs),
+		Skipped:   skipped,
+	}
+}
+
+func importJobIdentity(job config.Job) string {
+	schedules := make([]string, len(job.When))
+	for idx, schedule := range job.When {
+		schedules[idx] = strings.TrimSpace(schedule)
+	}
+	sort.Strings(schedules)
+
+	envKeys := make([]string, 0, len(job.Env))
+	for key := range job.Env {
+		envKeys = append(envKeys, key)
+	}
+	sort.Strings(envKeys)
+
+	var b strings.Builder
+	b.Grow(128)
+	b.WriteString("run:")
+	b.WriteString(strings.TrimSpace(job.Run))
+	b.WriteByte('\x1f')
+	b.WriteString("cwd:")
+	b.WriteString(strings.TrimSpace(job.Cwd))
+	b.WriteByte('\x1f')
+	b.WriteString("when:")
+	for _, schedule := range schedules {
+		b.WriteString(schedule)
+		b.WriteByte('\x1e')
+	}
+	b.WriteByte('\x1f')
+	b.WriteString("env:")
+	for _, key := range envKeys {
+		b.WriteString(key)
+		b.WriteByte('=')
+		b.WriteString(job.Env[key])
+		b.WriteByte('\x1e')
+	}
+
+	return b.String()
 }

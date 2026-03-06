@@ -388,3 +388,78 @@ func TestImportCommandDryRunAndStdoutMutuallyExclusive(t *testing.T) {
 		t.Errorf("error = %v, want mention of --dry-run", err)
 	}
 }
+
+func TestMergeImportedJobsSkipsDuplicatesAgainstExisting(t *testing.T) {
+	existing := []config.Job{
+		{
+			ID:   "nightly",
+			Name: "Nightly backup",
+			When: config.ScheduleList{"@daily"},
+			Run:  "/usr/local/bin/backup",
+			Env: map[string]string{
+				"PATH": "/usr/local/bin:/usr/bin",
+			},
+		},
+	}
+
+	imported := []config.Job{
+		{
+			ID:   "ignored-id",
+			Name: "Same job, different label",
+			When: config.ScheduleList{"@daily"},
+			Run:  "/usr/local/bin/backup",
+			Env: map[string]string{
+				"PATH": "/usr/local/bin:/usr/bin",
+			},
+		},
+		{
+			When: config.ScheduleList{"0 12 * * 1"},
+			Run:  "/usr/bin/date",
+		},
+	}
+
+	merged := mergeImportedJobs(existing, imported)
+
+	if merged.Added != 1 {
+		t.Fatalf("Added = %d, want 1", merged.Added)
+	}
+	if merged.Skipped != 1 {
+		t.Fatalf("Skipped = %d, want 1", merged.Skipped)
+	}
+	if len(merged.Jobs) != 2 {
+		t.Fatalf("merged jobs = %d, want 2", len(merged.Jobs))
+	}
+	if len(merged.AddedJobs) != 1 {
+		t.Fatalf("added jobs = %d, want 1", len(merged.AddedJobs))
+	}
+	if got := merged.AddedJobs[0].Run; got != "/usr/bin/date" {
+		t.Fatalf("added job run = %q, want %q", got, "/usr/bin/date")
+	}
+}
+
+func TestMergeImportedJobsSkipsDuplicatesInsideImportedBatch(t *testing.T) {
+	imported := []config.Job{
+		{
+			Name: "tick-1",
+			When: config.ScheduleList{"*/5 * * * *"},
+			Run:  "echo tick",
+		},
+		{
+			Name: "tick-2",
+			When: config.ScheduleList{"*/5 * * * *"},
+			Run:  "echo tick",
+		},
+	}
+
+	merged := mergeImportedJobs(nil, imported)
+
+	if merged.Added != 1 {
+		t.Fatalf("Added = %d, want 1", merged.Added)
+	}
+	if merged.Skipped != 1 {
+		t.Fatalf("Skipped = %d, want 1", merged.Skipped)
+	}
+	if len(merged.Jobs) != 1 {
+		t.Fatalf("merged jobs = %d, want 1", len(merged.Jobs))
+	}
+}
