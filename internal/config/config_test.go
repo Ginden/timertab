@@ -278,6 +278,26 @@ func TestLoadFromBytesRejectsInvalidLimits(t *testing.T) {
 	}
 }
 
+func TestLoadFromBytesGitAutoCommitToggle(t *testing.T) {
+	input := strings.Join([]string{
+		"version: 1",
+		"git:",
+		"  auto_commit: false",
+		"jobs:",
+		"  - id: a",
+		"    when: '@daily'",
+		"    run: 'echo a'",
+	}, "\n")
+
+	loaded, err := LoadFromBytes([]byte(input))
+	if err != nil {
+		t.Fatalf("LoadFromBytes() error = %v", err)
+	}
+	if loaded.AutoCommitEnabled() {
+		t.Fatalf("AutoCommitEnabled() = true, want false")
+	}
+}
+
 func requireSchemaValidationError(t *testing.T, err error) *SchemaValidationError {
 	t.Helper()
 	if err == nil {

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -43,7 +44,7 @@ func listConfig(cmd *cobra.Command, cfgPath string) error {
 	return nil
 }
 
-func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply, dryRun bool) error {
+func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply, dryRun, noCommit bool) error {
 	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
 		return err
 	}
@@ -55,8 +56,10 @@ func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply, dryRun 
 	tmpName := tmpFile.Name()
 	defer os.Remove(tmpName)
 
+	var beforeConfig *config.File
 	existing, err := os.ReadFile(cfgPath)
 	if err == nil {
+		beforeConfig = parseConfigForAutoCommit(existing)
 		if _, err := tmpFile.Write(existing); err != nil {
 			_ = tmpFile.Close()
 			return err
@@ -107,6 +110,8 @@ func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply, dryRun 
 			return err
 		}
 
+		configChanged := !bytes.Equal(existing, out)
+
 		if dryRun {
 			report, err := runDryRunPlan(cmd.Context(), loaded, targetUser)
 			if err != nil {
@@ -132,8 +137,29 @@ func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply, dryRun 
 
 		cmd.Printf("timertab: saved %s\n", cfgPath)
 		printApplyReport(cmd, report)
+
+		if !noCommit {
+			maybeAutoCommitEditedConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, beforeConfig, loaded, configChanged)
+		}
+
 		return nil
 	}
+}
+
+func parseConfigForAutoCommit(buf []byte) *config.File {
+	if len(buf) == 0 {
+		return nil
+	}
+
+	loaded, err := config.LoadFromBytes(buf)
+	if err != nil {
+		return nil
+	}
+	if err := loaded.NormalizeIDs(); err != nil {
+		return nil
+	}
+
+	return loaded
 }
 
 func printDryRunReport(cmd *cobra.Command, report applyReport) {

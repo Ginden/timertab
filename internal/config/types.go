@@ -3,7 +3,12 @@ package config
 type File struct {
 	Schema  string `yaml:"$schema,omitempty"`
 	Version int    `yaml:"version"`
+	Git     *Git   `yaml:"git,omitempty"`
 	Jobs    []Job  `yaml:"jobs"`
+}
+
+type Git struct {
+	AutoCommit *bool `yaml:"auto_commit,omitempty"`
 }
 
 type Job struct {
@@ -37,4 +42,11 @@ func (j Job) IsEnabled() bool {
 		return true
 	}
 	return *j.Enabled
+}
+
+func (f *File) AutoCommitEnabled() bool {
+	if f == nil || f.Git == nil || f.Git.AutoCommit == nil {
+		return true
+	}
+	return *f.Git.AutoCommit
 }

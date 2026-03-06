@@ -11,6 +11,7 @@ type Options struct {
 	Config    string
 	NoApply   bool
 	DryRun    bool
+	NoCommit  bool
 	PrintPath bool
 }
 
@@ -29,6 +30,10 @@ func (o *Options) Validate() error {
 
 	if o.DryRun && o.NoApply {
 		return errors.New("--dry-run cannot be combined with --no-apply")
+	}
+
+	if o.NoCommit && !o.Edit {
+		return errors.New("--no-commit can only be used with -e")
 	}
 
 	if o.PrintPath && (o.List || o.Edit) {

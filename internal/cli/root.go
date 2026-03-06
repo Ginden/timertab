@@ -50,7 +50,7 @@ func NewRootCommand() *cobra.Command {
 						return err
 					}
 				}
-				return editConfig(cmd, cfgPath, opts.User, opts.NoApply, opts.DryRun)
+				return editConfig(cmd, cfgPath, opts.User, opts.NoApply, opts.DryRun, opts.NoCommit)
 			default:
 				return cmd.Help()
 			}
@@ -66,6 +66,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.Flags().StringVar(&opts.Config, "config", "", "Override config path")
 	cmd.Flags().BoolVar(&opts.NoApply, "no-apply", false, "Validate and save edits, but do not reconcile systemd units")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Preview reconcile changes from edited config without writing anything")
+	cmd.Flags().BoolVar(&opts.NoCommit, "no-commit", false, "Disable git auto-commit for this edit/apply run")
 	cmd.Flags().BoolVar(&opts.PrintPath, "print-path", false, "Print resolved config path")
 
 	cmd.Version = fmt.Sprintf("%s (%s, %s)", version.Version, version.Commit, version.Date)

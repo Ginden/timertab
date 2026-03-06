@@ -39,7 +39,7 @@ func TestEditConfigApplyRunsSystemctlPipeline(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	if err := editConfig(cmd, cfgPath, "", false, false); err != nil {
+	if err := editConfig(cmd, cfgPath, "", false, false, true); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 	if callCount != 1 {
@@ -77,7 +77,7 @@ func TestEditConfigApplyPrintsChangedOperationsOnly(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	if err := editConfig(cmd, cfgPath, "", false, false); err != nil {
+	if err := editConfig(cmd, cfgPath, "", false, false, true); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 
@@ -133,7 +133,7 @@ func TestEditConfigApplyReturnsSystemctlPipelineErrors(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	err := editConfig(cmd, cfgPath, "", false, false)
+	err := editConfig(cmd, cfgPath, "", false, false, true)
 	if !errors.Is(err, pipelineErr) {
 		t.Fatalf("editConfig() error = %v, want %v", err, pipelineErr)
 	}
@@ -157,7 +157,7 @@ func TestEditConfigNoApplySkipsSystemctlPipeline(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	if err := editConfig(cmd, cfgPath, "", true, false); err != nil {
+	if err := editConfig(cmd, cfgPath, "", true, false, true); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 }
@@ -206,7 +206,7 @@ jobs:
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
 
-	if err := editConfig(cmd, cfgPath, "", false, true); err != nil {
+	if err := editConfig(cmd, cfgPath, "", false, true, true); err != nil {
 		t.Fatalf("editConfig() error = %v", err)
 	}
 	if dryRunCalls != 1 {
@@ -303,7 +303,7 @@ EOF
 	stderr := &bytes.Buffer{}
 	cmd.SetErr(stderr)
 
-	if err := editConfig(cmd, cfgPath, "", false, false); err != nil {
+	if err := editConfig(cmd, cfgPath, "", false, false, true); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 
@@ -398,7 +398,7 @@ exit 1
 	stderr := &bytes.Buffer{}
 	cmd.SetErr(stderr)
 
-	err := editConfig(cmd, cfgPath, "", false, false)
+	err := editConfig(cmd, cfgPath, "", false, false, true)
 	if err == nil {
 		t.Fatalf("editConfig() error = nil, want non-nil")
 	}

@@ -158,3 +158,18 @@ func TestRootCommandPrintConfigAliasListsConfig(t *testing.T) {
 		t.Fatalf("stdout missing config body, got:\n%s", out)
 	}
 }
+
+func TestRootCommandRejectsNoCommitWithoutEdit(t *testing.T) {
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"--no-commit"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "--no-commit can only be used with -e") {
+		t.Fatalf("error = %q, want --no-commit validation error", err.Error())
+	}
+}
