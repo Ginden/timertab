@@ -124,6 +124,9 @@ func renderTimerContent(targetUID uint32, job config.Job, serviceName string, ti
 	b.WriteString("Unit=")
 	b.WriteString(serviceName)
 	b.WriteString("\n")
+	if job.Persistent != nil && *job.Persistent {
+		b.WriteString("Persistent=true\n")
+	}
 	for _, directive := range timerDirectives {
 		b.WriteString(directive)
 		b.WriteString("\n")

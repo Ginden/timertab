@@ -7,15 +7,16 @@ type File struct {
 }
 
 type Job struct {
-	ID        string            `yaml:"id,omitempty"`
-	Name      string            `yaml:"name,omitempty"`
-	When      ScheduleList      `yaml:"when"`
-	Run       string            `yaml:"run"`
-	Env       map[string]string `yaml:"env,omitempty"`
-	Cwd       string            `yaml:"cwd,omitempty"`
-	Enabled   *bool             `yaml:"enabled,omitempty"`
-	OnSuccess *Hook             `yaml:"on_success,omitempty"`
-	OnFailure *Hook             `yaml:"on_failure,omitempty"`
+	ID         string            `yaml:"id,omitempty"`
+	Name       string            `yaml:"name,omitempty"`
+	When       ScheduleList      `yaml:"when"`
+	Run        string            `yaml:"run"`
+	Env        map[string]string `yaml:"env,omitempty"`
+	Cwd        string            `yaml:"cwd,omitempty"`
+	Enabled    *bool             `yaml:"enabled,omitempty"`
+	Persistent *bool             `yaml:"persistent,omitempty"`
+	OnSuccess  *Hook             `yaml:"on_success,omitempty"`
+	OnFailure  *Hook             `yaml:"on_failure,omitempty"`
 }
 
 type Hook struct {

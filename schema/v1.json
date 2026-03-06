@@ -102,6 +102,9 @@
           "type": "boolean",
           "default": true
         },
+        "persistent": {
+          "type": "boolean"
+        },
         "on_success": {
           "$ref": "#/$defs/hook"
         },

@@ -124,6 +124,28 @@ func TestLoadFromBytesStillRunsSemanticValidation(t *testing.T) {
 	}
 }
 
+func TestLoadFromBytesSchemaValidPersistentJob(t *testing.T) {
+	input := strings.Join([]string{
+		"version: 1",
+		"jobs:",
+		"  - id: wakeup-sync",
+		"    when: '@daily'",
+		"    run: 'echo sync'",
+		"    persistent: true",
+	}, "\n")
+
+	loaded, err := LoadFromBytes([]byte(input))
+	if err != nil {
+		t.Fatalf("LoadFromBytes() error = %v", err)
+	}
+	if len(loaded.Jobs) != 1 {
+		t.Fatalf("jobs count = %d, want 1", len(loaded.Jobs))
+	}
+	if loaded.Jobs[0].Persistent == nil || !*loaded.Jobs[0].Persistent {
+		t.Fatalf("jobs[0].persistent = %#v, want true", loaded.Jobs[0].Persistent)
+	}
+}
+
 func requireSchemaValidationError(t *testing.T, err error) *SchemaValidationError {
 	t.Helper()
 	if err == nil {

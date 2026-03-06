@@ -139,6 +139,42 @@ func TestRenderJobUnitsUsesOnBootSecForRebootSchedule(t *testing.T) {
 	}
 }
 
+func TestRenderJobUnitsIncludesPersistentForEnabledPersistentTimers(t *testing.T) {
+	t.Parallel()
+
+	persistent := true
+	units, err := RenderJobUnits(1000, config.Job{
+		ID:         "persistent-job",
+		When:       config.ScheduleList{"@daily"},
+		Run:        "echo hi",
+		Persistent: &persistent,
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if !strings.Contains(units.TimerContent, "Persistent=true\n") {
+		t.Fatalf("TimerContent missing Persistent=true:\n%s", units.TimerContent)
+	}
+}
+
+func TestRenderJobUnitsOmitsPersistentByDefault(t *testing.T) {
+	t.Parallel()
+
+	units, err := RenderJobUnits(1000, config.Job{
+		ID:   "default-persistent",
+		When: config.ScheduleList{"@daily"},
+		Run:  "echo hi",
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if strings.Contains(units.TimerContent, "Persistent=true") {
+		t.Fatalf("TimerContent should not include Persistent=true by default:\n%s", units.TimerContent)
+	}
+}
+
 func TestIsManagedUnitContentForUID(t *testing.T) {
 	t.Parallel()
 
