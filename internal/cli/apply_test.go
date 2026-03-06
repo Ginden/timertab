@@ -153,6 +153,59 @@ func TestApplyEditedConfigDisablesExistingTimersForDisabledJobs(t *testing.T) {
 	}
 }
 
+func TestApplyEditedConfigReloadsDaemonAfterPruningWithoutEnabledTimers(t *testing.T) {
+	unitDir := t.TempDir()
+	targetUID := uint32(1000)
+
+	staleTimer := "timertab-u1000-stale.timer"
+	staleService := "timertab-u1000-stale.service"
+	if err := os.WriteFile(filepath.Join(unitDir, staleTimer), []byte(managedUnitContent(targetUID, "stale")), 0o644); err != nil {
+		t.Fatalf("WriteFile(stale timer) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(unitDir, staleService), []byte(managedUnitContent(targetUID, "stale")), 0o644); err != nil {
+		t.Fatalf("WriteFile(stale service) error = %v", err)
+	}
+
+	fakeExecutor := &recordingExecutor{}
+	restore := stubApplyDeps(t, targetUID, unitDir, fakeExecutor)
+	defer restore()
+
+	cfg := &config.File{
+		Version: 1,
+		Jobs:    []config.Job{},
+	}
+	report, err := applyEditedConfig(context.Background(), cfg, "")
+	if err != nil {
+		t.Fatalf("applyEditedConfig() error = %v", err)
+	}
+
+	wantReport := applyReport{
+		Created:  []string{},
+		Modified: []string{},
+		Deleted: []string{
+			filepath.Join(unitDir, staleService),
+			filepath.Join(unitDir, staleTimer),
+		},
+		ReloadedDaemon: true,
+		DisabledTimers: nil,
+		StoppedTimers:  nil,
+		EnabledTimers:  nil,
+		StartedTimers:  nil,
+	}
+	if !reflect.DeepEqual(report, wantReport) {
+		t.Fatalf("apply report = %#v, want %#v", report, wantReport)
+	}
+
+	wantCalls := []string{
+		"disable " + staleTimer,
+		"stop " + staleTimer,
+		"daemon-reload",
+	}
+	if !reflect.DeepEqual(fakeExecutor.calls, wantCalls) {
+		t.Fatalf("systemctl calls = %v, want %v", fakeExecutor.calls, wantCalls)
+	}
+}
+
 func TestDiscoverExistingUnitsTracksManagedMetadata(t *testing.T) {
 	unitDir := t.TempDir()
 

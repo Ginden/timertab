@@ -253,6 +253,7 @@ func buildSystemctlPlan(state applyDesiredState, existing []reconcile.ExistingUn
 	return systemctl.Plan{
 		TimersToDisable: sortedUniqueStrings(toDisable),
 		TimersToEnable:  sortedUniqueStrings(state.enabledTimers),
+		ReloadDaemon:    len(plan.Create) > 0 || len(plan.Update) > 0 || len(plan.Remove) > 0,
 	}
 }
 
@@ -363,7 +364,7 @@ func buildApplyReport(unitDir string, plan reconcile.Plan, systemctlPlan systemc
 		StoppedTimers:  append([]string(nil), systemctlPlan.TimersToDisable...),
 		EnabledTimers:  append([]string(nil), systemctlPlan.TimersToEnable...),
 		StartedTimers:  append([]string(nil), systemctlPlan.TimersToEnable...),
-		ReloadedDaemon: len(systemctlPlan.TimersToEnable) > 0,
+		ReloadedDaemon: systemctlPlan.ReloadDaemon,
 	}
 
 	for _, unit := range plan.Create {

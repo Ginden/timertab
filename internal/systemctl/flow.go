@@ -19,12 +19,18 @@ type batchExecutor interface {
 type Plan struct {
 	TimersToDisable []string
 	TimersToEnable  []string
+	ReloadDaemon    bool
 }
 
 // RunPlan executes disable/stop operations first, then daemon-reload/enable/start.
 func RunPlan(ctx context.Context, executor Executor, plan Plan) error {
 	if err := DisableAndStopTimers(ctx, executor, plan.TimersToDisable); err != nil {
 		return err
+	}
+	if plan.ReloadDaemon && len(plan.TimersToEnable) == 0 {
+		if err := executor.DaemonReload(ctx); err != nil {
+			return fmt.Errorf("failed to daemon-reload after unit changes: %w", err)
+		}
 	}
 	if err := EnableAndStartTimers(ctx, executor, plan.TimersToEnable); err != nil {
 		return err

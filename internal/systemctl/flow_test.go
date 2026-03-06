@@ -113,6 +113,7 @@ func TestRunPlanStopsOnFailureAndReturnsActionableError(t *testing.T) {
 		Plan{
 			TimersToDisable: []string{"old.timer"},
 			TimersToEnable:  []string{"alpha.timer", "beta.timer", "gamma.timer"},
+			ReloadDaemon:    true,
 		},
 	)
 	if err == nil {
@@ -169,6 +170,31 @@ func TestDisableAndStopTimersUsesBatchExecutorWhenAvailable(t *testing.T) {
 	wantCalls := []string{
 		"disable-batch old-a.timer old-b.timer",
 		"stop-batch old-a.timer old-b.timer",
+	}
+	if !reflect.DeepEqual(executor.calls, wantCalls) {
+		t.Fatalf("calls = %v, want %v", executor.calls, wantCalls)
+	}
+}
+
+func TestRunPlanReloadsDaemonWhenUnitsChangedWithoutTimersToEnable(t *testing.T) {
+	executor := &fakeExecutor{}
+
+	err := RunPlan(
+		context.Background(),
+		executor,
+		Plan{
+			TimersToDisable: []string{"old.timer"},
+			ReloadDaemon:    true,
+		},
+	)
+	if err != nil {
+		t.Fatalf("RunPlan() error = %v, want nil", err)
+	}
+
+	wantCalls := []string{
+		"disable old.timer",
+		"stop old.timer",
+		"daemon-reload",
 	}
 	if !reflect.DeepEqual(executor.calls, wantCalls) {
 		t.Fatalf("calls = %v, want %v", executor.calls, wantCalls)
