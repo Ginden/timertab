@@ -58,16 +58,24 @@ func TestImportCommandReadsFromStdinAndProducesConfig(t *testing.T) {
 		if strings.TrimSpace(job.ID) == "" {
 			t.Fatalf("jobs[%d].id is empty", idx)
 		}
-		if job.Env["MAILTO"] != "ops@example.com" {
-			t.Fatalf("jobs[%d].env MAILTO = %q", idx, job.Env["MAILTO"])
+		// MAILTO and SHELL must be filtered out — they have no systemd equivalent.
+		if _, ok := job.Env["MAILTO"]; ok {
+			t.Fatalf("jobs[%d].env should not contain MAILTO", idx)
 		}
-		if job.Env["SHELL"] != "/bin/bash" {
-			t.Fatalf("jobs[%d].env SHELL = %q", idx, job.Env["SHELL"])
+		if _, ok := job.Env["SHELL"]; ok {
+			t.Fatalf("jobs[%d].env should not contain SHELL", idx)
 		}
 	}
 
-	if !strings.Contains(stderr.String(), "line 6:") || !strings.Contains(stderr.String(), "unsupported shorthand \"@every\"") {
-		t.Fatalf("stderr missing warning for unsupported entry, got:\n%s", stderr.String())
+	stderrStr := stderr.String()
+	if !strings.Contains(stderrStr, "MAILTO") {
+		t.Fatalf("stderr missing warning for MAILTO, got:\n%s", stderrStr)
+	}
+	if !strings.Contains(stderrStr, "SHELL") {
+		t.Fatalf("stderr missing warning for SHELL, got:\n%s", stderrStr)
+	}
+	if !strings.Contains(stderrStr, "line 6:") || !strings.Contains(stderrStr, "unsupported shorthand \"@every\"") {
+		t.Fatalf("stderr missing warning for unsupported entry, got:\n%s", stderrStr)
 	}
 }
 
@@ -115,5 +123,268 @@ func TestImportCommandReadsFromCrontabByDefault(t *testing.T) {
 	}
 	if loaded.Jobs[0].Run != "/usr/bin/date" {
 		t.Fatalf("job.run = %q, want %q", loaded.Jobs[0].Run, "/usr/bin/date")
+	}
+}
+
+func TestStripInlineComment(t *testing.T) {
+	tests := []struct {
+		input   string
+		command string
+		comment string
+	}{
+		{"/backup.sh # morning backup", "/backup.sh", "# morning backup"},
+		{"/backup.sh", "/backup.sh", ""},
+		{`echo "hello # world"`, `echo "hello # world"`, ""},
+		{`echo 'it'\''s cool' # comment`, `echo 'it'\''s cool'`, "# comment"},
+		{"/cmd --flag #value", "/cmd --flag", "#value"},
+		{"/cmd\t# tab before hash", "/cmd", "# tab before hash"},
+		{"echo $# args", "echo $# args", ""},
+		{`echo "quoted \" # not a comment"`, `echo "quoted \" # not a comment"`, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			gotCmd, gotComment := stripInlineComment(tt.input)
+			if gotCmd != tt.command {
+				t.Errorf("command = %q, want %q", gotCmd, tt.command)
+			}
+			if gotComment != tt.comment {
+				t.Errorf("comment = %q, want %q", gotComment, tt.comment)
+			}
+		})
+	}
+}
+
+func TestStripCronPercent(t *testing.T) {
+	tests := []struct {
+		input    string
+		stripped string
+		had      bool
+	}{
+		{"mail user@host%Body here", "mail user@host", true},
+		{"/bin/backup.sh", "/bin/backup.sh", false},
+		{`echo "percentage: 50\%"`, `echo "percentage: 50\%"`, false},
+		{"cmd arg%stdin text%more", "cmd arg", true},
+		{"cmd arg %-", "cmd arg", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			gotStripped, gotHad := stripCronPercent(tt.input)
+			if gotStripped != tt.stripped {
+				t.Errorf("stripped = %q, want %q", gotStripped, tt.stripped)
+			}
+			if gotHad != tt.had {
+				t.Errorf("had = %v, want %v", gotHad, tt.had)
+			}
+		})
+	}
+}
+
+func TestImportCrontabCommentAssociation(t *testing.T) {
+	input := strings.Join([]string{
+		"# Nightly database backup",
+		"0 2 * * * /usr/local/bin/db-backup.sh",
+		"",
+		"# Weekly cleanup",
+		"@weekly /usr/local/bin/cleanup.sh",
+		"@daily /usr/local/bin/other.sh",
+	}, "\n")
+
+	cfg, warnings, err := importCrontab(input)
+	if err != nil {
+		t.Fatalf("importCrontab error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
+	if len(cfg.Jobs) != 3 {
+		t.Fatalf("jobs count = %d, want 3", len(cfg.Jobs))
+	}
+
+	// Comment "Nightly database backup" → name of first job
+	if cfg.Jobs[0].Name != "Nightly database backup" {
+		t.Errorf("jobs[0].name = %q, want %q", cfg.Jobs[0].Name, "Nightly database backup")
+	}
+	// Comment "Weekly cleanup" → name of second job
+	if cfg.Jobs[1].Name != "Weekly cleanup" {
+		t.Errorf("jobs[1].name = %q, want %q", cfg.Jobs[1].Name, "Weekly cleanup")
+	}
+	// Blank line breaks comment association; third job has no comment
+	if cfg.Jobs[2].Name != "" {
+		t.Errorf("jobs[2].name = %q, want empty (blank line broke association)", cfg.Jobs[2].Name)
+	}
+}
+
+func TestImportCrontabInlineCommentWarning(t *testing.T) {
+	input := "0 9 * * * /backup.sh # morning backup\n"
+
+	cfg, warnings, err := importCrontab(input)
+	if err != nil {
+		t.Fatalf("importCrontab error = %v", err)
+	}
+	if len(cfg.Jobs) != 1 {
+		t.Fatalf("jobs count = %d, want 1", len(cfg.Jobs))
+	}
+	if cfg.Jobs[0].Run != "/backup.sh" {
+		t.Errorf("run = %q, want %q", cfg.Jobs[0].Run, "/backup.sh")
+	}
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w, "inline comment") && strings.Contains(w, "# morning backup") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected inline comment warning, got: %v", warnings)
+	}
+}
+
+func TestImportCrontabPercentWarning(t *testing.T) {
+	input := `0 9 * * * mail -s "Report" user@host%Body of email` + "\n"
+
+	cfg, warnings, err := importCrontab(input)
+	if err != nil {
+		t.Fatalf("importCrontab error = %v", err)
+	}
+	if len(cfg.Jobs) != 1 {
+		t.Fatalf("jobs count = %d, want 1", len(cfg.Jobs))
+	}
+	if cfg.Jobs[0].Run != `mail -s "Report" user@host` {
+		t.Errorf("run = %q, want command without %%", cfg.Jobs[0].Run)
+	}
+	found := false
+	for _, w := range warnings {
+		if strings.Contains(w, "%") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected percent warning, got: %v", warnings)
+	}
+}
+
+func TestImportCrontabInvalidScheduleWarning(t *testing.T) {
+	input := "0 ab * * * /bin/backup.sh\n"
+
+	cfg, warnings, err := importCrontab(input)
+	if err != nil {
+		t.Fatalf("importCrontab error = %v", err)
+	}
+	if len(cfg.Jobs) != 0 {
+		t.Fatalf("jobs count = %d, want 0 (invalid schedule should be skipped)", len(cfg.Jobs))
+	}
+	if len(warnings) == 0 {
+		t.Fatal("expected at least one warning for invalid schedule")
+	}
+	if !strings.Contains(warnings[0], "line 1") {
+		t.Errorf("warning should contain line number, got: %q", warnings[0])
+	}
+}
+
+func TestImportCrontabFiltersMATTOAndSHELL(t *testing.T) {
+	input := strings.Join([]string{
+		"MAILTO=ops@example.com",
+		"SHELL=/bin/bash",
+		"PATH=/usr/local/bin:/usr/bin",
+		"*/5 * * * * echo tick",
+	}, "\n")
+
+	cfg, warnings, err := importCrontab(input)
+	if err != nil {
+		t.Fatalf("importCrontab error = %v", err)
+	}
+	if len(cfg.Jobs) != 1 {
+		t.Fatalf("jobs count = %d, want 1", len(cfg.Jobs))
+	}
+
+	// PATH should be kept; MAILTO and SHELL should be dropped.
+	if cfg.Jobs[0].Env["PATH"] != "/usr/local/bin:/usr/bin" {
+		t.Errorf("PATH env = %q, want preserved", cfg.Jobs[0].Env["PATH"])
+	}
+	if _, ok := cfg.Jobs[0].Env["MAILTO"]; ok {
+		t.Error("MAILTO should be filtered from env")
+	}
+	if _, ok := cfg.Jobs[0].Env["SHELL"]; ok {
+		t.Error("SHELL should be filtered from env")
+	}
+
+	// Two warnings: one for MAILTO, one for SHELL.
+	var mailtoWarn, shellWarn bool
+	for _, w := range warnings {
+		if strings.Contains(w, "MAILTO") {
+			mailtoWarn = true
+		}
+		if strings.Contains(w, "SHELL") {
+			shellWarn = true
+		}
+	}
+	if !mailtoWarn {
+		t.Errorf("expected warning for MAILTO, got: %v", warnings)
+	}
+	if !shellWarn {
+		t.Errorf("expected warning for SHELL, got: %v", warnings)
+	}
+}
+
+func TestImportCommandForceStdout(t *testing.T) {
+	originalValidateTargetUserPermission := validateTargetUserPermission
+	originalRunCrontabList := runCrontabList
+	t.Cleanup(func() {
+		validateTargetUserPermission = originalValidateTargetUserPermission
+		runCrontabList = originalRunCrontabList
+	})
+
+	validateTargetUserPermission = func(string) error { return nil }
+	runCrontabList = func(_ context.Context, _ string) (string, error) {
+		return "@daily /usr/bin/backup\n", nil
+	}
+
+	stdout := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"import", "--stdout"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	loaded, err := config.LoadFromBytes(stdout.Bytes())
+	if err != nil {
+		t.Fatalf("LoadFromBytes(stdout) error = %v\nstdout:\n%s", err, stdout.String())
+	}
+	if len(loaded.Jobs) != 1 {
+		t.Fatalf("jobs count = %d, want 1", len(loaded.Jobs))
+	}
+}
+
+func TestImportCommandDryRunAndNoApplyMutuallyExclusive(t *testing.T) {
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"import", "--stdin", "--dry-run", "--no-apply"})
+	cmd.SetIn(strings.NewReader("@daily /bin/true\n"))
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error combining --dry-run and --no-apply, got nil")
+	}
+	if !strings.Contains(err.Error(), "--dry-run") {
+		t.Errorf("error = %v, want mention of --dry-run", err)
+	}
+}
+
+func TestImportCommandDryRunAndStdoutMutuallyExclusive(t *testing.T) {
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"import", "--stdin", "--dry-run", "--stdout"})
+	cmd.SetIn(strings.NewReader("@daily /bin/true\n"))
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error combining --dry-run and --stdout, got nil")
+	}
+	if !strings.Contains(err.Error(), "--dry-run") {
+		t.Errorf("error = %v, want mention of --dry-run", err)
 	}
 }
