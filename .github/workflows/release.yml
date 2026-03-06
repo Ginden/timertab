@@ -6,13 +6,30 @@ on:
       - "v*"
 
 permissions:
-  contents: write
-  attestations: write
-  id-token: write
+  contents: read
 
 jobs:
-  release:
+  test:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: go test ./...
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -23,9 +40,6 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
-      - name: Run tests
-        run: go test ./...
 
       - name: Build and publish release
         uses: goreleaser/goreleaser-action@v7
