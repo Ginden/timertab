@@ -93,6 +93,7 @@ jobs:
 | `timertab -l` / `timertab --print-config` | Print current config |
 | `timertab add` (or `+1`) | Append a single new job through your editor |
 | `timertab eject <id>` | Stop managing a job — its units stay and keep running |
+| `timertab enable <id>` / `timertab disable <id>` | Toggle one job on/off without removing it |
 | `timertab validate --config <path>` | Validate a config file without applying |
 | `timertab --print-path` | Show where the config file lives |
 | `timertab -u <user> ...` | Operate on another user's timers (requires privileges) |
