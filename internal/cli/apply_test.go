@@ -51,8 +51,24 @@ func TestApplyEditedConfigReconcilesUnitsAndRunsSystemctl(t *testing.T) {
 		Version: 1,
 		Jobs:    []config.Job{keepJob},
 	}
-	if err := applyEditedConfig(context.Background(), cfg, ""); err != nil {
+	report, err := applyEditedConfig(context.Background(), cfg, "")
+	if err != nil {
 		t.Fatalf("applyEditedConfig() error = %v", err)
+	}
+
+	wantReport := applyReport{
+		Created: []string{
+			filepath.Join(unitDir, rendered.ServiceName),
+			filepath.Join(unitDir, rendered.TimerName),
+		},
+		Modified: []string{},
+		Deleted: []string{
+			filepath.Join(unitDir, staleService),
+			filepath.Join(unitDir, staleTimer),
+		},
+	}
+	if !reflect.DeepEqual(report, wantReport) {
+		t.Fatalf("apply report = %#v, want %#v", report, wantReport)
 	}
 
 	wantCalls := []string{
@@ -104,8 +120,12 @@ func TestApplyEditedConfigDisablesExistingTimersForDisabledJobs(t *testing.T) {
 		Version: 1,
 		Jobs:    []config.Job{job},
 	}
-	if err := applyEditedConfig(context.Background(), cfg, ""); err != nil {
+	report, err := applyEditedConfig(context.Background(), cfg, "")
+	if err != nil {
 		t.Fatalf("applyEditedConfig() error = %v", err)
+	}
+	if len(report.Created) != 0 || len(report.Modified) != 0 || len(report.Deleted) != 0 {
+		t.Fatalf("apply report = %#v, want no file operations", report)
 	}
 
 	wantCalls := []string{

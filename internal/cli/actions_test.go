@@ -20,7 +20,7 @@ func TestEditConfigApplyRunsSystemctlPipeline(t *testing.T) {
 	})
 
 	var callCount int
-	runSystemctlApply = func(_ context.Context, loaded *config.File, targetUser string) error {
+	runSystemctlApply = func(_ context.Context, loaded *config.File, targetUser string) (applyReport, error) {
 		callCount++
 		if loaded == nil {
 			t.Fatalf("loaded config = nil")
@@ -28,7 +28,7 @@ func TestEditConfigApplyRunsSystemctlPipeline(t *testing.T) {
 		if targetUser != "" {
 			t.Fatalf("targetUser = %q, want empty", targetUser)
 		}
-		return nil
+		return applyReport{}, nil
 	}
 
 	t.Setenv("EDITOR", "true")
@@ -47,6 +47,48 @@ func TestEditConfigApplyRunsSystemctlPipeline(t *testing.T) {
 	}
 }
 
+func TestEditConfigApplyPrintsChangedOperationsOnly(t *testing.T) {
+	originalApply := runSystemctlApply
+	t.Cleanup(func() {
+		runSystemctlApply = originalApply
+	})
+
+	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+		return applyReport{
+			Created:  []string{"/units/a.service"},
+			Modified: []string{"/units/b.service"},
+			Deleted:  []string{"/units/c.timer"},
+		}, nil
+	}
+
+	t.Setenv("EDITOR", "true")
+
+	stdout := &bytes.Buffer{}
+	cmd := &cobra.Command{}
+	cmd.SetIn(bytes.NewBuffer(nil))
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	if err := editConfig(cmd, cfgPath, "", false); err != nil {
+		t.Fatalf("editConfig() error = %v, want nil", err)
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "created /units/a.service\n") {
+		t.Fatalf("stdout missing created entry, got:\n%s", output)
+	}
+	if !strings.Contains(output, "modified /units/b.service\n") {
+		t.Fatalf("stdout missing modified entry, got:\n%s", output)
+	}
+	if !strings.Contains(output, "deleted /units/c.timer\n") {
+		t.Fatalf("stdout missing deleted entry, got:\n%s", output)
+	}
+	if strings.Contains(output, "applied systemd reconcile") {
+		t.Fatalf("stdout should not include generic apply line, got:\n%s", output)
+	}
+}
+
 func TestEditConfigApplyReturnsSystemctlPipelineErrors(t *testing.T) {
 	originalApply := runSystemctlApply
 	t.Cleanup(func() {
@@ -54,8 +96,8 @@ func TestEditConfigApplyReturnsSystemctlPipelineErrors(t *testing.T) {
 	})
 
 	pipelineErr := errors.New("systemctl apply failed")
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) error {
-		return pipelineErr
+	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+		return applyReport{}, pipelineErr
 	}
 
 	t.Setenv("EDITOR", "true")
@@ -78,8 +120,8 @@ func TestEditConfigNoApplySkipsSystemctlPipeline(t *testing.T) {
 		runSystemctlApply = originalApply
 	})
 
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) error {
-		return errors.New("systemctl pipeline should not run for --no-apply")
+	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+		return applyReport{}, errors.New("systemctl pipeline should not run for --no-apply")
 	}
 
 	t.Setenv("EDITOR", "true")
@@ -113,7 +155,7 @@ jobs:
 	}
 
 	var applyCallCount int
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) error {
+	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
 		applyCallCount++
 
 		saved, err := os.ReadFile(cfgPath)
@@ -123,7 +165,7 @@ jobs:
 		if !bytes.Contains(saved, []byte("id: sample-job")) {
 			t.Fatalf("saved config missing normalized id before apply:\n%s", saved)
 		}
-		return nil
+		return applyReport{}, nil
 	}
 
 	countPath := filepath.Join(t.TempDir(), "editor-count")
@@ -222,9 +264,9 @@ jobs:
 	}
 
 	var applyCallCount int
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) error {
+	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
 		applyCallCount++
-		return nil
+		return applyReport{}, nil
 	}
 
 	countPath := filepath.Join(t.TempDir(), "editor-count")

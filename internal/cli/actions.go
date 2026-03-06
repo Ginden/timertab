@@ -112,13 +112,26 @@ func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply bool) er
 			return nil
 		}
 
-		if err := runSystemctlApply(cmd.Context(), loaded, targetUser); err != nil {
+		report, err := runSystemctlApply(cmd.Context(), loaded, targetUser)
+		if err != nil {
 			return err
 		}
 
 		cmd.Printf("timertab: saved %s\n", cfgPath)
-		cmd.Println("timertab: applied systemd reconcile")
+		printApplyReport(cmd, report)
 		return nil
+	}
+}
+
+func printApplyReport(cmd *cobra.Command, report applyReport) {
+	for _, path := range report.Created {
+		cmd.Printf("created %s\n", path)
+	}
+	for _, path := range report.Modified {
+		cmd.Printf("modified %s\n", path)
+	}
+	for _, path := range report.Deleted {
+		cmd.Printf("deleted %s\n", path)
 	}
 }
 

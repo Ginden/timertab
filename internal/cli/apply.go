@@ -28,29 +28,35 @@ type applyDesiredState struct {
 	disabledTimers []string
 }
 
-func applyEditedConfig(ctx context.Context, cfg *config.File, targetUser string) error {
+type applyReport struct {
+	Created  []string
+	Modified []string
+	Deleted  []string
+}
+
+func applyEditedConfig(ctx context.Context, cfg *config.File, targetUser string) (applyReport, error) {
 	if cfg == nil {
-		return fmt.Errorf("config is required")
+		return applyReport{}, fmt.Errorf("config is required")
 	}
 
 	targetUID, err := resolveTargetUID(targetUser)
 	if err != nil {
-		return err
+		return applyReport{}, err
 	}
 
 	unitDir, err := resolveSystemdUserUnitDir(targetUser)
 	if err != nil {
-		return err
+		return applyReport{}, err
 	}
 
 	desiredState, err := buildDesiredState(targetUID, cfg.Jobs)
 	if err != nil {
-		return err
+		return applyReport{}, err
 	}
 
 	existing, err := discoverExistingUnits(unitDir, targetUID)
 	if err != nil {
-		return err
+		return applyReport{}, err
 	}
 
 	executor := newSystemctlExecutor()
@@ -65,15 +71,20 @@ func applyEditedConfig(ctx context.Context, cfg *config.File, targetUser string)
 		Existing:  existing,
 	}, mutator)
 	if err != nil {
-		return fmt.Errorf("reconcile apply: %w", err)
+		return applyReport{}, fmt.Errorf("reconcile apply: %w", err)
 	}
 
 	systemctlPlan := buildSystemctlPlan(desiredState, existing, plan)
 	if err := systemctl.RunPlan(ctx, executor, systemctlPlan); err != nil {
-		return err
+		return applyReport{}, err
 	}
 
-	return nil
+	report, err := buildApplyReport(unitDir, plan)
+	if err != nil {
+		return applyReport{}, err
+	}
+
+	return report, nil
 }
 
 func buildDesiredState(targetUID uint32, jobs []config.Job) (applyDesiredState, error) {
@@ -279,4 +290,38 @@ func sortedUniqueStrings(values []string) []string {
 	}
 
 	return unique
+}
+
+func buildApplyReport(unitDir string, plan reconcile.Plan) (applyReport, error) {
+	report := applyReport{
+		Created:  make([]string, 0, len(plan.Create)),
+		Modified: make([]string, 0, len(plan.Update)),
+		Deleted:  make([]string, 0, len(plan.Remove)),
+	}
+
+	for _, unit := range plan.Create {
+		path, err := unitFilePath(unitDir, unit.Name)
+		if err != nil {
+			return applyReport{}, err
+		}
+		report.Created = append(report.Created, path)
+	}
+
+	for _, unit := range plan.Update {
+		path, err := unitFilePath(unitDir, unit.Name)
+		if err != nil {
+			return applyReport{}, err
+		}
+		report.Modified = append(report.Modified, path)
+	}
+
+	for _, unitName := range plan.Remove {
+		path, err := unitFilePath(unitDir, unitName)
+		if err != nil {
+			return applyReport{}, err
+		}
+		report.Deleted = append(report.Deleted, path)
+	}
+
+	return report, nil
 }
