@@ -214,3 +214,7 @@ git push origin v1.2.3
 ## License
 
 [MIT](LICENSE) © Michał Wadas
+
+## Disclosure
+
+Large parts of this project were written with OpenAI Codex. The intent here is not to ask for blind trust: the core logic is still compact enough to review end-to-end, and releases ship with provenance attestations so distributed artifacts can be tied back to the published build process.
