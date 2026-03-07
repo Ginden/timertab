@@ -34,7 +34,7 @@ checksum:
   name_template: checksums.txt
 
 changelog:
-  use: git-cliff
+  use: git
 
 release:
   prerelease: auto
