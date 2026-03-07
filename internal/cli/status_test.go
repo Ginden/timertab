@@ -112,6 +112,127 @@ func TestStatusCommandPrintsRowsAndHandlesMissingUnits(t *testing.T) {
 	}
 }
 
+func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
+	originalValidateTargetUserPermission := validateTargetUserPermission
+	originalResolveConfigPath := resolveConfigPath
+	originalResolveSystemdUserUnitDir := resolveSystemdUserUnitDir
+	originalResolveTargetUID := resolveTargetUID
+	originalRunSystemctlShow := runSystemctlShow
+	t.Cleanup(func() {
+		validateTargetUserPermission = originalValidateTargetUserPermission
+		resolveConfigPath = originalResolveConfigPath
+		resolveSystemdUserUnitDir = originalResolveSystemdUserUnitDir
+		resolveTargetUID = originalResolveTargetUID
+		runSystemctlShow = originalRunSystemctlShow
+	})
+
+	validateTargetUserPermission = func(string) error { return nil }
+	resolveTargetUID = func(string) (uint32, error) { return 1000, nil }
+
+	tempDir := t.TempDir()
+	cfgPath := filepath.Join(tempDir, "timertab.yaml")
+	unitDir := filepath.Join(tempDir, "systemd-user")
+	cfg := &config.File{
+		Version: 1,
+		Jobs: []config.Job{{
+			ID:         "alpha",
+			Name:       "Alpha job",
+			When:       config.ScheduleList{"@hourly"},
+			Run:        "echo alpha",
+			Cwd:        "/srv/alpha",
+			OnFailure:  &config.Hook{Command: "echo failed"},
+			Persistent: func() *bool { v := true; return &v }(),
+		}},
+	}
+	if err := saveConfig(cfgPath, cfg); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	resolveConfigPath = func(_, override string) (string, error) {
+		if override != cfgPath {
+			t.Fatalf("override = %q, want %q", override, cfgPath)
+		}
+		return cfgPath, nil
+	}
+	resolveSystemdUserUnitDir = func(string) (string, error) { return unitDir, nil }
+
+	rendered, err := systemd.RenderJobUnits(1000, cfg.Jobs[0])
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
+		if len(args) < 3 {
+			return "", "", fmt.Errorf("unexpected args: %v", args)
+		}
+		unit := args[2]
+		switch unit {
+		case rendered.ServiceName:
+			return strings.Join([]string{
+				"LoadState=loaded",
+				"ActiveState=failed",
+				"SubState=failed",
+				"Result=exit-code",
+				"FragmentPath=" + filepath.Join(unitDir, rendered.ServiceName),
+				"UnitFileState=static",
+			}, "\n") + "\n", "", nil
+		case rendered.TimerName:
+			return strings.Join([]string{
+				"LoadState=loaded",
+				"ActiveState=active",
+				"SubState=waiting",
+				"LastTriggerUSec=Fri 2026-03-06 10:00:00 CET",
+				"NextElapseUSecRealtime=Fri 2026-03-06 11:00:00 CET",
+				"FragmentPath=" + filepath.Join(unitDir, rendered.TimerName),
+				"UnitFileState=enabled",
+			}, "\n") + "\n", "", nil
+		default:
+			return "", "", fmt.Errorf("unexpected unit %q", unit)
+		}
+	}
+
+	stdout := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"status", "alpha", "--config", cfgPath})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	out := stdout.String()
+	for _, needle := range []string{
+		"job: alpha",
+		"name: Alpha job",
+		"config: " + cfgPath,
+		"unit_dir: " + unitDir,
+		"service: " + rendered.ServiceName,
+		"timer: " + rendered.TimerName,
+		"service_result  fail",
+		"last_run        Fri 2026-03-06 10:00:00 CET",
+		"next_trigger    Fri 2026-03-06 11:00:00 CET",
+		"timer_enabled   enabled",
+		"service_path  " + filepath.Join(unitDir, rendered.ServiceName),
+		"timer_path    " + filepath.Join(unitDir, rendered.TimerName),
+		"job_definition:",
+		"  id: alpha",
+		"  name: Alpha job",
+		"service_definition:",
+		"  ExecStart=/bin/sh -lc \"echo alpha\"",
+		"timer_definition:",
+		"  Persistent=true",
+		"diagnostics:",
+		"  systemctl --user status " + rendered.ServiceName,
+		"  systemctl --user cat " + rendered.TimerName,
+		"  journalctl --user -u " + rendered.ServiceName + " -n 100 --no-pager",
+	} {
+		if !strings.Contains(out, needle) {
+			t.Fatalf("detail output missing %q, got:\n%s", needle, out)
+		}
+	}
+}
+
 func TestStatusCommandReturnsErrorForSystemctlFailure(t *testing.T) {
 	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
@@ -241,5 +362,46 @@ func TestStatusCommandJSONOutput(t *testing.T) {
 	}
 	if payload.Jobs[0].Result != "pass" {
 		t.Fatalf("result = %q, want %q", payload.Jobs[0].Result, "pass")
+	}
+}
+
+func TestStatusCommandRejectsJSONForDetailedView(t *testing.T) {
+	originalValidateTargetUserPermission := validateTargetUserPermission
+	originalResolveConfigPath := resolveConfigPath
+	originalResolveTargetUID := resolveTargetUID
+	t.Cleanup(func() {
+		validateTargetUserPermission = originalValidateTargetUserPermission
+		resolveConfigPath = originalResolveConfigPath
+		resolveTargetUID = originalResolveTargetUID
+	})
+
+	validateTargetUserPermission = func(string) error { return nil }
+	resolveTargetUID = func(string) (uint32, error) { return 1000, nil }
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	if err := saveConfig(cfgPath, &config.File{
+		Version: 1,
+		Jobs: []config.Job{{
+			ID:   "alpha",
+			When: config.ScheduleList{"@hourly"},
+			Run:  "echo alpha",
+		}},
+	}); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	resolveConfigPath = func(_, _ string) (string, error) { return cfgPath, nil }
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"status", "alpha", "--json", "--config", cfgPath})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want non-nil")
+	}
+	if !strings.Contains(err.Error(), "--json is only supported for summary status") {
+		t.Fatalf("error = %q", err.Error())
 	}
 }

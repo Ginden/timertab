@@ -19,6 +19,7 @@ You absolutely can — and `timertab` won't stop you. In fact, that's the point:
 - **One YAML file** — all your scheduled jobs in one place, version-control friendly.
 - **Success and failure hooks** — run a command when a job succeeds or fails (send a notification, dump logs, trigger another script).
 - **Cron syntax you already know** — `@hourly`, `@daily`, or standard 5-field cron expressions.
+- **Multiline scripts** — these just work, run multiple commands without `&&` abuse.
 - **Multiple schedules per job** — `when` accepts a list, so one job can fire at different times.
 - **Zero lock-in** — eject any job and it keeps running as a standalone systemd timer.
 - **Per-user isolation** — units are scoped to your UID; `timertab` never touches units it didn't create.
@@ -100,6 +101,7 @@ jobs:
 | `timertab edit --no-commit` | Apply without creating/updating the git history entry for that edit run |
 | `timertab list` / `timertab print-config` (or `timertab -l`) | Print current config |
 | `timertab status` / `timertab status --json` | Show last run, next trigger, and result for each job |
+| `timertab status <id>` | Show detailed runtime state, generated unit definitions, file locations, and diagnostic commands |
 | `timertab add` (or `+1`) | Append a single new job through your editor |
 | `timertab eject <id>` | Stop managing a job — its units stay and keep running |
 | `timertab enable <id>` / `timertab disable <id>` | Toggle one job on/off without removing it |
