@@ -1,0 +1,15 @@
+FROM golang:1.24-alpine AS build
+
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -o /timertab ./cmd/timertab
+
+FROM alpine:3.21
+
+COPY --from=build /timertab /usr/local/bin/timertab
+
+VOLUME /output
+
+ENTRYPOINT ["timertab", "render", "--stdin", "--output", "/output"]

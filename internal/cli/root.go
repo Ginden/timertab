@@ -46,6 +46,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newDisableCommand())
 	cmd.AddCommand(newDiffCommand())
 	cmd.AddCommand(newImportCommand())
+	cmd.AddCommand(newRenderCommand())
 	cmd.InitDefaultCompletionCmd()
 
 	return cmd

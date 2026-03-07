@@ -125,14 +125,12 @@ Generate completions with `timertab completion <shell>`.
 **bash**
 
 ```bash
-mkdir -p ~/.local/share/bash-completion/completions
 timertab completion bash > ~/.local/share/bash-completion/completions/timertab
 ```
 
 **zsh**
 
-```bash
-mkdir -p ~/.zfunc
+```zsh
 timertab completion zsh > ~/.zfunc/_timertab
 ```
 
@@ -141,14 +139,12 @@ Then make sure `~/.zfunc` is on your `fpath`.
 **fish**
 
 ```bash
-mkdir -p ~/.config/fish/completions
 timertab completion fish > ~/.config/fish/completions/timertab.fish
 ```
 
 ## Requirements
 
 - Linux with **systemd ≥ 247**
-- **Go 1.24+** (build-time only)
 - A running user session (`systemctl --user` must work)
 
 If you need timers to fire while you're logged out:
@@ -156,6 +152,8 @@ If you need timers to fire while you're logged out:
 ```bash
 loginctl enable-linger "$USER"
 ```
+
+`timertab` will automatically detect this and print instructions if it's not set up.
 
 ## How it works
 
@@ -179,7 +177,7 @@ git:
 
 ## Spec and schema
 
-- [v1 Specification](docs/spec-v1.md) — full behavioral spec
+- [v1 Specification](docs/spec-v1.md) — spec created for LLMs
 - [JSON Schema](schema/v1.json) — for editor integration and validation
 - [Technical Details](docs/technical-details.md) — implementation, release, and maintenance notes
 - [Caveats and Design Choices](docs/caveats.md) — weird edges and opinionated behavior
