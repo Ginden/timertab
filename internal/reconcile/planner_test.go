@@ -7,6 +7,7 @@ import (
 
 func TestBuildPlanDeterministicSets(t *testing.T) {
 	targetUID := uint32(1000)
+	instanceID := "timertab"
 
 	desired := []DesiredUnit{
 		{Name: "timertab-u1000-gamma.service", Content: "gamma-new"},
@@ -22,7 +23,7 @@ func TestBuildPlanDeterministicSets(t *testing.T) {
 		{Name: "ssh.service", Content: "foreign", Managed: true},
 	}
 
-	plan, err := BuildPlan(targetUID, desired, existing)
+	plan, err := BuildPlan(targetUID, instanceID, desired, existing)
 	if err != nil {
 		t.Fatalf("BuildPlan() error = %v", err)
 	}
@@ -45,7 +46,7 @@ func TestBuildPlanDeterministicSets(t *testing.T) {
 	reversedExisting := slices.Clone(existing)
 	slices.Reverse(reversedExisting)
 
-	planFromReversed, err := BuildPlan(targetUID, reversedDesired, reversedExisting)
+	planFromReversed, err := BuildPlan(targetUID, instanceID, reversedDesired, reversedExisting)
 	if err != nil {
 		t.Fatalf("BuildPlan() with reversed input error = %v", err)
 	}
@@ -65,7 +66,7 @@ func TestBuildPlanDeterministicSets(t *testing.T) {
 }
 
 func TestBuildPlanRejectsForeignConflicts(t *testing.T) {
-	_, err := BuildPlan(1000,
+	_, err := BuildPlan(1000, "timertab",
 		[]DesiredUnit{
 			{Name: "timertab-u1000-job.timer", Content: "desired"},
 		},

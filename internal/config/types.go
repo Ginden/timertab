@@ -8,10 +8,11 @@ import (
 )
 
 type File struct {
-	Schema  string `yaml:"$schema,omitempty"`
-	Version int    `yaml:"version"`
-	Git     *Git   `yaml:"git,omitempty"`
-	Jobs    []Job  `yaml:"jobs"`
+	Schema     string `yaml:"$schema,omitempty"`
+	Version    int    `yaml:"version"`
+	InstanceID string `yaml:"instance_id,omitempty"`
+	Git        *Git   `yaml:"git,omitempty"`
+	Jobs       []Job  `yaml:"jobs"`
 }
 
 type Git struct {
@@ -134,4 +135,14 @@ func (f *File) AutoCommitEnabled() bool {
 		return true
 	}
 	return *f.Git.AutoCommit
+}
+
+func (f *File) EffectiveInstanceID() string {
+	if f == nil {
+		return DefaultInstanceID
+	}
+	if f.InstanceID == "" {
+		return DefaultInstanceID
+	}
+	return f.InstanceID
 }

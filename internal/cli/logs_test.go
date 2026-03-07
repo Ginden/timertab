@@ -53,7 +53,7 @@ func TestLogsCommandResolvesJobAndRunsJournalctl(t *testing.T) {
 		return cfgPath, nil
 	}
 
-	rendered, err := systemd.RenderJobUnits(1000, cfg.Jobs[0])
+	rendered, err := systemd.RenderJobUnits(1000, config.DefaultInstanceID, cfg.Jobs[0])
 	if err != nil {
 		t.Fatalf("RenderJobUnits() error = %v", err)
 	}

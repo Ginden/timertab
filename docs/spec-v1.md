@@ -20,7 +20,9 @@ v1 focuses on:
 
 Config path:
 
-- `${XDG_CONFIG_HOME:-$HOME/.config}/timertab/timertab.yaml`
+- `--config <path>` when explicitly provided
+- `${TIMERTAB_CONFIG_DIR}/timertab.yaml` when `TIMERTAB_CONFIG_DIR` is set
+- otherwise `${XDG_CONFIG_HOME:-$HOME/.config}/timertab/timertab.yaml`
 
 The YAML config file is the source of truth. Generated unit files are derived artifacts.
 
@@ -31,6 +33,7 @@ Top-level is an object (not an array), to support `$schema`:
 ```yaml
 $schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
 version: 1
+instance_id: "work"
 jobs:
   - id: "npm-cache-verify"
     name: "NPM cache verify"
@@ -46,6 +49,8 @@ jobs:
 
 Top-level optional fields:
 
+- `instance_id`: string, default logical instance `timertab`
+- when set, `timertab` treats the config as a separate ownership namespace for generated units
 - `git.auto_commit`: boolean, default `true`
 - when enabled, successful `timertab edit` apply runs stage and commit the config file
 - if the config directory is not already in a git work tree, `timertab` initializes one before committing
@@ -127,8 +132,12 @@ Generated units are fully native and do not require `timertab` at runtime.
 
 Per job:
 
-- `timertab-u<uid>-<idslug>-<short>.service`
-- `timertab-u<uid>-<idslug>-<short>.timer`
+- default instance:
+  - `timertab-u<uid>-<idslug>-<short>.service`
+  - `timertab-u<uid>-<idslug>-<short>.timer`
+- custom instance `instance_id: work`:
+  - `timertab-work-u<uid>-<idslug>-<short>.service`
+  - `timertab-work-u<uid>-<idslug>-<short>.timer`
 
 Service shape:
 
@@ -151,15 +160,18 @@ Hook dispatch uses `SERVICE_RESULT`/`EXIT_CODE`/`EXIT_STATUS` provided by `syste
 
 Ownership rules:
 
-- unit name prefix: `timertab-u<uid>-`
+- unit name prefix must match both UID and instance namespace
+- default instance prefix: `timertab-u<uid>-`
+- custom instance prefix: `timertab-<instance_id>-u<uid>-`
 - generated units contain managed marker comments/metadata
+- generated units include both `timertab-uid` and `timertab-instance-id` markers
 
 Apply algorithm:
 
 1. Parse + validate config
 2. Auto-generate/persist missing IDs
 3. Render desired units
-4. Discover existing managed units for target UID
+4. Discover existing managed units for target UID and instance namespace
 5. Stop/disable/delete stale managed units
 6. Write desired units
 7. `daemon-reload`

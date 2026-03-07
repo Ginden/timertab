@@ -73,8 +73,9 @@ func newLogsCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			instanceID := loaded.EffectiveInstanceID()
 
-			rendered, err := renderJobUnits(targetUID, loaded.Jobs[jobIndex])
+			rendered, err := renderJobUnits(targetUID, instanceID, loaded.Jobs[jobIndex])
 			if err != nil {
 				return err
 			}

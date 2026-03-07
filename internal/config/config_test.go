@@ -29,6 +29,7 @@ func TestLoadFromBytesSchemaValidSample(t *testing.T) {
 	input := strings.Join([]string{
 		`$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"`,
 		"version: 1",
+		"instance_id: work",
 		"jobs:",
 		"  - id: nightly",
 		"    name: Nightly backup",
@@ -47,6 +48,9 @@ func TestLoadFromBytesSchemaValidSample(t *testing.T) {
 	}
 	if len(cfg.Jobs) != 1 {
 		t.Fatalf("expected one job, got %d", len(cfg.Jobs))
+	}
+	if cfg.InstanceID != "work" {
+		t.Fatalf("instance_id = %q, want %q", cfg.InstanceID, "work")
 	}
 }
 
@@ -95,6 +99,18 @@ func TestLoadFromBytesSchemaInvalidSamples(t *testing.T) {
 			}, "\n"),
 			expectPath:  "$.version",
 			expectInMsg: "value must be 1",
+		},
+		{
+			name: "invalid instance id",
+			input: strings.Join([]string{
+				"version: 1",
+				"instance_id: bad value",
+				"jobs:",
+				"  - when: '@daily'",
+				"    run: 'echo ok'",
+			}, "\n"),
+			expectPath:  "$.instance_id",
+			expectInMsg: "does not match pattern",
 		},
 		{
 			name: "invalid env key",

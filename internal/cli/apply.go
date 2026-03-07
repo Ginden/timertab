@@ -54,18 +54,19 @@ func applyEditedConfig(ctx context.Context, cfg *config.File, targetUser string)
 	if err != nil {
 		return applyReport{}, err
 	}
+	instanceID := cfg.EffectiveInstanceID()
 
 	unitDir, err := resolveSystemdUserUnitDir(targetUser)
 	if err != nil {
 		return applyReport{}, err
 	}
 
-	desiredState, err := buildDesiredState(targetUID, cfg.Jobs)
+	desiredState, err := buildDesiredState(targetUID, instanceID, cfg.Jobs)
 	if err != nil {
 		return applyReport{}, err
 	}
 
-	existing, err := discoverExistingUnits(unitDir, targetUID)
+	existing, err := discoverExistingUnits(unitDir, targetUID, instanceID)
 	if err != nil {
 		return applyReport{}, err
 	}
@@ -77,9 +78,10 @@ func applyEditedConfig(ctx context.Context, cfg *config.File, targetUser string)
 	}
 
 	plan, err := reconcile.Apply(ctx, reconcile.ApplyRequest{
-		TargetUID: targetUID,
-		Desired:   desiredState.units,
-		Existing:  existing,
+		TargetUID:  targetUID,
+		InstanceID: instanceID,
+		Desired:    desiredState.units,
+		Existing:   existing,
 	}, mutator)
 	if err != nil {
 		return applyReport{}, fmt.Errorf("reconcile apply: %w", err)
@@ -110,23 +112,24 @@ func previewEditedConfig(_ context.Context, cfg *config.File, targetUser string)
 	if err != nil {
 		return applyReport{}, err
 	}
+	instanceID := cfg.EffectiveInstanceID()
 
 	unitDir, err := resolveSystemdUserUnitDir(targetUser)
 	if err != nil {
 		return applyReport{}, err
 	}
 
-	desiredState, err := buildDesiredState(targetUID, cfg.Jobs)
+	desiredState, err := buildDesiredState(targetUID, instanceID, cfg.Jobs)
 	if err != nil {
 		return applyReport{}, err
 	}
 
-	existing, err := discoverExistingUnits(unitDir, targetUID)
+	existing, err := discoverExistingUnits(unitDir, targetUID, instanceID)
 	if err != nil {
 		return applyReport{}, err
 	}
 
-	plan, err := reconcile.BuildPlan(targetUID, desiredState.units, existing)
+	plan, err := reconcile.BuildPlan(targetUID, instanceID, desiredState.units, existing)
 	if err != nil {
 		return applyReport{}, fmt.Errorf("reconcile build plan: %w", err)
 	}
@@ -149,7 +152,7 @@ func previewEditedConfig(_ context.Context, cfg *config.File, targetUser string)
 	return report, nil
 }
 
-func buildDesiredState(targetUID uint32, jobs []config.Job) (applyDesiredState, error) {
+func buildDesiredState(targetUID uint32, instanceID string, jobs []config.Job) (applyDesiredState, error) {
 	state := applyDesiredState{
 		units:          make([]reconcile.DesiredUnit, 0, len(jobs)*2),
 		enabledTimers:  make([]string, 0, len(jobs)),
@@ -157,7 +160,7 @@ func buildDesiredState(targetUID uint32, jobs []config.Job) (applyDesiredState, 
 	}
 
 	for idx, job := range jobs {
-		rendered, err := renderJobUnits(targetUID, job)
+		rendered, err := renderJobUnits(targetUID, instanceID, job)
 		if err != nil {
 			return applyDesiredState{}, fmt.Errorf("render units for jobs[%d] %q: %w", idx, job.ID, err)
 		}
@@ -185,7 +188,7 @@ func buildDesiredState(targetUID uint32, jobs []config.Job) (applyDesiredState, 
 	return state, nil
 }
 
-func discoverExistingUnits(unitDir string, targetUID uint32) ([]reconcile.ExistingUnit, error) {
+func discoverExistingUnits(unitDir string, targetUID uint32, instanceID string) ([]reconcile.ExistingUnit, error) {
 	entries, err := os.ReadDir(unitDir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -201,7 +204,7 @@ func discoverExistingUnits(unitDir string, targetUID uint32) ([]reconcile.Existi
 		}
 
 		name := entry.Name()
-		if !reconcile.IsManagedUnitForUID(targetUID, name) {
+		if !reconcile.IsManagedUnitForUID(targetUID, instanceID, name) {
 			continue
 		}
 
@@ -217,7 +220,7 @@ func discoverExistingUnits(unitDir string, targetUID uint32) ([]reconcile.Existi
 		existing = append(existing, reconcile.ExistingUnit{
 			Name:    name,
 			Content: content,
-			Managed: systemd.IsManagedUnitContentForUID(content, targetUID),
+			Managed: systemd.IsManagedUnitContentForUID(content, targetUID, instanceID),
 		})
 	}
 

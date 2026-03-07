@@ -105,9 +105,10 @@ func newStatusCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			instanceID := loaded.EffectiveInstanceID()
 
 			if len(args) == 0 {
-				rows, err := collectStatusRows(cmd.Context(), targetUID, loaded.Jobs)
+				rows, err := collectStatusRows(cmd.Context(), targetUID, instanceID, loaded.Jobs)
 				if err != nil {
 					return err
 				}
@@ -139,7 +140,7 @@ func newStatusCommand() *cobra.Command {
 				return err
 			}
 
-			detail, err := collectStatusDetail(cmd.Context(), cfgPath, unitDir, targetUID, loaded.Jobs[jobIndex])
+			detail, err := collectStatusDetail(cmd.Context(), cfgPath, unitDir, targetUID, instanceID, loaded.Jobs[jobIndex])
 			if err != nil {
 				return err
 			}
@@ -156,10 +157,10 @@ func newStatusCommand() *cobra.Command {
 	return cmd
 }
 
-func collectStatusRows(ctx context.Context, targetUID uint32, jobs []config.Job) ([]statusRow, error) {
+func collectStatusRows(ctx context.Context, targetUID uint32, instanceID string, jobs []config.Job) ([]statusRow, error) {
 	rows := make([]statusRow, 0, len(jobs))
 	for _, job := range jobs {
-		rendered, err := renderJobUnits(targetUID, job)
+		rendered, err := renderJobUnits(targetUID, instanceID, job)
 		if err != nil {
 			return nil, err
 		}
@@ -185,8 +186,8 @@ func collectStatusRows(ctx context.Context, targetUID uint32, jobs []config.Job)
 	return rows, nil
 }
 
-func collectStatusDetail(ctx context.Context, cfgPath, unitDir string, targetUID uint32, job config.Job) (statusDetail, error) {
-	rendered, err := renderJobUnits(targetUID, job)
+func collectStatusDetail(ctx context.Context, cfgPath, unitDir string, targetUID uint32, instanceID string, job config.Job) (statusDetail, error) {
+	rendered, err := renderJobUnits(targetUID, instanceID, job)
 	if err != nil {
 		return statusDetail{}, err
 	}

@@ -46,6 +46,39 @@ func TestResolvePathTargetUserUsesLookupHome(t *testing.T) {
 	}
 }
 
+func TestResolvePathPrefersTimertabConfigDirEnv(t *testing.T) {
+	path, err := resolvePath(
+		"",
+		"",
+		func(key string) string {
+			switch key {
+			case ConfigDirEnv:
+				return "/tmp/custom-timertab"
+			case "XDG_CONFIG_HOME":
+				return "/tmp/xdg"
+			default:
+				return ""
+			}
+		},
+		func() (string, error) {
+			t.Fatalf("resolvePath() should not resolve home when %s is set", ConfigDirEnv)
+			return "", nil
+		},
+		func(string) (*user.User, error) {
+			t.Fatalf("resolvePath() should not look up user for current target")
+			return nil, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("resolvePath() error = %v", err)
+	}
+
+	want := filepath.Join("/tmp/custom-timertab", FileName)
+	if path != want {
+		t.Fatalf("resolvePath() = %q, want %q", path, want)
+	}
+}
+
 func TestValidateTargetUserPermissionFlows(t *testing.T) {
 	tests := []struct {
 		name       string

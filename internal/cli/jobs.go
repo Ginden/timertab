@@ -138,6 +138,7 @@ func newEjectCommand() *cobra.Command {
 				return fmt.Errorf("job %q not found", jobID)
 			}
 			job := loaded.Jobs[jobIndex]
+			instanceID := loaded.EffectiveInstanceID()
 
 			targetUID, err := resolveTargetUID(targetUser)
 			if err != nil {
@@ -148,7 +149,7 @@ func newEjectCommand() *cobra.Command {
 				return err
 			}
 
-			rendered, err := renderJobUnits(targetUID, job)
+			rendered, err := renderJobUnits(targetUID, instanceID, job)
 			if err != nil {
 				return err
 			}
@@ -156,11 +157,11 @@ func newEjectCommand() *cobra.Command {
 			servicePath := filepath.Join(unitDir, rendered.ServiceName)
 			timerPath := filepath.Join(unitDir, rendered.TimerName)
 
-			serviceResult, err := stripManagedMarkersFromUnitFile(servicePath, targetUID, job.ID)
+			serviceResult, err := stripManagedMarkersFromUnitFile(servicePath, targetUID, instanceID, job.ID)
 			if err != nil {
 				return err
 			}
-			timerResult, err := stripManagedMarkersFromUnitFile(timerPath, targetUID, job.ID)
+			timerResult, err := stripManagedMarkersFromUnitFile(timerPath, targetUID, instanceID, job.ID)
 			if err != nil {
 				return err
 			}
@@ -245,7 +246,7 @@ type markerStripResult struct {
 	Missing bool
 }
 
-func stripManagedMarkersFromUnitFile(path string, targetUID uint32, jobID string) (markerStripResult, error) {
+func stripManagedMarkersFromUnitFile(path string, targetUID uint32, instanceID, jobID string) (markerStripResult, error) {
 	contentBytes, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -255,7 +256,7 @@ func stripManagedMarkersFromUnitFile(path string, targetUID uint32, jobID string
 	}
 
 	content := string(contentBytes)
-	updatedContent, changed := stripManagedMarkers(content, targetUID, jobID)
+	updatedContent, changed := stripManagedMarkers(content, targetUID, instanceID, jobID)
 	if !changed {
 		return markerStripResult{}, nil
 	}
@@ -272,9 +273,13 @@ func stripManagedMarkersFromUnitFile(path string, targetUID uint32, jobID string
 	return markerStripResult{Changed: true}, nil
 }
 
-func stripManagedMarkers(content string, targetUID uint32, jobID string) (string, bool) {
+func stripManagedMarkers(content string, targetUID uint32, instanceID, jobID string) (string, bool) {
 	managedMarker := "# timertab-managed: true"
 	uidMarker := fmt.Sprintf("# timertab-uid: %d", targetUID)
+	instanceMarker := "# timertab-instance-id: " + config.DefaultInstanceID
+	if strings.TrimSpace(instanceID) != "" {
+		instanceMarker = "# timertab-instance-id: " + strings.TrimSpace(instanceID)
+	}
 	jobIDMarker := "# timertab-job-id: " + jobID
 
 	hasTrailingNewline := strings.HasSuffix(content, "\n")
@@ -284,7 +289,7 @@ func stripManagedMarkers(content string, targetUID uint32, jobID string) (string
 	changed := false
 	for _, line := range lines {
 		switch strings.TrimSpace(line) {
-		case managedMarker, uidMarker, jobIDMarker:
+		case managedMarker, uidMarker, instanceMarker, jobIDMarker:
 			changed = true
 			continue
 		}

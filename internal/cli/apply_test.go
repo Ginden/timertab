@@ -25,17 +25,17 @@ func TestApplyEditedConfigReconcilesUnitsAndRunsSystemctl(t *testing.T) {
 		When: config.ScheduleList{"@hourly"},
 		Run:  "echo keep",
 	}
-	rendered, err := systemd.RenderJobUnits(targetUID, keepJob)
+	rendered, err := systemd.RenderJobUnits(targetUID, config.DefaultInstanceID, keepJob)
 	if err != nil {
 		t.Fatalf("RenderJobUnits() error = %v", err)
 	}
 
 	staleTimer := "timertab-u1000-stale-a.timer"
 	staleService := "timertab-u1000-stale-a.service"
-	if err := os.WriteFile(filepath.Join(unitDir, staleTimer), []byte(managedUnitContent(targetUID, "stale-a")), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(unitDir, staleTimer), []byte(managedUnitContent(targetUID, config.DefaultInstanceID, "stale-a")), 0o644); err != nil {
 		t.Fatalf("WriteFile(stale timer) error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(unitDir, staleService), []byte(managedUnitContent(targetUID, "stale-a")), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(unitDir, staleService), []byte(managedUnitContent(targetUID, config.DefaultInstanceID, "stale-a")), 0o644); err != nil {
 		t.Fatalf("WriteFile(stale service) error = %v", err)
 	}
 
@@ -106,7 +106,7 @@ func TestApplyEditedConfigDisablesExistingTimersForDisabledJobs(t *testing.T) {
 		Run:     "echo disabled",
 		Enabled: &disabled,
 	}
-	rendered, err := systemd.RenderJobUnits(targetUID, job)
+	rendered, err := systemd.RenderJobUnits(targetUID, config.DefaultInstanceID, job)
 	if err != nil {
 		t.Fatalf("RenderJobUnits() error = %v", err)
 	}
@@ -159,10 +159,10 @@ func TestApplyEditedConfigReloadsDaemonAfterPruningWithoutEnabledTimers(t *testi
 
 	staleTimer := "timertab-u1000-stale.timer"
 	staleService := "timertab-u1000-stale.service"
-	if err := os.WriteFile(filepath.Join(unitDir, staleTimer), []byte(managedUnitContent(targetUID, "stale")), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(unitDir, staleTimer), []byte(managedUnitContent(targetUID, config.DefaultInstanceID, "stale")), 0o644); err != nil {
 		t.Fatalf("WriteFile(stale timer) error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(unitDir, staleService), []byte(managedUnitContent(targetUID, "stale")), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(unitDir, staleService), []byte(managedUnitContent(targetUID, config.DefaultInstanceID, "stale")), 0o644); err != nil {
 		t.Fatalf("WriteFile(stale service) error = %v", err)
 	}
 
@@ -213,23 +213,23 @@ func TestDiscoverExistingUnitsTracksManagedMetadata(t *testing.T) {
 	unmanagedName := "timertab-u1000-unmanaged.timer"
 	foreignName := "timertab-u1001-foreign.timer"
 
-	if err := os.WriteFile(filepath.Join(unitDir, managedName), []byte(managedUnitContent(1000, "managed")), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(unitDir, managedName), []byte(managedUnitContent(1000, config.DefaultInstanceID, "managed")), 0o644); err != nil {
 		t.Fatalf("WriteFile(managed) error = %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(unitDir, unmanagedName), []byte("[Timer]\nOnCalendar=@hourly"), 0o644); err != nil {
 		t.Fatalf("WriteFile(unmanaged) error = %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(unitDir, foreignName), []byte(managedUnitContent(1001, "foreign")), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(unitDir, foreignName), []byte(managedUnitContent(1001, config.DefaultInstanceID, "foreign")), 0o644); err != nil {
 		t.Fatalf("WriteFile(foreign) error = %v", err)
 	}
 
-	got, err := discoverExistingUnits(unitDir, 1000)
+	got, err := discoverExistingUnits(unitDir, 1000, config.DefaultInstanceID)
 	if err != nil {
 		t.Fatalf("discoverExistingUnits() error = %v", err)
 	}
 
 	want := []reconcile.ExistingUnit{
-		{Name: managedName, Content: managedUnitContent(1000, "managed"), Managed: true},
+		{Name: managedName, Content: managedUnitContent(1000, config.DefaultInstanceID, "managed"), Managed: true},
 		{Name: unmanagedName, Content: "[Timer]\nOnCalendar=@hourly", Managed: false},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -305,10 +305,11 @@ func TestLingeringWarningForTargetWarnsWhenLingerFileMissing(t *testing.T) {
 	}
 }
 
-func managedUnitContent(uid uint32, jobID string) string {
+func managedUnitContent(uid uint32, instanceID, jobID string) string {
 	return strings.Join([]string{
 		"# timertab-managed: true",
 		"# timertab-uid: " + strconv.FormatUint(uint64(uid), 10),
+		"# timertab-instance-id: " + instanceID,
 		"# timertab-job-id: " + jobID,
 		"[Unit]",
 		"Description=test",

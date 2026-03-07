@@ -278,6 +278,9 @@ func (f *File) Validate() error {
 	if f.Jobs == nil {
 		return fmt.Errorf("jobs is required")
 	}
+	if f.InstanceID != "" && !validID.MatchString(f.InstanceID) {
+		return fmt.Errorf("instance_id must match %s", validID.String())
+	}
 
 	seen := make(map[string]struct{}, len(f.Jobs))
 	for idx := range f.Jobs {

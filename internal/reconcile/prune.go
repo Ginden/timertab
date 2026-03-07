@@ -9,11 +9,12 @@ import (
 // ApplyRequest carries all inputs required for a guarded reconcile pass.
 // Validate and Compile are optional callbacks used as safety gates.
 type ApplyRequest struct {
-	TargetUID uint32
-	Desired   []DesiredUnit
-	Existing  []ExistingUnit
-	Validate  func() error
-	Compile   func() error
+	TargetUID  uint32
+	InstanceID string
+	Desired    []DesiredUnit
+	Existing   []ExistingUnit
+	Validate   func() error
+	Compile    func() error
 }
 
 // Mutator performs filesystem and systemctl changes required by reconcile.
@@ -43,12 +44,12 @@ func Apply(ctx context.Context, req ApplyRequest, mutator Mutator) (Plan, error)
 		}
 	}
 
-	plan, err := BuildPlan(req.TargetUID, req.Desired, req.Existing)
+	plan, err := BuildPlan(req.TargetUID, req.InstanceID, req.Desired, req.Existing)
 	if err != nil {
 		return Plan{}, err
 	}
 
-	if err := ExecutePrune(ctx, req.TargetUID, plan.Remove, mutator); err != nil {
+	if err := ExecutePrune(ctx, req.TargetUID, req.InstanceID, plan.Remove, mutator); err != nil {
 		return Plan{}, err
 	}
 
@@ -67,9 +68,9 @@ func Apply(ctx context.Context, req ApplyRequest, mutator Mutator) (Plan, error)
 }
 
 // ExecutePrune performs safe stale-unit removal in deterministic order.
-func ExecutePrune(ctx context.Context, targetUID uint32, units []string, mutator Mutator) error {
+func ExecutePrune(ctx context.Context, targetUID uint32, instanceID string, units []string, mutator Mutator) error {
 	for _, unit := range units {
-		if !IsManagedUnitForUID(targetUID, unit) {
+		if !IsManagedUnitForUID(targetUID, instanceID, unit) {
 			return fmt.Errorf("refusing to prune unmanaged or foreign unit %q", unit)
 		}
 

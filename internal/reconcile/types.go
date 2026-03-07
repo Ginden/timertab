@@ -27,25 +27,37 @@ type Plan struct {
 	Remove []string
 }
 
-func validateDesiredUnitName(name string, targetUID uint32) error {
+func validateDesiredUnitName(name string, targetUID uint32, instanceID string) error {
 	if strings.TrimSpace(name) == "" {
 		return fmt.Errorf("desired unit name cannot be empty")
 	}
-	if !IsManagedUnitForUID(targetUID, name) {
-		return fmt.Errorf("desired unit %q is outside managed scope for uid %d", name, targetUID)
+	if !IsManagedUnitForUID(targetUID, instanceID, name) {
+		return fmt.Errorf("desired unit %q is outside managed scope for uid %d instance %q", name, targetUID, normalizeInstanceID(instanceID))
 	}
 	return nil
 }
 
-func managedUnitPrefix(targetUID uint32) string {
-	return fmt.Sprintf("timertab-u%d-", targetUID)
+func managedUnitPrefix(targetUID uint32, instanceID string) string {
+	effectiveInstanceID := normalizeInstanceID(instanceID)
+	if effectiveInstanceID == "timertab" {
+		return fmt.Sprintf("timertab-u%d-", targetUID)
+	}
+	return fmt.Sprintf("timertab-%s-u%d-", effectiveInstanceID, targetUID)
 }
 
 // IsManagedUnitForUID reports whether unitName belongs to timertab namespace
 // for targetUID and has a supported unit extension.
-func IsManagedUnitForUID(targetUID uint32, unitName string) bool {
-	if !strings.HasPrefix(unitName, managedUnitPrefix(targetUID)) {
+func IsManagedUnitForUID(targetUID uint32, instanceID string, unitName string) bool {
+	if !strings.HasPrefix(unitName, managedUnitPrefix(targetUID, instanceID)) {
 		return false
 	}
 	return strings.HasSuffix(unitName, ".service") || strings.HasSuffix(unitName, ".timer")
+}
+
+func normalizeInstanceID(instanceID string) string {
+	trimmed := strings.TrimSpace(instanceID)
+	if trimmed == "" {
+		return "timertab"
+	}
+	return trimmed
 }

@@ -10,6 +10,8 @@ import (
 )
 
 const FileName = "timertab.yaml"
+const DefaultInstanceID = "timertab"
+const ConfigDirEnv = "TIMERTAB_CONFIG_DIR"
 
 func ResolvePath(targetUser, override string) (string, error) {
 	return resolvePath(targetUser, override, os.Getenv, os.UserHomeDir, user.Lookup)
@@ -49,6 +51,10 @@ func resolvePath(
 		return filepath.Join(u.HomeDir, ".config", "timertab", FileName), nil
 	}
 
+	configDir := strings.TrimSpace(getenv(ConfigDirEnv))
+	if configDir != "" {
+		return filepath.Join(configDir, FileName), nil
+	}
 	xdg := strings.TrimSpace(getenv("XDG_CONFIG_HOME"))
 	if xdg != "" {
 		return filepath.Join(xdg, "timertab", FileName), nil

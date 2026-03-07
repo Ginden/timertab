@@ -68,7 +68,7 @@ func TestRenderJobUnitsGolden(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := RenderJobUnits(tc.uid, tc.job)
+			got, err := RenderJobUnits(tc.uid, config.DefaultInstanceID, tc.job)
 			if err != nil {
 				t.Fatalf("RenderJobUnits() error = %v", err)
 			}
@@ -101,7 +101,7 @@ func TestRenderJobUnitsGolden(t *testing.T) {
 func TestRenderJobUnitsErrors(t *testing.T) {
 	t.Parallel()
 
-	_, err := RenderJobUnits(1000, config.Job{
+	_, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		When: config.ScheduleList{"@hourly"},
 		Run:  "echo hi",
 	})
@@ -109,7 +109,7 @@ func TestRenderJobUnitsErrors(t *testing.T) {
 		t.Fatalf("RenderJobUnits() error = nil for empty id")
 	}
 
-	_, err = RenderJobUnits(1000, config.Job{
+	_, err = RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "ok-id",
 		When: config.ScheduleList{"@every-second"},
 		Run:  "echo hi",
@@ -122,7 +122,7 @@ func TestRenderJobUnitsErrors(t *testing.T) {
 func TestRenderJobUnitsUsesOnBootSecForRebootSchedule(t *testing.T) {
 	t.Parallel()
 
-	units, err := RenderJobUnits(1000, config.Job{
+	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "reboot-job",
 		When: config.ScheduleList{"@reboot"},
 		Run:  "echo hi",
@@ -143,7 +143,7 @@ func TestRenderJobUnitsIncludesPersistentForEnabledPersistentTimers(t *testing.T
 	t.Parallel()
 
 	persistent := true
-	units, err := RenderJobUnits(1000, config.Job{
+	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:         "persistent-job",
 		When:       config.ScheduleList{"@daily"},
 		Run:        "echo hi",
@@ -161,7 +161,7 @@ func TestRenderJobUnitsIncludesPersistentForEnabledPersistentTimers(t *testing.T
 func TestRenderJobUnitsOmitsPersistentByDefault(t *testing.T) {
 	t.Parallel()
 
-	units, err := RenderJobUnits(1000, config.Job{
+	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "default-persistent",
 		When: config.ScheduleList{"@daily"},
 		Run:  "echo hi",
@@ -178,7 +178,7 @@ func TestRenderJobUnitsOmitsPersistentByDefault(t *testing.T) {
 func TestRenderJobUnitsIncludesRandomizedDelaySecWhenJitterIsSet(t *testing.T) {
 	t.Parallel()
 
-	units, err := RenderJobUnits(1000, config.Job{
+	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:     "jitter-job",
 		When:   config.ScheduleList{"@daily"},
 		Run:    "echo hi",
@@ -197,7 +197,7 @@ func TestRenderJobUnitsIncludesServiceLimits(t *testing.T) {
 	t.Parallel()
 
 	ioWeight := 500
-	units, err := RenderJobUnits(1000, config.Job{
+	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "limited-job",
 		When: config.ScheduleList{"@daily"},
 		Run:  "echo hi",
@@ -225,7 +225,7 @@ func TestRenderJobUnitsIncludesServiceLimits(t *testing.T) {
 func TestRenderJobUnitsIncludesRawSystemdOverridesFromMap(t *testing.T) {
 	t.Parallel()
 
-	units, err := RenderJobUnits(1000, config.Job{
+	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "raw-map",
 		When: config.ScheduleList{"@daily"},
 		Run:  "echo hi",
@@ -265,7 +265,7 @@ func TestRenderJobUnitsIncludesRawSystemdOverridesFromMap(t *testing.T) {
 func TestRenderJobUnitsPreservesRawSystemdOverrideOrderForList(t *testing.T) {
 	t.Parallel()
 
-	units, err := RenderJobUnits(1000, config.Job{
+	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "raw-list",
 		When: config.ScheduleList{"@daily"},
 		Run:  "echo hi",
@@ -307,18 +307,19 @@ func TestIsManagedUnitContentForUID(t *testing.T) {
 	content := strings.Join([]string{
 		"# timertab-managed: true",
 		"# timertab-uid: 1000",
+		"# timertab-instance-id: timertab",
 		"# timertab-job-id: sample",
 		"[Unit]",
 		"Description=sample",
 	}, "\n")
 
-	if !IsManagedUnitContentForUID(content, 1000) {
+	if !IsManagedUnitContentForUID(content, 1000, config.DefaultInstanceID) {
 		t.Fatalf("IsManagedUnitContentForUID() = false, want true")
 	}
-	if IsManagedUnitContentForUID(content, 1001) {
+	if IsManagedUnitContentForUID(content, 1001, config.DefaultInstanceID) {
 		t.Fatalf("IsManagedUnitContentForUID() = true for wrong uid")
 	}
-	if IsManagedUnitContentForUID(strings.Replace(content, "# timertab-job-id: sample", "# timertab-job-id: ", 1), 1000) {
+	if IsManagedUnitContentForUID(strings.Replace(content, "# timertab-job-id: sample", "# timertab-job-id: ", 1), 1000, config.DefaultInstanceID) {
 		t.Fatalf("IsManagedUnitContentForUID() = true for empty job id marker")
 	}
 }
@@ -326,7 +327,7 @@ func TestIsManagedUnitContentForUID(t *testing.T) {
 func TestRenderJobUnitsSupportsMultilineCommandWithoutBreakingDirectiveLine(t *testing.T) {
 	t.Parallel()
 
-	units, err := RenderJobUnits(1000, config.Job{
+	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "trim-test",
 		When: config.ScheduleList{"@hourly"},
 		Run:  "echo hello\n",
@@ -346,6 +347,26 @@ func TestRenderJobUnitsSupportsMultilineCommandWithoutBreakingDirectiveLine(t *t
 	}
 	if !strings.Contains(units.ServiceContent, "echo ok\\n") {
 		t.Fatalf("service content missing escaped multiline hook command: %q", units.ServiceContent)
+	}
+}
+
+func TestRenderJobUnitsPrefixesCustomInstanceID(t *testing.T) {
+	t.Parallel()
+
+	units, err := RenderJobUnits(1000, "work", config.Job{
+		ID:   "trim-test",
+		When: config.ScheduleList{"@hourly"},
+		Run:  "echo hello",
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if !strings.HasPrefix(units.BaseName, "timertab-work-u1000-") {
+		t.Fatalf("BaseName = %q, want custom instance prefix", units.BaseName)
+	}
+	if !strings.Contains(units.ServiceContent, "# timertab-instance-id: work\n") {
+		t.Fatalf("ServiceContent missing custom instance marker:\n%s", units.ServiceContent)
 	}
 }
 

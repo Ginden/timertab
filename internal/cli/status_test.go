@@ -51,13 +51,13 @@ func TestStatusCommandPrintsRowsAndHandlesMissingUnits(t *testing.T) {
 		return cfgPath, nil
 	}
 
-	alphaRendered, err := systemd.RenderJobUnits(1000, cfg.Jobs[0])
+	alphaRendered, err := systemd.RenderJobUnits(1000, config.DefaultInstanceID, cfg.Jobs[0])
 	if err != nil {
-		t.Fatalf("RenderJobUnits(alpha) error = %v", err)
+		t.Fatalf("RenderJobUnits() error = %v", err)
 	}
-	betaRendered, err := systemd.RenderJobUnits(1000, cfg.Jobs[1])
+	betaRendered, err := systemd.RenderJobUnits(1000, config.DefaultInstanceID, cfg.Jobs[1])
 	if err != nil {
-		t.Fatalf("RenderJobUnits(beta) error = %v", err)
+		t.Fatalf("RenderJobUnits() error = %v", err)
 	}
 
 	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
@@ -163,7 +163,7 @@ func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 	}
 	resolveSystemdUserUnitDir = func(string) (string, error) { return unitDir, nil }
 
-	rendered, err := systemd.RenderJobUnits(1000, cfg.Jobs[0])
+	rendered, err := systemd.RenderJobUnits(1000, config.DefaultInstanceID, cfg.Jobs[0])
 	if err != nil {
 		t.Fatalf("RenderJobUnits() error = %v", err)
 	}
@@ -337,7 +337,7 @@ func TestStatusCommandJSONOutput(t *testing.T) {
 		return cfgPath, nil
 	}
 
-	rendered, err := systemd.RenderJobUnits(1000, cfg.Jobs[0])
+	rendered, err := systemd.RenderJobUnits(1000, config.DefaultInstanceID, cfg.Jobs[0])
 	if err != nil {
 		t.Fatalf("RenderJobUnits() error = %v", err)
 	}

@@ -1,5 +1,6 @@
 # timertab-managed: true
 # timertab-uid: 1001
+# timertab-instance-id: timertab
 # timertab-job-id: journal-scan
 [Unit]
 Description="timertab timer journal-scan"

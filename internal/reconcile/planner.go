@@ -9,10 +9,10 @@ import (
 // Existing units are considered for management only when they are both:
 // - marked as timertab-managed metadata (ExistingUnit.Managed == true)
 // - in the timertab namespace for targetUID
-func BuildPlan(targetUID uint32, desired []DesiredUnit, existing []ExistingUnit) (Plan, error) {
+func BuildPlan(targetUID uint32, instanceID string, desired []DesiredUnit, existing []ExistingUnit) (Plan, error) {
 	desiredByName := make(map[string]DesiredUnit, len(desired))
 	for _, unit := range desired {
-		if err := validateDesiredUnitName(unit.Name, targetUID); err != nil {
+		if err := validateDesiredUnitName(unit.Name, targetUID, instanceID); err != nil {
 			return Plan{}, err
 		}
 		if _, exists := desiredByName[unit.Name]; exists {
@@ -29,7 +29,7 @@ func BuildPlan(targetUID uint32, desired []DesiredUnit, existing []ExistingUnit)
 		}
 		existingByName[unit.Name] = unit
 
-		if unit.Managed && IsManagedUnitForUID(targetUID, unit.Name) {
+		if unit.Managed && IsManagedUnitForUID(targetUID, instanceID, unit.Name) {
 			managedExistingByName[unit.Name] = unit
 		}
 	}

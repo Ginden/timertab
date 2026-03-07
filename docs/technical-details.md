@@ -16,9 +16,17 @@ This document collects implementation, release, and maintenance notes that are u
 - The YAML config file is the only source of truth.
 - Generated unit files are treated as derived artifacts.
 - `timertab` only mutates units that match both:
-  - the target UID naming prefix
+  - the target UID + instance naming prefix
   - embedded `timertab` managed markers inside the unit contents
 - This double check is intentional: filename patterns narrow discovery, but content markers are the actual ownership guard before prune or update.
+
+### Instance identity
+
+- Top-level `instance_id` is optional.
+- The default logical instance is `timertab`.
+- Default instance keeps the historical unit prefix `timertab-u<uid>-...`.
+- Custom instances use `timertab-<instance_id>-u<uid>-...`.
+- Ownership checks and prune safety are scoped by both UID and instance, not UID alone.
 
 ### Generated units
 
@@ -50,6 +58,8 @@ This document collects implementation, release, and maintenance notes that are u
 - Successful `timertab edit` apply runs auto-commit the config by default.
 - If the config directory is not inside a Git work tree, `timertab` initializes one first.
 - Git failures are warnings, not fatal errors. The config edit/apply path must not depend on Git success.
+- The Git scope is the directory that contains the resolved config file.
+- `--config` or `TIMERTAB_CONFIG_DIR` can therefore move the auto-commit boundary into a different repository.
 - Disable auto-commit:
 
 ```yaml
@@ -62,6 +72,16 @@ git:
 ```bash
 timertab edit --no-commit
 ```
+
+### Config path resolution
+
+- Precedence is:
+  - `--config`
+  - `TIMERTAB_CONFIG_DIR`
+  - `XDG_CONFIG_HOME`
+  - `~/.config`
+- `TIMERTAB_CONFIG_DIR` only changes where `timertab.yaml` lives.
+- It does not change the systemd user unit directory, which remains under the user's standard config home.
 
 ## Development
 

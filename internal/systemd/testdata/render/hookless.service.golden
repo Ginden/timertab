@@ -1,5 +1,6 @@
 # timertab-managed: true
 # timertab-uid: 1000
+# timertab-instance-id: timertab
 # timertab-job-id: npm-cache-verify
 [Unit]
 Description="timertab job npm-cache-verify"

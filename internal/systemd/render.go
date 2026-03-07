@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	managedMarkerLine = "# timertab-managed: true"
-	uidMarkerPrefix   = "# timertab-uid: "
-	jobIDMarkerPrefix = "# timertab-job-id: "
+	managedMarkerLine    = "# timertab-managed: true"
+	uidMarkerPrefix      = "# timertab-uid: "
+	instanceMarkerPrefix = "# timertab-instance-id: "
+	jobIDMarkerPrefix    = "# timertab-job-id: "
 )
 
 type RenderedUnits struct {
@@ -25,14 +26,16 @@ type RenderedUnits struct {
 	TimerContent   string
 }
 
-func IsManagedUnitContentForUID(content string, targetUID uint32) bool {
+func IsManagedUnitContentForUID(content string, targetUID uint32, instanceID string) bool {
 	var (
-		hasManagedMarker bool
-		hasUIDMarker     bool
-		hasJobIDMarker   bool
+		hasManagedMarker  bool
+		hasUIDMarker      bool
+		hasInstanceMarker bool
+		hasJobIDMarker    bool
 	)
 
 	targetUIDString := fmt.Sprintf("%d", targetUID)
+	effectiveInstanceID := normalizeInstanceID(instanceID)
 	for _, rawLine := range strings.Split(content, "\n") {
 		line := strings.TrimSpace(rawLine)
 		switch {
@@ -41,21 +44,24 @@ func IsManagedUnitContentForUID(content string, targetUID uint32) bool {
 		case strings.HasPrefix(line, uidMarkerPrefix):
 			uidValue := strings.TrimSpace(strings.TrimPrefix(line, uidMarkerPrefix))
 			hasUIDMarker = uidValue == targetUIDString
+		case strings.HasPrefix(line, instanceMarkerPrefix):
+			instanceValue := strings.TrimSpace(strings.TrimPrefix(line, instanceMarkerPrefix))
+			hasInstanceMarker = instanceValue == effectiveInstanceID
 		case strings.HasPrefix(line, jobIDMarkerPrefix):
 			jobIDValue := strings.TrimSpace(strings.TrimPrefix(line, jobIDMarkerPrefix))
 			hasJobIDMarker = jobIDValue != ""
 		}
 	}
 
-	return hasManagedMarker && hasUIDMarker && hasJobIDMarker
+	return hasManagedMarker && hasUIDMarker && hasInstanceMarker && hasJobIDMarker
 }
 
-func RenderJobUnits(targetUID uint32, job config.Job) (RenderedUnits, error) {
+func RenderJobUnits(targetUID uint32, instanceID string, job config.Job) (RenderedUnits, error) {
 	if strings.TrimSpace(job.ID) == "" {
 		return RenderedUnits{}, fmt.Errorf("job id is required")
 	}
 
-	baseName := buildUnitBaseName(targetUID, job.ID)
+	baseName := buildUnitBaseName(targetUID, instanceID, job.ID)
 	serviceName := baseName + ".service"
 	timerName := baseName + ".timer"
 
@@ -68,24 +74,25 @@ func RenderJobUnits(targetUID uint32, job config.Job) (RenderedUnits, error) {
 		BaseName:       baseName,
 		ServiceName:    serviceName,
 		TimerName:      timerName,
-		ServiceContent: renderServiceContent(targetUID, job, serviceName),
-		TimerContent:   renderTimerContent(targetUID, job, serviceName, timerDirectives),
+		ServiceContent: renderServiceContent(targetUID, instanceID, job, serviceName),
+		TimerContent:   renderTimerContent(targetUID, instanceID, job, serviceName, timerDirectives),
 	}
 
 	return units, nil
 }
 
-func buildUnitBaseName(targetUID uint32, jobID string) string {
+func buildUnitBaseName(targetUID uint32, instanceID, jobID string) string {
 	// Keep unit names readable, but always include a hash so distinct job IDs do not
 	// collapse after sanitization or truncation into the systemd-safe name space.
+	prefix := managedUnitPrefix(targetUID, instanceID)
 	component := sanitizeUnitComponent(jobID)
-	return fmt.Sprintf("timertab-u%d-%s-%s", targetUID, component, shortStableHash(jobID))
+	return fmt.Sprintf("%s%s-%s", prefix, component, shortStableHash(jobID))
 }
 
-func renderServiceContent(targetUID uint32, job config.Job, serviceName string) string {
+func renderServiceContent(targetUID uint32, instanceID string, job config.Job, serviceName string) string {
 	var b strings.Builder
 
-	writeManagedMarkers(&b, targetUID, job.ID)
+	writeManagedMarkers(&b, targetUID, instanceID, job.ID)
 	b.WriteString("[Unit]\n")
 	b.WriteString("Description=")
 	b.WriteString(systemdQuoted("timertab job " + job.ID))
@@ -115,10 +122,10 @@ func renderServiceContent(targetUID uint32, job config.Job, serviceName string) 
 	return b.String()
 }
 
-func renderTimerContent(targetUID uint32, job config.Job, serviceName string, timerDirectives []string) string {
+func renderTimerContent(targetUID uint32, instanceID string, job config.Job, serviceName string, timerDirectives []string) string {
 	var b strings.Builder
 
-	writeManagedMarkers(&b, targetUID, job.ID)
+	writeManagedMarkers(&b, targetUID, instanceID, job.ID)
 	b.WriteString("[Unit]\n")
 	b.WriteString("Description=")
 	b.WriteString(systemdQuoted("timertab timer " + job.ID))
@@ -149,15 +156,34 @@ func renderTimerContent(targetUID uint32, job config.Job, serviceName string, ti
 	return b.String()
 }
 
-func writeManagedMarkers(b *strings.Builder, targetUID uint32, jobID string) {
+func writeManagedMarkers(b *strings.Builder, targetUID uint32, instanceID, jobID string) {
 	b.WriteString(managedMarkerLine)
 	b.WriteString("\n")
 	b.WriteString(uidMarkerPrefix)
 	b.WriteString(fmt.Sprintf("%d", targetUID))
 	b.WriteString("\n")
+	b.WriteString(instanceMarkerPrefix)
+	b.WriteString(normalizeInstanceID(instanceID))
+	b.WriteString("\n")
 	b.WriteString(jobIDMarkerPrefix)
 	b.WriteString(jobID)
 	b.WriteString("\n")
+}
+
+func managedUnitPrefix(targetUID uint32, instanceID string) string {
+	effectiveInstanceID := normalizeInstanceID(instanceID)
+	if effectiveInstanceID == config.DefaultInstanceID {
+		return fmt.Sprintf("timertab-u%d-", targetUID)
+	}
+	return fmt.Sprintf("timertab-%s-u%d-", effectiveInstanceID, targetUID)
+}
+
+func normalizeInstanceID(instanceID string) string {
+	trimmed := strings.TrimSpace(instanceID)
+	if trimmed == "" {
+		return config.DefaultInstanceID
+	}
+	return trimmed
 }
 
 func appendEnvironmentLines(b *strings.Builder, env map[string]string) {

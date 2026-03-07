@@ -150,7 +150,7 @@ func TestEjectCommandRemovesJobAndManagedMarkers(t *testing.T) {
 		t.Fatalf("saveConfig() error = %v", err)
 	}
 
-	rendered, err := systemd.RenderJobUnits(targetUID, cfg.Jobs[0])
+	rendered, err := systemd.RenderJobUnits(targetUID, config.DefaultInstanceID, cfg.Jobs[0])
 	if err != nil {
 		t.Fatalf("RenderJobUnits() error = %v", err)
 	}

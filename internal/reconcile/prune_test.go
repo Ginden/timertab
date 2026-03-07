@@ -11,7 +11,8 @@ func TestApplyPrunesOnlyManagedUnitsForTargetUID(t *testing.T) {
 	mutator := &recordingMutator{}
 
 	_, err := Apply(context.Background(), ApplyRequest{
-		TargetUID: 1000,
+		TargetUID:  1000,
+		InstanceID: "timertab",
 		Desired: []DesiredUnit{
 			{Name: "timertab-u1000-keep.timer", Content: "same"},
 		},
@@ -44,7 +45,8 @@ func TestApplyValidationFailureAbortsBeforeMutation(t *testing.T) {
 	validateErr := errors.New("invalid config")
 
 	_, err := Apply(context.Background(), ApplyRequest{
-		TargetUID: 1000,
+		TargetUID:  1000,
+		InstanceID: "timertab",
 		Desired: []DesiredUnit{
 			{Name: "timertab-u1000-a.timer", Content: "A"},
 		},
@@ -71,7 +73,8 @@ func TestApplyCompileFailureAbortsBeforeMutation(t *testing.T) {
 	var compileCalled bool
 
 	_, err := Apply(context.Background(), ApplyRequest{
-		TargetUID: 1000,
+		TargetUID:  1000,
+		InstanceID: "timertab",
 		Desired: []DesiredUnit{
 			{Name: "timertab-u1000-a.timer", Content: "A"},
 		},
@@ -101,7 +104,7 @@ func TestApplyCompileFailureAbortsBeforeMutation(t *testing.T) {
 func TestExecutePruneRejectsForeignUnit(t *testing.T) {
 	mutator := &recordingMutator{}
 
-	err := ExecutePrune(context.Background(), 1000, []string{"timertab-u1001-foreign.timer"}, mutator)
+	err := ExecutePrune(context.Background(), 1000, "timertab", []string{"timertab-u1001-foreign.timer"}, mutator)
 	if err == nil {
 		t.Fatalf("expected prune safety error")
 	}

@@ -52,6 +52,7 @@ This opens your `$EDITOR` with the config file. Add a job:
 ```yaml
 $schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
 version: 1
+instance_id: work
 jobs:
   - name: clean temp files
     when: "@daily"
@@ -112,7 +113,10 @@ jobs:
 | `timertab print-path` (or `timertab --print-path`) | Show where the config file lives |
 | `timertab <command> -u <user>` | Operate on another user's timers (requires privileges) |
 
-Config file location: `${XDG_CONFIG_HOME:-$HOME/.config}/timertab/timertab.yaml`
+Config file location:
+- `--config <path>` if provided
+- `${TIMERTAB_CONFIG_DIR}/timertab.yaml` if `TIMERTAB_CONFIG_DIR` is set
+- otherwise `${XDG_CONFIG_HOME:-$HOME/.config}/timertab/timertab.yaml`
 
 ### Shell Completions
 
@@ -178,6 +182,7 @@ git:
 - [v1 Specification](docs/spec-v1.md) — full behavioral spec
 - [JSON Schema](schema/v1.json) — for editor integration and validation
 - [Technical Details](docs/technical-details.md) — implementation, release, and maintenance notes
+- [Caveats and Design Choices](docs/caveats.md) — weird edges and opinionated behavior
 - [Libraries](docs/libraries.md) — third-party dependencies
 
 ## License
