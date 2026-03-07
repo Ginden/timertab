@@ -90,6 +90,8 @@ func validateConfigSchema(raw any) error {
 
 func loadCompiledSchema() (*jsonschema.Schema, error) {
 	compiledSchemaMu.Do(func() {
+		// Ship validation rules inside the binary so release builds do not depend on
+		// the repo layout or a copied schema file being present at runtime.
 		var schemaDoc any
 		if err := json.Unmarshal(timertabschema.V1JSON, &schemaDoc); err != nil {
 			compiledSchemaErr = fmt.Errorf("parse embedded schema/v1.json: %w", err)
@@ -156,6 +158,8 @@ func toJSONValue(value any) (any, error) {
 		}
 		return out, nil
 	default:
+		// yaml.v3 already gives us JSON-compatible scalars for the remaining cases;
+		// keep them as-is instead of forcing another lossy conversion step.
 		return typed, nil
 	}
 }
@@ -204,6 +208,8 @@ func collectSchemaViolations(
 		currentPath = err.InstanceLocation
 	}
 
+	// Walk to leaf causes so users see concrete field-level failures instead of
+	// generic aggregate schema errors emitted by parent combinators.
 	if len(err.Causes) == 0 {
 		message := err.ErrorKind.LocalizedString(printer)
 		if message == "" {
@@ -296,6 +302,8 @@ func (f *File) NormalizeIDs() error {
 		return err
 	}
 
+	// ID generation happens only after full validation so we never persist synthetic
+	// identifiers for configs that would still be rejected.
 	seen := make(map[string]struct{}, len(f.Jobs))
 	for idx := range f.Jobs {
 		job := &f.Jobs[idx]
@@ -431,6 +439,8 @@ func validateSchedule(v string) error {
 }
 
 func nextGeneratedID(job Job, seen map[string]struct{}) string {
+	// Prefer readable IDs derived from the job name, then fall back to a content
+	// digest so unnamed jobs still get stable identifiers across reloads.
 	if slug := slugify(job.Name); slug != "" {
 		if _, exists := seen[slug]; !exists {
 			return slug
@@ -495,6 +505,8 @@ func jobDigest(job Job) string {
 	copyJob.ID = ""
 
 	if len(copyJob.When) > 1 {
+		// Schedule order is not semantically meaningful, so sort before hashing to
+		// avoid churning IDs when users reorder equivalent entries.
 		sorted := append([]string(nil), copyJob.When...)
 		sort.Strings(sorted)
 		copyJob.When = sorted

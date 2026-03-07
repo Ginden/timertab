@@ -486,6 +486,8 @@ func commandAfterCrontabFields(line string, fieldCount int) (string, bool) {
 		return strings.TrimSpace(line), true
 	}
 
+	// Scan the original line instead of rebuilding it from Fields so repeated
+	// spaces and tabs in the command area never get mistaken for schedule text.
 	inField := false
 	fieldsSeen := 0
 	for idx, r := range line {
@@ -574,6 +576,8 @@ func importJobIdentity(job config.Job) string {
 	}
 	sort.Strings(envKeys)
 
+	// Duplicate detection intentionally ignores human-facing metadata like name/id;
+	// import should dedupe by execution semantics, not by how the entry was labeled.
 	var b strings.Builder
 	b.Grow(128)
 	b.WriteString("run:")

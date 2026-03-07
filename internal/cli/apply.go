@@ -174,6 +174,8 @@ func buildDesiredState(targetUID uint32, jobs []config.Job) (applyDesiredState, 
 		}
 	}
 
+	// Normalize order before planning so dry-runs, tests, and auto-generated
+	// diffs stay stable regardless of input job ordering.
 	sort.Slice(state.units, func(i, j int) bool {
 		return state.units[i].Name < state.units[j].Name
 	})
@@ -210,6 +212,8 @@ func discoverExistingUnits(unitDir string, targetUID uint32) ([]reconcile.Existi
 		}
 		content := string(contentBytes)
 
+		// Name prefix narrows the search space; embedded markers decide whether the
+		// file is actually ours and therefore safe to mutate or prune.
 		existing = append(existing, reconcile.ExistingUnit{
 			Name:    name,
 			Content: content,
@@ -250,6 +254,8 @@ func buildSystemctlPlan(state applyDesiredState, existing []reconcile.ExistingUn
 		}
 	}
 
+	// Only disable timers that already exist and will remain on disk. New disabled
+	// jobs do not need a stop/disable cycle, and removed timers are handled by prune.
 	return systemctl.Plan{
 		TimersToDisable: sortedUniqueStrings(toDisable),
 		TimersToEnable:  sortedUniqueStrings(state.enabledTimers),

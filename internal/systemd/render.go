@@ -76,6 +76,8 @@ func RenderJobUnits(targetUID uint32, job config.Job) (RenderedUnits, error) {
 }
 
 func buildUnitBaseName(targetUID uint32, jobID string) string {
+	// Keep unit names readable, but always include a hash so distinct job IDs do not
+	// collapse after sanitization or truncation into the systemd-safe name space.
 	component := sanitizeUnitComponent(jobID)
 	return fmt.Sprintf("timertab-u%d-%s-%s", targetUID, component, shortStableHash(jobID))
 }
@@ -228,6 +230,8 @@ func hookDispatchScript(serviceName string, job config.Job) string {
 	successCommand := hookCommand(job.OnSuccess)
 	failureCommand := hookCommand(job.OnFailure)
 
+	// Hooks run through ExecStopPost so generated units keep working on systemd 247
+	// without depending on newer OnSuccess=/OnFailure= features.
 	parts := []string{
 		"TIMERTAB_JOB_ID=" + shellQuoted(job.ID),
 		"TIMERTAB_UNIT=" + shellQuoted(serviceName),
@@ -280,6 +284,8 @@ func sanitizeUnitComponent(value string) string {
 		return "job"
 	}
 
+	// Collapse arbitrary user IDs into a conservative filename fragment so the final
+	// unit name is predictable across filesystems and systemd parsers.
 	var b strings.Builder
 	b.Grow(len(trimmed))
 	lastDash := false

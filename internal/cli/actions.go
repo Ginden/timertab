@@ -153,6 +153,8 @@ func prepareEditedConfigForSave(raw []byte) (*config.File, []byte, error) {
 		return nil, nil, err
 	}
 
+	// Preserve the user's hand-edited layout whenever normalization is a no-op.
+	// Reformatting only to prove validity would make repeated edit cycles noisy.
 	if !jobIDsChanged(originalIDs, loaded.Jobs) {
 		// Keep exact user formatting/comments when IDs are already present.
 		return loaded, raw, nil
@@ -217,6 +219,8 @@ func injectGeneratedIDsIntoYAML(raw []byte, normalized *config.File) ([]byte, er
 		return nil, fmt.Errorf("jobs length mismatch")
 	}
 
+	// Patch only the missing ids back into the original node tree so comments and
+	// field ordering survive automatic ID generation.
 	for idx, jobNode := range jobsNode.Content {
 		if jobNode.Kind != yaml.MappingNode {
 			return nil, fmt.Errorf("jobs[%d] must be a mapping", idx)

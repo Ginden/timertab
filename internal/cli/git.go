@@ -35,6 +35,9 @@ func maybeAutoCommitEditedConfig(
 	before, after *config.File,
 	changed bool,
 ) {
+	// Auto-commit is a convenience feature layered on top of a successful save/apply.
+	// Any git failure must degrade to a warning rather than turning config edits into
+	// a partial or failed user operation.
 	if !changed || after == nil || !after.AutoCommitEnabled() {
 		return
 	}
@@ -112,6 +115,8 @@ func buildAutoCommitMessage(before, after *config.File) string {
 	sort.Strings(edited)
 	sort.Strings(removed)
 
+	// Summarize by stable job IDs so commit history stays compact and diff-friendly
+	// even when the YAML around those jobs is reordered.
 	parts := make([]string, 0, 3)
 	if len(added) > 0 {
 		parts = append(parts, "add "+formatJobIDs(added))
