@@ -46,6 +46,12 @@ type statusDetail struct {
 	TimerBody      string
 }
 
+type statusDiagnosticStep struct {
+	Title   string
+	Why     string
+	Command string
+}
+
 var runSystemctlShow = func(ctx context.Context, args ...string) (string, string, error) {
 	cmd := exec.CommandContext(ctx, "systemctl", args...)
 	var stdout bytes.Buffer
@@ -228,10 +234,18 @@ func collectStatusDetail(ctx context.Context, cfgPath, unitDir string, targetUID
 }
 
 func printStatusTable(cmd *cobra.Command, rows []statusRow) {
-	tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
+	out := cmd.OutOrStdout()
+	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(tw, "id\tlast_run\tnext_trigger\tresult")
 	for _, row := range rows {
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", row.ID, row.LastRun, row.NextTrigger, row.Result)
+		_, _ = fmt.Fprintf(
+			tw,
+			"%s\t%s\t%s\t%s\n",
+			colorizeStatusJobID(out, row.ID),
+			row.LastRun,
+			row.NextTrigger,
+			colorizeStatusSummaryResult(out, row.Result),
+		)
 	}
 	_ = tw.Flush()
 }
@@ -244,72 +258,90 @@ func printStatusJSON(cmd *cobra.Command, rows []statusRow) error {
 
 func printStatusDetail(cmd *cobra.Command, detail statusDetail) {
 	out := cmd.OutOrStdout()
-
-	_, _ = fmt.Fprintf(out, "job: %s\n", detail.Job.ID)
-	if strings.TrimSpace(detail.Job.Name) != "" {
-		_, _ = fmt.Fprintf(out, "name: %s\n", detail.Job.Name)
-	}
-	_, _ = fmt.Fprintf(out, "config: %s\n", detail.ConfigPath)
-	_, _ = fmt.Fprintf(out, "unit_dir: %s\n", detail.UnitDir)
-	_, _ = fmt.Fprintf(out, "service: %s\n", detail.ServiceName)
-	_, _ = fmt.Fprintf(out, "timer: %s\n", detail.TimerName)
-	_, _ = fmt.Fprintf(out, "\n")
-
-	printStatusPropertyTable(out, "runtime", [][2]string{
-		{"service_load", statusValue(detail.ServiceProps["LoadState"], detail.ServiceMissing)},
-		{"service_active", statusValue(detail.ServiceProps["ActiveState"], detail.ServiceMissing)},
-		{"service_sub", statusValue(detail.ServiceProps["SubState"], detail.ServiceMissing)},
-		{"service_result", statusResultValue(detail.ServiceProps["Result"], detail.ServiceMissing)},
-		{"timer_load", statusValue(detail.TimerProps["LoadState"], detail.TimerMissing)},
-		{"timer_active", statusValue(detail.TimerProps["ActiveState"], detail.TimerMissing)},
-		{"timer_sub", statusValue(detail.TimerProps["SubState"], detail.TimerMissing)},
-		{"last_run", statusTimeValue(detail.TimerProps["LastTriggerUSec"], detail.TimerMissing)},
-		{"next_trigger", statusTimeValue(detail.TimerProps["NextElapseUSecRealtime"], detail.TimerMissing)},
-		{"timer_enabled", statusValue(detail.TimerProps["UnitFileState"], detail.TimerMissing)},
-	})
-	_, _ = fmt.Fprintln(out)
-
-	printStatusPropertyTable(out, "files", [][2]string{
-		{"service_path", detail.ServicePath},
-		{"timer_path", detail.TimerPath},
-	})
-	_, _ = fmt.Fprintln(out)
-
 	jobYAML := mustMarshalStatusYAML(detail.Job)
-	_, _ = fmt.Fprintln(out, "job_definition:")
-	_, _ = fmt.Fprint(out, indentBlock(jobYAML, "  "))
-	if !strings.HasSuffix(jobYAML, "\n") {
+	result := statusResultValue(detail.ServiceProps["Result"], detail.ServiceMissing)
+
+	printStatusHeadline(out, detail.Job.ID, detail.Job.Name, result)
+	printStatusTableSection(out, "Overview", []string{"field", "value"}, [][]string{
+		{"job", detail.Job.ID},
+		{"name", statusDisplayName(detail.Job.Name)},
+		{"result", colorizeStatusResult(out, result)},
+		{"last run", statusTimeValue(detail.TimerProps["LastTriggerUSec"], detail.TimerMissing)},
+		{"next trigger", statusTimeValue(detail.TimerProps["NextElapseUSecRealtime"], detail.TimerMissing)},
+		{"config", detail.ConfigPath},
+		{"unit dir", detail.UnitDir},
+	})
+	printStatusTableSection(out, "Units", []string{"kind", "unit", "load", "active", "sub", "enabled", "path"}, [][]string{
+		{
+			"service",
+			detail.ServiceName,
+			statusValue(detail.ServiceProps["LoadState"], detail.ServiceMissing),
+			statusValue(detail.ServiceProps["ActiveState"], detail.ServiceMissing),
+			statusValue(detail.ServiceProps["SubState"], detail.ServiceMissing),
+			statusValue(detail.ServiceProps["UnitFileState"], detail.ServiceMissing),
+			detail.ServicePath,
+		},
+		{
+			"timer",
+			detail.TimerName,
+			statusValue(detail.TimerProps["LoadState"], detail.TimerMissing),
+			statusValue(detail.TimerProps["ActiveState"], detail.TimerMissing),
+			statusValue(detail.TimerProps["SubState"], detail.TimerMissing),
+			statusValue(detail.TimerProps["UnitFileState"], detail.TimerMissing),
+			detail.TimerPath,
+		},
+	})
+	printStatusBlockSection(out, "Job YAML", jobYAML)
+	printStatusBlockSection(out, "Service Unit", detail.ServiceBody)
+	printStatusBlockSection(out, "Timer Unit", detail.TimerBody)
+	printStatusCommandsSection(out, statusDiagnosticSteps(detail))
+}
+
+func printStatusHeadline(out io.Writer, jobID, name, result string) {
+	label := "STATUS " + jobID
+	if trimmed := strings.TrimSpace(name); trimmed != "" {
+		label += " - " + trimmed
+	}
+	_, _ = fmt.Fprintln(out, label)
+	_, _ = fmt.Fprintln(out, strings.Repeat("=", len(label)))
+	_, _ = fmt.Fprintf(out, "Result: %s\n\n", colorizeStatusResult(out, result))
+}
+
+func printStatusTableSection(out io.Writer, title string, headers []string, rows [][]string) {
+	printStatusSectionTitle(out, title)
+	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(tw, strings.Join(headers, "\t"))
+	for _, row := range rows {
+		_, _ = fmt.Fprintln(tw, strings.Join(row, "\t"))
+	}
+	_ = tw.Flush()
+	_, _ = fmt.Fprintln(out)
+}
+
+func printStatusBlockSection(out io.Writer, title, content string) {
+	printStatusSectionTitle(out, title)
+	_, _ = fmt.Fprint(out, indentBlock(content, "  "))
+	if !strings.HasSuffix(content, "\n") {
 		_, _ = fmt.Fprintln(out)
 	}
 	_, _ = fmt.Fprintln(out)
+}
 
-	_, _ = fmt.Fprintln(out, "service_definition:")
-	_, _ = fmt.Fprint(out, indentBlock(detail.ServiceBody, "  "))
-	if !strings.HasSuffix(detail.ServiceBody, "\n") {
-		_, _ = fmt.Fprintln(out)
-	}
+func printStatusCommandsSection(out io.Writer, steps []statusDiagnosticStep) {
+	printStatusSectionTitle(out, "Diagnostics")
+	_, _ = fmt.Fprintln(out, "  Start with the first command, then continue only if you need more detail.")
 	_, _ = fmt.Fprintln(out)
-
-	_, _ = fmt.Fprintln(out, "timer_definition:")
-	_, _ = fmt.Fprint(out, indentBlock(detail.TimerBody, "  "))
-	if !strings.HasSuffix(detail.TimerBody, "\n") {
+	for idx, step := range steps {
+		_, _ = fmt.Fprintf(out, "  %d. %s\n", idx+1, step.Title)
+		_, _ = fmt.Fprintf(out, "     %s\n", step.Why)
+		_, _ = fmt.Fprintf(out, "     %s\n", colorizeStatusCommand(out, step.Command))
 		_, _ = fmt.Fprintln(out)
-	}
-	_, _ = fmt.Fprintln(out)
-
-	_, _ = fmt.Fprintln(out, "diagnostics:")
-	for _, command := range statusDiagnosticCommands(detail) {
-		_, _ = fmt.Fprintln(out, "  "+colorizeStatusCommand(out, command))
 	}
 }
 
-func printStatusPropertyTable(out io.Writer, title string, rows [][2]string) {
-	_, _ = fmt.Fprintf(out, "%s:\n", title)
-	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	for _, row := range rows {
-		_, _ = fmt.Fprintf(tw, "  %s\t%s\n", row[0], row[1])
-	}
-	_ = tw.Flush()
+func printStatusSectionTitle(out io.Writer, title string) {
+	_, _ = fmt.Fprintln(out, colorizeStatusSectionTitle(out, title))
+	_, _ = fmt.Fprintln(out, strings.Repeat("-", len(title)))
 }
 
 func showUnitProperties(ctx context.Context, unit string, properties ...string) (map[string]string, bool, error) {
@@ -430,16 +462,80 @@ func indentBlock(content, prefix string) string {
 	return b.String()
 }
 
-func statusDiagnosticCommands(detail statusDetail) []string {
-	return []string{
-		fmt.Sprintf("systemctl --user status %s", detail.ServiceName),
-		fmt.Sprintf("systemctl --user status %s", detail.TimerName),
-		fmt.Sprintf("systemctl --user cat %s", detail.ServiceName),
-		fmt.Sprintf("systemctl --user cat %s", detail.TimerName),
-		fmt.Sprintf("systemctl --user show %s --property=Result,ExecMainStatus,FragmentPath", detail.ServiceName),
-		fmt.Sprintf("systemctl --user list-timers %s", detail.TimerName),
-		fmt.Sprintf("journalctl --user -u %s -n 100 --no-pager", detail.ServiceName),
+func statusDiagnosticSteps(detail statusDetail) []statusDiagnosticStep {
+	return []statusDiagnosticStep{
+		{
+			Title:   "Check the last service run",
+			Why:     "Shows whether the job failed, the recent exit summary, and the most relevant status lines.",
+			Command: fmt.Sprintf("systemctl --user status %s", detail.ServiceName),
+		},
+		{
+			Title:   "Check whether the timer is armed",
+			Why:     "Confirms that the timer unit is loaded and whether systemd believes it is waiting for the next trigger.",
+			Command: fmt.Sprintf("systemctl --user status %s", detail.TimerName),
+		},
+		{
+			Title:   "Read recent logs",
+			Why:     "Best next step when the service failed or exited unexpectedly; journal output usually contains the real error.",
+			Command: fmt.Sprintf("journalctl --user -u %s -n 100 --no-pager", detail.ServiceName),
+		},
+		{
+			Title:   "Inspect service metadata only",
+			Why:     "Useful when you want the exact result code and the resolved unit file path without the extra prose from status.",
+			Command: fmt.Sprintf("systemctl --user show %s --property=Result,ExecMainStatus,FragmentPath", detail.ServiceName),
+		},
+		{
+			Title:   "View the loaded service unit",
+			Why:     "Shows the final unit content that systemd sees, including drop-ins and the generated ExecStart/ExecStopPost lines.",
+			Command: fmt.Sprintf("systemctl --user cat %s", detail.ServiceName),
+		},
+		{
+			Title:   "View the loaded timer unit",
+			Why:     "Lets you confirm the real OnCalendar schedule, persistence, and timer-specific overrides after generation.",
+			Command: fmt.Sprintf("systemctl --user cat %s", detail.TimerName),
+		},
+		{
+			Title:   "List timer scheduling details",
+			Why:     "Shows the next and previous trigger times in the context of all active user timers.",
+			Command: fmt.Sprintf("systemctl --user list-timers %s", detail.TimerName),
+		},
 	}
+}
+
+func colorizeStatusResult(out io.Writer, result string) string {
+	if !statusWriterSupportsANSI(out) {
+		return strings.ToUpper(result)
+	}
+	const ansiReset = "\x1b[0m"
+	switch result {
+	case "pass":
+		return "\x1b[1;32mPASS" + ansiReset
+	case "fail":
+		return "\x1b[1;31mFAIL" + ansiReset
+	default:
+		return "\x1b[1;33mUNKNOWN" + ansiReset
+	}
+}
+
+func colorizeStatusSummaryResult(out io.Writer, result string) string {
+	if !statusWriterSupportsANSI(out) {
+		return result
+	}
+	return colorizeStatusResult(out, result)
+}
+
+func colorizeStatusJobID(out io.Writer, jobID string) string {
+	if !statusWriterSupportsANSI(out) {
+		return jobID
+	}
+	return "\x1b[1;34m" + jobID + "\x1b[0m"
+}
+
+func colorizeStatusSectionTitle(out io.Writer, title string) string {
+	if !statusWriterSupportsANSI(out) {
+		return title
+	}
+	return "\x1b[1m" + title + "\x1b[0m"
 }
 
 func colorizeStatusCommand(out io.Writer, command string) string {
@@ -451,6 +547,14 @@ func colorizeStatusCommand(out io.Writer, command string) string {
 		ansiReset   = "\x1b[0m"
 	)
 	return ansiCommand + command + ansiReset
+}
+
+func statusDisplayName(name string) string {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return "-"
+	}
+	return trimmed
 }
 
 func statusWriterSupportsANSI(out io.Writer) bool {
