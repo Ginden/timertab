@@ -79,6 +79,7 @@ func newEditCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&noApply, "no-apply", false, "Validate and save edits, but do not reconcile systemd units")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview reconcile changes from edited config without writing anything")
 	cmd.Flags().BoolVar(&noCommit, "no-commit", false, "Disable git auto-commit for this edit/apply run")
+	_ = cmd.Flags().MarkDeprecated("dry-run", "use `timertab diff` for reconcile previews; review-bundle rendering will replace edit-time dry runs")
 
 	return cmd
 }

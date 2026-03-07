@@ -129,6 +129,7 @@ func newImportCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&noApply, "no-apply", false, "Merge into config but skip systemd reconcile")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview what would be merged without writing anything")
 	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
+	_ = cmd.Flags().MarkDeprecated("dry-run", "use `--stdout` for YAML export today; review-bundle rendering will replace import-time dry runs")
 
 	return cmd
 }
