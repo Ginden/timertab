@@ -29,12 +29,13 @@ archives:
     files:
       - LICENSE
       - README.md
+      - CHANGELOG.md
 
 checksum:
   name_template: checksums.txt
 
 changelog:
-  use: github-native
+  use: git-cliff
 
 release:
   prerelease: auto

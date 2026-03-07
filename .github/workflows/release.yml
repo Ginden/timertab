@@ -72,6 +72,27 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Generate CHANGELOG.md
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --verbose
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Commit and push CHANGELOG.md
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          if git diff --staged --quiet; then
+            echo "No changes to CHANGELOG.md"
+          else
+            git commit -m "chore: update CHANGELOG.md for ${{ github.ref_name }}"
+            git push origin HEAD:refs/heads/main
+          fi
+
       - name: Build and publish release
         uses: goreleaser/goreleaser-action@v7
         with:
