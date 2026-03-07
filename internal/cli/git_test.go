@@ -23,7 +23,7 @@ func TestEditConfigApplyAutoCommitsChangedConfig(t *testing.T) {
 		runGitCommand = originalRunGitCommand
 	})
 
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
 		return applyReport{}, nil
 	}
 	findGitBinary = func(string) (string, error) {
@@ -81,7 +81,7 @@ EOF
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	if err := editConfig(cmd, cfgPath, "", false, false, false); err != nil {
+	if err := editConfig(cmd, cfgPath, false, false, false); err != nil {
 		t.Fatalf("editConfig() error = %v", err)
 	}
 
@@ -116,7 +116,7 @@ func TestEditConfigNoCommitSkipsAutoCommit(t *testing.T) {
 		runGitCommand = originalRunGitCommand
 	})
 
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
 		return applyReport{}, nil
 	}
 
@@ -138,7 +138,7 @@ func TestEditConfigNoCommitSkipsAutoCommit(t *testing.T) {
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	if err := editConfig(cmd, cfgPath, "", false, false, true); err != nil {
+	if err := editConfig(cmd, cfgPath, false, false, true); err != nil {
 		t.Fatalf("editConfig() error = %v", err)
 	}
 	if called {
@@ -156,7 +156,7 @@ func TestEditConfigAutoCommitDisabledByConfig(t *testing.T) {
 		runGitCommand = originalRunGitCommand
 	})
 
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
 		return applyReport{}, nil
 	}
 
@@ -188,7 +188,7 @@ EOF
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	if err := editConfig(cmd, cfgPath, "", false, false, false); err != nil {
+	if err := editConfig(cmd, cfgPath, false, false, false); err != nil {
 		t.Fatalf("editConfig() error = %v", err)
 	}
 	if called {
@@ -204,7 +204,7 @@ func TestEditConfigWarnsWhenGitIsUnavailable(t *testing.T) {
 		findGitBinary = originalFindGitBinary
 	})
 
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
 		return applyReport{}, nil
 	}
 	findGitBinary = func(string) (string, error) {
@@ -220,7 +220,7 @@ func TestEditConfigWarnsWhenGitIsUnavailable(t *testing.T) {
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(stderr)
 
-	if err := editConfig(cmd, cfgPath, "", false, false, false); err != nil {
+	if err := editConfig(cmd, cfgPath, false, false, false); err != nil {
 		t.Fatalf("editConfig() error = %v", err)
 	}
 

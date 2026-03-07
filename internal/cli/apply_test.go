@@ -52,7 +52,7 @@ func TestApplyEditedConfigReconcilesUnitsAndRunsSystemctl(t *testing.T) {
 		Version: 1,
 		Jobs:    []config.Job{keepJob},
 	}
-	report, err := applyEditedConfig(context.Background(), cfg, "")
+	report, err := applyEditedConfig(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("applyEditedConfig() error = %v", err)
 	}
@@ -126,7 +126,7 @@ func TestApplyEditedConfigDisablesExistingTimersForDisabledJobs(t *testing.T) {
 		Version: 1,
 		Jobs:    []config.Job{job},
 	}
-	report, err := applyEditedConfig(context.Background(), cfg, "")
+	report, err := applyEditedConfig(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("applyEditedConfig() error = %v", err)
 	}
@@ -174,7 +174,7 @@ func TestApplyEditedConfigReloadsDaemonAfterPruningWithoutEnabledTimers(t *testi
 		Version: 1,
 		Jobs:    []config.Job{},
 	}
-	report, err := applyEditedConfig(context.Background(), cfg, "")
+	report, err := applyEditedConfig(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("applyEditedConfig() error = %v", err)
 	}
@@ -240,19 +240,15 @@ func TestDiscoverExistingUnitsTracksManagedMetadata(t *testing.T) {
 func stubApplyDeps(t *testing.T, targetUID uint32, unitDir string, executor systemctl.Executor) func() {
 	t.Helper()
 
-	originalResolveTargetUID := resolveTargetUID
+	originalResolveCurrentUID := resolveCurrentUID
 	originalResolveSystemdUserUnitDir := resolveSystemdUserUnitDir
 	originalNewSystemctlExecutor := newSystemctlExecutor
-	originalLookupUserByName := lookupUserByName
 	originalLookupUserByUID := lookupUserByUID
 	originalStatPath := statPath
 
-	resolveTargetUID = func(string) (uint32, error) { return targetUID, nil }
-	resolveSystemdUserUnitDir = func(string) (string, error) { return unitDir, nil }
+	resolveCurrentUID = func() (uint32, error) { return targetUID, nil }
+	resolveSystemdUserUnitDir = func() (string, error) { return unitDir, nil }
 	newSystemctlExecutor = func() systemctl.Executor { return executor }
-	lookupUserByName = func(name string) (*user.User, error) {
-		return &user.User{Username: name, Uid: strconv.FormatUint(uint64(targetUID), 10)}, nil
-	}
 	lookupUserByUID = func(uid string) (*user.User, error) {
 		return &user.User{Username: "test-user", Uid: uid}, nil
 	}
@@ -261,42 +257,36 @@ func stubApplyDeps(t *testing.T, targetUID uint32, unitDir string, executor syst
 	}
 
 	return func() {
-		resolveTargetUID = originalResolveTargetUID
+		resolveCurrentUID = originalResolveCurrentUID
 		resolveSystemdUserUnitDir = originalResolveSystemdUserUnitDir
 		newSystemctlExecutor = originalNewSystemctlExecutor
-		lookupUserByName = originalLookupUserByName
 		lookupUserByUID = originalLookupUserByUID
 		statPath = originalStatPath
 	}
 }
 
-func TestLingeringWarningForTargetSkipsRoot(t *testing.T) {
-	if warning := lingeringWarningForTarget(0, ""); warning != "" {
-		t.Fatalf("lingeringWarningForTarget() = %q, want empty warning for root", warning)
+func TestLingeringWarningForCurrentUserSkipsRoot(t *testing.T) {
+	if warning := lingeringWarningForCurrentUser(0); warning != "" {
+		t.Fatalf("lingeringWarningForCurrentUser() = %q, want empty warning for root", warning)
 	}
 }
 
-func TestLingeringWarningForTargetWarnsWhenLingerFileMissing(t *testing.T) {
-	originalLookupUserByName := lookupUserByName
+func TestLingeringWarningForCurrentUserWarnsWhenLingerFileMissing(t *testing.T) {
 	originalLookupUserByUID := lookupUserByUID
 	originalStatPath := statPath
 	t.Cleanup(func() {
-		lookupUserByName = originalLookupUserByName
 		lookupUserByUID = originalLookupUserByUID
 		statPath = originalStatPath
 	})
 
-	lookupUserByName = func(name string) (*user.User, error) {
-		return &user.User{Username: name, Uid: "1000"}, nil
-	}
 	lookupUserByUID = func(uid string) (*user.User, error) {
-		return &user.User{Username: "test-user", Uid: uid}, nil
+		return &user.User{Username: "alice", Uid: uid}, nil
 	}
 	statPath = func(string) (os.FileInfo, error) {
 		return nil, os.ErrNotExist
 	}
 
-	warning := lingeringWarningForTarget(1000, "alice")
+	warning := lingeringWarningForCurrentUser(1000)
 	if !strings.Contains(warning, `lingering is not enabled for user "alice"`) {
 		t.Fatalf("warning = %q, want lingering warning for alice", warning)
 	}

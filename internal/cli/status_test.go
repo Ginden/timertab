@@ -15,19 +15,16 @@ import (
 )
 
 func TestStatusCommandPrintsRowsAndHandlesMissingUnits(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
-	originalResolveTargetUID := resolveTargetUID
+	originalResolveCurrentUID := resolveCurrentUID
 	originalRunSystemctlShow := runSystemctlShow
 	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
 		resolveConfigPath = originalResolveConfigPath
-		resolveTargetUID = originalResolveTargetUID
+		resolveCurrentUID = originalResolveCurrentUID
 		runSystemctlShow = originalRunSystemctlShow
 	})
 
-	validateTargetUserPermission = func(string) error { return nil }
-	resolveTargetUID = func(string) (uint32, error) { return 1000, nil }
+	resolveCurrentUID = func() (uint32, error) { return 1000, nil }
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
 	cfg := &config.File{
@@ -41,10 +38,7 @@ func TestStatusCommandPrintsRowsAndHandlesMissingUnits(t *testing.T) {
 		t.Fatalf("saveConfig() error = %v", err)
 	}
 
-	resolveConfigPath = func(targetUser, override string) (string, error) {
-		if targetUser != "" {
-			t.Fatalf("targetUser = %q, want empty", targetUser)
-		}
+	resolveConfigPath = func(override string) (string, error) {
 		if override != cfgPath {
 			t.Fatalf("override = %q, want %q", override, cfgPath)
 		}
@@ -120,21 +114,18 @@ func TestStatusPrintableWidthIgnoresANSIEscapes(t *testing.T) {
 }
 
 func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
 	originalResolveSystemdUserUnitDir := resolveSystemdUserUnitDir
-	originalResolveTargetUID := resolveTargetUID
+	originalResolveCurrentUID := resolveCurrentUID
 	originalRunSystemctlShow := runSystemctlShow
 	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
 		resolveConfigPath = originalResolveConfigPath
 		resolveSystemdUserUnitDir = originalResolveSystemdUserUnitDir
-		resolveTargetUID = originalResolveTargetUID
+		resolveCurrentUID = originalResolveCurrentUID
 		runSystemctlShow = originalRunSystemctlShow
 	})
 
-	validateTargetUserPermission = func(string) error { return nil }
-	resolveTargetUID = func(string) (uint32, error) { return 1000, nil }
+	resolveCurrentUID = func() (uint32, error) { return 1000, nil }
 
 	tempDir := t.TempDir()
 	cfgPath := filepath.Join(tempDir, "timertab.yaml")
@@ -155,13 +146,13 @@ func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 		t.Fatalf("saveConfig() error = %v", err)
 	}
 
-	resolveConfigPath = func(_, override string) (string, error) {
+	resolveConfigPath = func(override string) (string, error) {
 		if override != cfgPath {
 			t.Fatalf("override = %q, want %q", override, cfgPath)
 		}
 		return cfgPath, nil
 	}
-	resolveSystemdUserUnitDir = func(string) (string, error) { return unitDir, nil }
+	resolveSystemdUserUnitDir = func() (string, error) { return unitDir, nil }
 
 	rendered, err := systemd.RenderJobUnits(1000, config.DefaultInstanceID, cfg.Jobs[0])
 	if err != nil {
@@ -254,19 +245,16 @@ func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 }
 
 func TestStatusCommandReturnsErrorForSystemctlFailure(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
-	originalResolveTargetUID := resolveTargetUID
+	originalResolveCurrentUID := resolveCurrentUID
 	originalRunSystemctlShow := runSystemctlShow
 	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
 		resolveConfigPath = originalResolveConfigPath
-		resolveTargetUID = originalResolveTargetUID
+		resolveCurrentUID = originalResolveCurrentUID
 		runSystemctlShow = originalRunSystemctlShow
 	})
 
-	validateTargetUserPermission = func(string) error { return nil }
-	resolveTargetUID = func(string) (uint32, error) { return 1000, nil }
+	resolveCurrentUID = func() (uint32, error) { return 1000, nil }
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
 	if err := saveConfig(cfgPath, &config.File{
@@ -280,7 +268,7 @@ func TestStatusCommandReturnsErrorForSystemctlFailure(t *testing.T) {
 		t.Fatalf("saveConfig() error = %v", err)
 	}
 
-	resolveConfigPath = func(_, _ string) (string, error) {
+	resolveConfigPath = func(string) (string, error) {
 		return cfgPath, nil
 	}
 
@@ -303,19 +291,16 @@ func TestStatusCommandReturnsErrorForSystemctlFailure(t *testing.T) {
 }
 
 func TestStatusCommandJSONOutput(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
-	originalResolveTargetUID := resolveTargetUID
+	originalResolveCurrentUID := resolveCurrentUID
 	originalRunSystemctlShow := runSystemctlShow
 	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
 		resolveConfigPath = originalResolveConfigPath
-		resolveTargetUID = originalResolveTargetUID
+		resolveCurrentUID = originalResolveCurrentUID
 		runSystemctlShow = originalRunSystemctlShow
 	})
 
-	validateTargetUserPermission = func(string) error { return nil }
-	resolveTargetUID = func(string) (uint32, error) { return 1000, nil }
+	resolveCurrentUID = func() (uint32, error) { return 1000, nil }
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
 	cfg := &config.File{
@@ -330,7 +315,7 @@ func TestStatusCommandJSONOutput(t *testing.T) {
 		t.Fatalf("saveConfig() error = %v", err)
 	}
 
-	resolveConfigPath = func(_, override string) (string, error) {
+	resolveConfigPath = func(override string) (string, error) {
 		if override != cfgPath {
 			t.Fatalf("override = %q, want %q", override, cfgPath)
 		}
@@ -386,17 +371,14 @@ func TestStatusCommandJSONOutput(t *testing.T) {
 }
 
 func TestStatusCommandRejectsJSONForDetailedView(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
-	originalResolveTargetUID := resolveTargetUID
+	originalResolveCurrentUID := resolveCurrentUID
 	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
 		resolveConfigPath = originalResolveConfigPath
-		resolveTargetUID = originalResolveTargetUID
+		resolveCurrentUID = originalResolveCurrentUID
 	})
 
-	validateTargetUserPermission = func(string) error { return nil }
-	resolveTargetUID = func(string) (uint32, error) { return 1000, nil }
+	resolveCurrentUID = func() (uint32, error) { return 1000, nil }
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
 	if err := saveConfig(cfgPath, &config.File{
@@ -410,7 +392,7 @@ func TestStatusCommandRejectsJSONForDetailedView(t *testing.T) {
 		t.Fatalf("saveConfig() error = %v", err)
 	}
 
-	resolveConfigPath = func(_, _ string) (string, error) { return cfgPath, nil }
+	resolveConfigPath = func(string) (string, error) { return cfgPath, nil }
 
 	cmd := NewRootCommand()
 	cmd.SetOut(&bytes.Buffer{})

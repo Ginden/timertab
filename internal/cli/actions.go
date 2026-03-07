@@ -45,7 +45,7 @@ func listConfig(cmd *cobra.Command, cfgPath string) error {
 	return nil
 }
 
-func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply, dryRun, noCommit bool) error {
+func editConfig(cmd *cobra.Command, cfgPath string, noApply, dryRun, noCommit bool) error {
 	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply, dryRun,
 		configChanged := !bytes.Equal(existing, out)
 
 		if dryRun {
-			report, err := runDryRunPlan(cmd.Context(), loaded, targetUser)
+			report, err := runDryRunPlan(cmd.Context(), loaded)
 			if err != nil {
 				return err
 			}
@@ -126,7 +126,7 @@ func editConfig(cmd *cobra.Command, cfgPath, targetUser string, noApply, dryRun,
 			return nil
 		}
 
-		report, err := runSystemctlApply(cmd.Context(), loaded, targetUser)
+		report, err := runSystemctlApply(cmd.Context(), loaded)
 		if err != nil {
 			return err
 		}

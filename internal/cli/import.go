@@ -26,12 +26,8 @@ var ignoredCrontabEnv = map[string]string{
 	"SHELL":  "systemd does not use $SHELL for ExecStart; add an explicit shell invocation in run: if needed",
 }
 
-var runCrontabList = func(ctx context.Context, targetUser string) (string, error) {
+var runCrontabList = func(ctx context.Context) (string, error) {
 	args := []string{"-l"}
-	if strings.TrimSpace(targetUser) != "" {
-		args = append([]string{"-u", strings.TrimSpace(targetUser)}, args...)
-	}
-
 	cmd := exec.CommandContext(ctx, "crontab", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -63,7 +59,6 @@ func isTTY(w io.Writer) bool {
 func newImportCommand() *cobra.Command {
 	var (
 		fromStdin    bool
-		targetUser   string
 		forceStdout  bool
 		noApply      bool
 		dryRun       bool
@@ -82,11 +77,7 @@ func newImportCommand() *cobra.Command {
 				return fmt.Errorf("--dry-run cannot be combined with --stdout")
 			}
 
-			if err := validateTargetUserPermission(targetUser); err != nil {
-				return err
-			}
-
-			rawCrontab, err := loadCrontabInput(cmd.Context(), cmd.InOrStdin(), fromStdin, targetUser)
+			rawCrontab, err := loadCrontabInput(cmd.Context(), cmd.InOrStdin(), fromStdin)
 			if err != nil {
 				return err
 			}
@@ -110,7 +101,7 @@ func newImportCommand() *cobra.Command {
 				return err
 			}
 
-			cfgPath, err := resolveConfigPath(targetUser, overridePath)
+			cfgPath, err := resolveConfigPath(overridePath)
 			if err != nil {
 				return err
 			}
@@ -119,12 +110,11 @@ func newImportCommand() *cobra.Command {
 				return importDryRun(cmd, cfgPath, imported)
 			}
 
-			return importInteractive(cmd, cfgPath, targetUser, imported, noApply)
+			return importInteractive(cmd, cfgPath, imported, noApply)
 		},
 	}
 
 	cmd.Flags().BoolVar(&fromStdin, "stdin", false, "Read crontab input from stdin")
-	cmd.Flags().StringVarP(&targetUser, "user", "u", "", "Import another user's crontab")
 	cmd.Flags().BoolVar(&forceStdout, "stdout", false, "Force YAML-to-stdout mode even on a TTY")
 	cmd.Flags().BoolVar(&noApply, "no-apply", false, "Merge into config but skip systemd reconcile")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview what would be merged without writing anything")
@@ -134,7 +124,7 @@ func newImportCommand() *cobra.Command {
 	return cmd
 }
 
-func loadCrontabInput(ctx context.Context, in io.Reader, fromStdin bool, targetUser string) (string, error) {
+func loadCrontabInput(ctx context.Context, in io.Reader, fromStdin bool) (string, error) {
 	if fromStdin || stdinHasData(in) {
 		buf, err := io.ReadAll(in)
 		if err != nil {
@@ -143,7 +133,7 @@ func loadCrontabInput(ctx context.Context, in io.Reader, fromStdin bool, targetU
 		return string(buf), nil
 	}
 
-	return runCrontabList(ctx, targetUser)
+	return runCrontabList(ctx)
 }
 
 func stdinHasData(in io.Reader) bool {
@@ -326,7 +316,7 @@ func importDryRun(cmd *cobra.Command, cfgPath string, imported *config.File) err
 
 // importInteractive opens an editor pre-filled with the imported jobs, then merges
 // the result into the main config and optionally reconciles systemd units.
-func importInteractive(cmd *cobra.Command, cfgPath string, targetUser string, imported *config.File, noApply bool) error {
+func importInteractive(cmd *cobra.Command, cfgPath string, imported *config.File, noApply bool) error {
 	// Present jobs without pre-assigned IDs so they're regenerated conflict-free after merge.
 	importedForEdit := &config.File{
 		Schema:  imported.Schema,
@@ -421,7 +411,7 @@ func importInteractive(cmd *cobra.Command, cfgPath string, targetUser string, im
 		return err
 	}
 
-	report, err := runSystemctlApply(cmd.Context(), existing, targetUser)
+	report, err := runSystemctlApply(cmd.Context(), existing)
 	if err != nil {
 		return err
 	}

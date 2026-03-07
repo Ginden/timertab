@@ -11,12 +11,8 @@ import (
 	"github.com/ginden/timertab/internal/config"
 )
 
-func completeJobIDs(targetUser, overridePath, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if err := validateTargetUserPermission(targetUser); err != nil {
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-
-	cfgPath, err := resolveConfigPath(targetUser, overridePath)
+func completeJobIDs(overridePath, toComplete string) ([]string, cobra.ShellCompDirective) {
+	cfgPath, err := resolveConfigPath(overridePath)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}

@@ -16,19 +16,16 @@ import (
 )
 
 func TestLogsCommandResolvesJobAndRunsJournalctl(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
-	originalResolveTargetUID := resolveTargetUID
+	originalResolveCurrentUID := resolveCurrentUID
 	originalRunJournalctl := runJournalctl
 	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
 		resolveConfigPath = originalResolveConfigPath
-		resolveTargetUID = originalResolveTargetUID
+		resolveCurrentUID = originalResolveCurrentUID
 		runJournalctl = originalRunJournalctl
 	})
 
-	validateTargetUserPermission = func(string) error { return nil }
-	resolveTargetUID = func(string) (uint32, error) { return 1000, nil }
+	resolveCurrentUID = func() (uint32, error) { return 1000, nil }
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
 	cfg := &config.File{
@@ -43,10 +40,7 @@ func TestLogsCommandResolvesJobAndRunsJournalctl(t *testing.T) {
 		t.Fatalf("saveConfig() error = %v", err)
 	}
 
-	resolveConfigPath = func(targetUser, override string) (string, error) {
-		if targetUser != "" {
-			t.Fatalf("targetUser = %q, want empty", targetUser)
-		}
+	resolveConfigPath = func(override string) (string, error) {
 		if override != cfgPath {
 			t.Fatalf("override = %q, want %q", override, cfgPath)
 		}
@@ -89,16 +83,12 @@ func TestLogsCommandResolvesJobAndRunsJournalctl(t *testing.T) {
 }
 
 func TestLogsCommandReturnsClearErrorForUnknownID(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
 	originalRunJournalctl := runJournalctl
 	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
 		resolveConfigPath = originalResolveConfigPath
 		runJournalctl = originalRunJournalctl
 	})
-
-	validateTargetUserPermission = func(string) error { return nil }
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
 	if err := saveConfig(cfgPath, &config.File{
@@ -112,7 +102,7 @@ func TestLogsCommandReturnsClearErrorForUnknownID(t *testing.T) {
 		t.Fatalf("saveConfig() error = %v", err)
 	}
 
-	resolveConfigPath = func(_, _ string) (string, error) { return cfgPath, nil }
+	resolveConfigPath = func(string) (string, error) { return cfgPath, nil }
 	runJournalctl = func(_ context.Context, _ io.Reader, _ io.Writer, _ io.Writer, _ ...string) error {
 		return errors.New("journalctl should not run for unknown id")
 	}
@@ -132,14 +122,10 @@ func TestLogsCommandReturnsClearErrorForUnknownID(t *testing.T) {
 }
 
 func TestLogsCommandCompletesKnownJobIDs(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
 	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
 		resolveConfigPath = originalResolveConfigPath
 	})
-
-	validateTargetUserPermission = func(string) error { return nil }
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
 	if err := saveConfig(cfgPath, &config.File{
@@ -152,7 +138,7 @@ func TestLogsCommandCompletesKnownJobIDs(t *testing.T) {
 		t.Fatalf("saveConfig() error = %v", err)
 	}
 
-	resolveConfigPath = func(_, override string) (string, error) {
+	resolveConfigPath = func(override string) (string, error) {
 		if override != cfgPath {
 			t.Fatalf("override = %q, want %q", override, cfgPath)
 		}

@@ -14,7 +14,6 @@ import (
 )
 
 var ensureSystemdBaseline = systemd.EnsureBaseline
-var validateTargetUserPermission = config.ValidateTargetUserPermission
 var resolveConfigPath = config.ResolvePath
 
 func NewRootCommand() *cobra.Command {
@@ -38,7 +37,6 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newEditCommand())
 	cmd.AddCommand(newPrintPathCommand())
 	cmd.AddCommand(newValidateCommand())
-	cmd.AddCommand(newAddCommand())
 	cmd.AddCommand(newEjectCommand())
 	cmd.AddCommand(newStatusCommand())
 	cmd.AddCommand(newLogsCommand())

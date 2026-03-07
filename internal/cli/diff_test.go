@@ -11,16 +11,12 @@ import (
 )
 
 func TestDiffCommandPrintsDryRunReport(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
 	originalRunDryRunPlan := runDryRunPlan
 	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
 		resolveConfigPath = originalResolveConfigPath
 		runDryRunPlan = originalRunDryRunPlan
 	})
-
-	validateTargetUserPermission = func(string) error { return nil }
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
 	if err := saveConfig(cfgPath, &config.File{
@@ -34,11 +30,11 @@ func TestDiffCommandPrintsDryRunReport(t *testing.T) {
 		t.Fatalf("saveConfig() error = %v", err)
 	}
 
-	resolveConfigPath = func(_, _ string) (string, error) {
+	resolveConfigPath = func(string) (string, error) {
 		return cfgPath, nil
 	}
 
-	runDryRunPlan = func(_ context.Context, loaded *config.File, _ string) (applyReport, error) {
+	runDryRunPlan = func(_ context.Context, loaded *config.File) (applyReport, error) {
 		if loaded == nil || len(loaded.Jobs) != 1 || loaded.Jobs[0].ID != "job-1" {
 			t.Fatalf("loaded config not passed to dry-run plan: %#v", loaded)
 		}

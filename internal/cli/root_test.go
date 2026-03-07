@@ -72,7 +72,7 @@ func TestRootCommandEditDryRunSkipsSystemdCheck(t *testing.T) {
 	ensureSystemdBaseline = func() error {
 		return errors.New("systemd check should not run for --dry-run")
 	}
-	runDryRunPlan = func(context.Context, *config.File, string) (applyReport, error) {
+	runDryRunPlan = func(context.Context, *config.File) (applyReport, error) {
 		return applyReport{}, nil
 	}
 
@@ -88,42 +88,6 @@ func TestRootCommandEditDryRunSkipsSystemdCheck(t *testing.T) {
 	}
 }
 
-func TestRootCommandRejectsUnauthorizedTargetUser(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
-	originalResolveConfigPath := resolveConfigPath
-	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
-		resolveConfigPath = originalResolveConfigPath
-	})
-
-	deniedErr := errors.New("permission denied for target user")
-	validateTargetUserPermission = func(targetUser string) error {
-		if targetUser != "alice" {
-			t.Fatalf("targetUser = %q, want %q", targetUser, "alice")
-		}
-		return deniedErr
-	}
-
-	resolveCalled := false
-	resolveConfigPath = func(string, string) (string, error) {
-		resolveCalled = true
-		return "", nil
-	}
-
-	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"print-path", "--user", "alice"})
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err := cmd.Execute()
-	if !errors.Is(err, deniedErr) {
-		t.Fatalf("Execute() error = %v, want %v", err, deniedErr)
-	}
-	if resolveCalled {
-		t.Fatalf("ResolvePath was called despite target user validation failure")
-	}
-}
-
 func TestRootCommandPrintConfigAliasListsConfig(t *testing.T) {
 	originalResolveConfigPath := resolveConfigPath
 	t.Cleanup(func() {
@@ -136,7 +100,7 @@ func TestRootCommandPrintConfigAliasListsConfig(t *testing.T) {
 		t.Fatalf("WriteFile(%q) error = %v", cfgPath, err)
 	}
 
-	resolveConfigPath = func(string, string) (string, error) {
+	resolveConfigPath = func(string) (string, error) {
 		return cfgPath, nil
 	}
 
@@ -156,6 +120,13 @@ func TestRootCommandPrintConfigAliasListsConfig(t *testing.T) {
 	}
 	if !strings.Contains(out, string(content)) {
 		t.Fatalf("stdout missing config body, got:\n%s", out)
+	}
+}
+
+func TestRootCommandDoesNotRegisterAddCommand(t *testing.T) {
+	cmd := NewRootCommand()
+	if found, _, err := cmd.Find([]string{"add"}); err == nil && found != nil && found.Name() == "add" {
+		t.Fatalf("add command should not be registered")
 	}
 }
 

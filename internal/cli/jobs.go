@@ -1,12 +1,9 @@
 package cli
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -16,89 +13,9 @@ import (
 )
 
 const defaultSchemaURL = "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
-const defaultAddJobTemplate = `$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
-version: 1
-jobs:
-  - name: "example"
-    when: "@daily"
-    run: |-
-      echo 'timertab executes commands via /bin/sh -lc'
-      echo 'direct executable mode is planned for v2'
-`
-
-func newAddCommand() *cobra.Command {
-	var (
-		targetUser   string
-		overridePath string
-		noApply      bool
-	)
-
-	cmd := &cobra.Command{
-		Use:     "add",
-		Aliases: []string{"+1"},
-		Short:   "Open editor for one new job and append it to timertab config",
-		Args:    cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := validateTargetUserPermission(targetUser); err != nil {
-				return err
-			}
-
-			cfgPath, err := resolveConfigPath(targetUser, overridePath)
-			if err != nil {
-				return err
-			}
-
-			loaded, err := loadOrCreateConfig(cfgPath)
-			if err != nil {
-				return err
-			}
-
-			job, err := editSingleJob(cmd.Context(), cmd)
-			if err != nil {
-				return err
-			}
-			loaded.Jobs = append(loaded.Jobs, job)
-
-			if err := loaded.NormalizeIDs(); err != nil {
-				return err
-			}
-
-			if err := saveConfig(cfgPath, loaded); err != nil {
-				return err
-			}
-
-			if noApply {
-				cmd.Printf("timertab: saved %s (no apply)\n", cfgPath)
-				return nil
-			}
-
-			if err := ensureSystemdBaseline(); err != nil {
-				return err
-			}
-
-			report, err := runSystemctlApply(cmd.Context(), loaded, targetUser)
-			if err != nil {
-				return err
-			}
-
-			cmd.Printf("timertab: saved %s\n", cfgPath)
-			printApplyReport(cmd, report)
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVarP(&targetUser, "user", "u", "", "Operate on a specific user")
-	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
-	cmd.Flags().BoolVar(&noApply, "no-apply", false, "Validate and save, but do not reconcile systemd units")
-
-	return cmd
-}
 
 func newEjectCommand() *cobra.Command {
-	var (
-		targetUser   string
-		overridePath string
-	)
+	var overridePath string
 
 	cmd := &cobra.Command{
 		Use:   "eject <id>",
@@ -108,7 +25,7 @@ func newEjectCommand() *cobra.Command {
 			if len(args) > 0 {
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
-			return completeJobIDs(targetUser, overridePath, toComplete)
+			return completeJobIDs(overridePath, toComplete)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jobID := strings.TrimSpace(args[0])
@@ -116,11 +33,7 @@ func newEjectCommand() *cobra.Command {
 				return fmt.Errorf("job id cannot be empty")
 			}
 
-			if err := validateTargetUserPermission(targetUser); err != nil {
-				return err
-			}
-
-			cfgPath, err := resolveConfigPath(targetUser, overridePath)
+			cfgPath, err := resolveConfigPath(overridePath)
 			if err != nil {
 				return err
 			}
@@ -140,11 +53,11 @@ func newEjectCommand() *cobra.Command {
 			job := loaded.Jobs[jobIndex]
 			instanceID := loaded.EffectiveInstanceID()
 
-			targetUID, err := resolveTargetUID(targetUser)
+			targetUID, err := resolveCurrentUID()
 			if err != nil {
 				return err
 			}
-			unitDir, err := resolveSystemdUserUnitDir(targetUser)
+			unitDir, err := resolveSystemdUserUnitDir()
 			if err != nil {
 				return err
 			}
@@ -189,7 +102,6 @@ func newEjectCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&targetUser, "user", "u", "", "Operate on a specific user")
 	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
 
 	return cmd
@@ -309,63 +221,4 @@ func stripManagedMarkers(content string, targetUID uint32, instanceID, jobID str
 	}
 
 	return out, true
-}
-
-func editSingleJob(ctx context.Context, cmd *cobra.Command) (config.Job, error) {
-	tmpFile, err := os.CreateTemp("", "timertab-add-*.yaml")
-	if err != nil {
-		return config.Job{}, err
-	}
-	tmpName := tmpFile.Name()
-	defer os.Remove(tmpName)
-
-	if _, err := io.WriteString(tmpFile, defaultAddJobTemplate); err != nil {
-		_ = tmpFile.Close()
-		return config.Job{}, err
-	}
-	if err := tmpFile.Close(); err != nil {
-		return config.Job{}, err
-	}
-
-	editor, err := resolveEditor()
-	if err != nil {
-		return config.Job{}, err
-	}
-
-	for {
-		editCmd := exec.CommandContext(ctx, "sh", "-lc", `$EDITOR_CMD "$1"`, "timertab-editor", tmpName)
-		editCmd.Env = append(os.Environ(), "EDITOR_CMD="+editor)
-		editCmd.Stdin = cmd.InOrStdin()
-		editCmd.Stdout = cmd.OutOrStdout()
-		editCmd.Stderr = cmd.ErrOrStderr()
-		if err := editCmd.Run(); err != nil {
-			return config.Job{}, fmt.Errorf("editor failed: %w", err)
-		}
-
-		edited, err := os.ReadFile(tmpName)
-		if err != nil {
-			return config.Job{}, err
-		}
-
-		job, err := parseEditedJob(edited)
-		if err == nil {
-			return job, nil
-		}
-		printEditValidationError(cmd, err)
-	}
-}
-
-func parseEditedJob(buf []byte) (config.Job, error) {
-	cfg, err := config.LoadFromBytes(buf)
-	if err != nil {
-		return config.Job{}, err
-	}
-	if len(cfg.Jobs) != 1 {
-		return config.Job{}, fmt.Errorf("add expects exactly one job in jobs, got %d", len(cfg.Jobs))
-	}
-	if err := cfg.NormalizeIDs(); err != nil {
-		return config.Job{}, err
-	}
-
-	return cfg.Jobs[0], nil
 }

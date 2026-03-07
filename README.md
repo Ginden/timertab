@@ -103,7 +103,6 @@ jobs:
 | `timertab list` / `timertab print-config` (or `timertab -l`) | Print current config |
 | `timertab status` / `timertab status --json` | Show last run, next trigger, and result for each job |
 | `timertab status <id>` | Show detailed runtime state, generated unit definitions, file locations, and diagnostic commands |
-| `timertab add` (or `+1`) | Append a single new job through your editor |
 | `timertab eject <id>` | Stop managing a job — its units stay and keep running |
 | `timertab enable <id>` / `timertab disable <id>` | Toggle one job on/off without removing it |
 | `timertab logs <id>` | Tail/query journald logs for one job |
@@ -111,7 +110,6 @@ jobs:
 | `timertab import` | Convert crontab entries into timertab YAML |
 | `timertab validate --config <path>` | Validate a config file without applying |
 | `timertab print-path` (or `timertab --print-path`) | Show where the config file lives |
-| `timertab <command> -u <user>` | Operate on another user's timers (requires privileges) |
 
 Config file location:
 - `--config <path>` if provided

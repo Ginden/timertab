@@ -81,20 +81,13 @@ func TestImportCommandReadsFromStdinAndProducesConfig(t *testing.T) {
 
 func TestImportCommandReadsFromCrontabByDefault(t *testing.T) {
 	originalRunCrontabList := runCrontabList
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	t.Cleanup(func() {
 		runCrontabList = originalRunCrontabList
-		validateTargetUserPermission = originalValidateTargetUserPermission
 	})
 
-	validateTargetUserPermission = func(string) error { return nil }
-
 	var callCount int
-	runCrontabList = func(_ context.Context, targetUser string) (string, error) {
+	runCrontabList = func(_ context.Context) (string, error) {
 		callCount++
-		if targetUser != "alice" {
-			t.Fatalf("targetUser = %q, want %q", targetUser, "alice")
-		}
 		return "0 12 * * 1 /usr/bin/date\n", nil
 	}
 
@@ -102,7 +95,7 @@ func TestImportCommandReadsFromCrontabByDefault(t *testing.T) {
 	cmd := NewRootCommand()
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{"import", "--user", "alice"})
+	cmd.SetArgs([]string{"import"})
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -369,15 +362,12 @@ func TestImportCrontabFiltersMATTOAndSHELL(t *testing.T) {
 }
 
 func TestImportCommandForceStdout(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalRunCrontabList := runCrontabList
 	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
 		runCrontabList = originalRunCrontabList
 	})
 
-	validateTargetUserPermission = func(string) error { return nil }
-	runCrontabList = func(_ context.Context, _ string) (string, error) {
+	runCrontabList = func(_ context.Context) (string, error) {
 		return "@daily /usr/bin/backup\n", nil
 	}
 

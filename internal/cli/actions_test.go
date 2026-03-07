@@ -20,13 +20,10 @@ func TestEditConfigApplyRunsSystemctlPipeline(t *testing.T) {
 	})
 
 	var callCount int
-	runSystemctlApply = func(_ context.Context, loaded *config.File, targetUser string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, loaded *config.File) (applyReport, error) {
 		callCount++
 		if loaded == nil {
 			t.Fatalf("loaded config = nil")
-		}
-		if targetUser != "" {
-			t.Fatalf("targetUser = %q, want empty", targetUser)
 		}
 		return applyReport{}, nil
 	}
@@ -39,7 +36,7 @@ func TestEditConfigApplyRunsSystemctlPipeline(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	if err := editConfig(cmd, cfgPath, "", false, false, true); err != nil {
+	if err := editConfig(cmd, cfgPath, false, false, true); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 	if callCount != 1 {
@@ -53,7 +50,7 @@ func TestEditConfigApplyPrintsChangedOperationsOnly(t *testing.T) {
 		runSystemctlApply = originalApply
 	})
 
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
 		return applyReport{
 			Created:        []string{"/units/a.service"},
 			Modified:       []string{"/units/b.service"},
@@ -77,7 +74,7 @@ func TestEditConfigApplyPrintsChangedOperationsOnly(t *testing.T) {
 	cmd.SetErr(stderr)
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	if err := editConfig(cmd, cfgPath, "", false, false, true); err != nil {
+	if err := editConfig(cmd, cfgPath, false, false, true); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 
@@ -121,7 +118,7 @@ func TestEditConfigApplyReturnsSystemctlPipelineErrors(t *testing.T) {
 	})
 
 	pipelineErr := errors.New("systemctl apply failed")
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
 		return applyReport{}, pipelineErr
 	}
 
@@ -133,7 +130,7 @@ func TestEditConfigApplyReturnsSystemctlPipelineErrors(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	err := editConfig(cmd, cfgPath, "", false, false, true)
+	err := editConfig(cmd, cfgPath, false, false, true)
 	if !errors.Is(err, pipelineErr) {
 		t.Fatalf("editConfig() error = %v, want %v", err, pipelineErr)
 	}
@@ -145,7 +142,7 @@ func TestEditConfigNoApplySkipsSystemctlPipeline(t *testing.T) {
 		runSystemctlApply = originalApply
 	})
 
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
 		return applyReport{}, errors.New("systemctl pipeline should not run for --no-apply")
 	}
 
@@ -157,7 +154,7 @@ func TestEditConfigNoApplySkipsSystemctlPipeline(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
-	if err := editConfig(cmd, cfgPath, "", true, false, true); err != nil {
+	if err := editConfig(cmd, cfgPath, true, false, true); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 }
@@ -184,7 +181,7 @@ jobs:
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	if err := editConfig(cmd, cfgPath, "", true, false, true); err != nil {
+	if err := editConfig(cmd, cfgPath, true, false, true); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 
@@ -217,7 +214,7 @@ jobs:
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
 
-	if err := editConfig(cmd, cfgPath, "", true, false, true); err != nil {
+	if err := editConfig(cmd, cfgPath, true, false, true); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 
@@ -241,7 +238,7 @@ func TestEditConfigDryRunPrintsPlanWithoutMutatingConfigOrApplying(t *testing.T)
 		runDryRunPlan = originalDryRunPlan
 	})
 
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
 		return applyReport{}, errors.New("apply should not run for dry-run")
 	}
 
@@ -257,7 +254,7 @@ jobs:
 	}
 
 	var dryRunCalls int
-	runDryRunPlan = func(_ context.Context, loaded *config.File, _ string) (applyReport, error) {
+	runDryRunPlan = func(_ context.Context, loaded *config.File) (applyReport, error) {
 		dryRunCalls++
 		if loaded == nil || len(loaded.Jobs) != 1 || loaded.Jobs[0].ID != "existing" {
 			t.Fatalf("loaded config not passed to dry-run plan: %#v", loaded)
@@ -277,7 +274,7 @@ jobs:
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
 
-	if err := editConfig(cmd, cfgPath, "", false, true, true); err != nil {
+	if err := editConfig(cmd, cfgPath, false, true, true); err != nil {
 		t.Fatalf("editConfig() error = %v", err)
 	}
 	if dryRunCalls != 1 {
@@ -318,7 +315,7 @@ jobs:
 	}
 
 	var applyCallCount int
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
 		applyCallCount++
 
 		saved, err := os.ReadFile(cfgPath)
@@ -374,7 +371,7 @@ EOF
 	stderr := &bytes.Buffer{}
 	cmd.SetErr(stderr)
 
-	if err := editConfig(cmd, cfgPath, "", false, false, true); err != nil {
+	if err := editConfig(cmd, cfgPath, false, false, true); err != nil {
 		t.Fatalf("editConfig() error = %v, want nil", err)
 	}
 
@@ -427,7 +424,7 @@ jobs:
 	}
 
 	var applyCallCount int
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
 		applyCallCount++
 		return applyReport{}, nil
 	}
@@ -469,7 +466,7 @@ exit 1
 	stderr := &bytes.Buffer{}
 	cmd.SetErr(stderr)
 
-	err := editConfig(cmd, cfgPath, "", false, false, true)
+	err := editConfig(cmd, cfgPath, false, false, true)
 	if err == nil {
 		t.Fatalf("editConfig() error = nil, want non-nil")
 	}

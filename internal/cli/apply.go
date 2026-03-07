@@ -18,11 +18,10 @@ import (
 )
 
 var (
-	resolveTargetUID          = config.ResolveTargetUID
+	resolveCurrentUID         = config.ResolveCurrentUID
 	resolveSystemdUserUnitDir = config.ResolveSystemdUserUnitDir
 	renderJobUnits            = systemd.RenderJobUnits
 	newSystemctlExecutor      = func() systemctl.Executor { return systemctl.NewCommandExecutor() }
-	lookupUserByName          = user.Lookup
 	lookupUserByUID           = user.LookupId
 	statPath                  = os.Stat
 )
@@ -45,18 +44,18 @@ type applyReport struct {
 	Warnings       []string
 }
 
-func applyEditedConfig(ctx context.Context, cfg *config.File, targetUser string) (applyReport, error) {
+func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, error) {
 	if cfg == nil {
 		return applyReport{}, fmt.Errorf("config is required")
 	}
 
-	targetUID, err := resolveTargetUID(targetUser)
+	targetUID, err := resolveCurrentUID()
 	if err != nil {
 		return applyReport{}, err
 	}
 	instanceID := cfg.EffectiveInstanceID()
 
-	unitDir, err := resolveSystemdUserUnitDir(targetUser)
+	unitDir, err := resolveSystemdUserUnitDir()
 	if err != nil {
 		return applyReport{}, err
 	}
@@ -96,25 +95,25 @@ func applyEditedConfig(ctx context.Context, cfg *config.File, targetUser string)
 	if err != nil {
 		return applyReport{}, err
 	}
-	if warning := lingeringWarningForTarget(targetUID, targetUser); warning != "" {
+	if warning := lingeringWarningForCurrentUser(targetUID); warning != "" {
 		report.Warnings = append(report.Warnings, warning)
 	}
 
 	return report, nil
 }
 
-func previewEditedConfig(_ context.Context, cfg *config.File, targetUser string) (applyReport, error) {
+func previewEditedConfig(_ context.Context, cfg *config.File) (applyReport, error) {
 	if cfg == nil {
 		return applyReport{}, fmt.Errorf("config is required")
 	}
 
-	targetUID, err := resolveTargetUID(targetUser)
+	targetUID, err := resolveCurrentUID()
 	if err != nil {
 		return applyReport{}, err
 	}
 	instanceID := cfg.EffectiveInstanceID()
 
-	unitDir, err := resolveSystemdUserUnitDir(targetUser)
+	unitDir, err := resolveSystemdUserUnitDir()
 	if err != nil {
 		return applyReport{}, err
 	}
@@ -403,12 +402,12 @@ func buildApplyReport(unitDir string, plan reconcile.Plan, systemctlPlan systemc
 	return report, nil
 }
 
-func lingeringWarningForTarget(targetUID uint32, targetUser string) string {
+func lingeringWarningForCurrentUser(targetUID uint32) string {
 	if targetUID == 0 {
 		return ""
 	}
 
-	username, err := resolveTargetUsername(targetUID, targetUser)
+	username, err := resolveCurrentUsername(targetUID)
 	if err != nil || strings.TrimSpace(username) == "" {
 		return ""
 	}
@@ -427,16 +426,7 @@ func lingeringWarningForTarget(targetUID uint32, targetUser string) string {
 	)
 }
 
-func resolveTargetUsername(targetUID uint32, targetUser string) (string, error) {
-	normalizedTargetUser := strings.TrimSpace(targetUser)
-	if normalizedTargetUser != "" {
-		u, err := lookupUserByName(normalizedTargetUser)
-		if err != nil {
-			return "", err
-		}
-		return u.Username, nil
-	}
-
+func resolveCurrentUsername(targetUID uint32) (string, error) {
 	u, err := lookupUserByUID(strconv.FormatUint(uint64(targetUID), 10))
 	if err != nil {
 		return "", err

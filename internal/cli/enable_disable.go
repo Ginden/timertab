@@ -18,10 +18,7 @@ func newDisableCommand() *cobra.Command {
 }
 
 func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command {
-	var (
-		targetUser   string
-		overridePath string
-	)
+	var overridePath string
 
 	cmd := &cobra.Command{
 		Use:   use + " <id>",
@@ -31,7 +28,7 @@ func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command
 			if len(args) > 0 {
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
-			return completeJobIDs(targetUser, overridePath, toComplete)
+			return completeJobIDs(overridePath, toComplete)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jobID := strings.TrimSpace(args[0])
@@ -39,11 +36,7 @@ func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command
 				return fmt.Errorf("job id cannot be empty")
 			}
 
-			if err := validateTargetUserPermission(targetUser); err != nil {
-				return err
-			}
-
-			cfgPath, err := resolveConfigPath(targetUser, overridePath)
+			cfgPath, err := resolveConfigPath(overridePath)
 			if err != nil {
 				return err
 			}
@@ -71,7 +64,7 @@ func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command
 				return err
 			}
 
-			report, err := runSystemctlApply(cmd.Context(), loaded, targetUser)
+			report, err := runSystemctlApply(cmd.Context(), loaded)
 			if err != nil {
 				return err
 			}
@@ -82,7 +75,6 @@ func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command
 		},
 	}
 
-	cmd.Flags().StringVarP(&targetUser, "user", "u", "", "Operate on a specific user")
 	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
 
 	return cmd

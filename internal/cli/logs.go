@@ -22,7 +22,6 @@ var runJournalctl = func(ctx context.Context, stdin io.Reader, stdout, stderr io
 
 func newLogsCommand() *cobra.Command {
 	var (
-		targetUser   string
 		overridePath string
 		lines        string
 		since        string
@@ -39,7 +38,7 @@ func newLogsCommand() *cobra.Command {
 			if len(args) > 0 {
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
-			return completeJobIDs(targetUser, overridePath, toComplete)
+			return completeJobIDs(overridePath, toComplete)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jobID := strings.TrimSpace(args[0])
@@ -47,11 +46,7 @@ func newLogsCommand() *cobra.Command {
 				return fmt.Errorf("job id cannot be empty")
 			}
 
-			if err := validateTargetUserPermission(targetUser); err != nil {
-				return err
-			}
-
-			cfgPath, err := resolveConfigPath(targetUser, overridePath)
+			cfgPath, err := resolveConfigPath(overridePath)
 			if err != nil {
 				return err
 			}
@@ -69,7 +64,7 @@ func newLogsCommand() *cobra.Command {
 				return fmt.Errorf("job %q not found", jobID)
 			}
 
-			targetUID, err := resolveTargetUID(targetUser)
+			targetUID, err := resolveCurrentUID()
 			if err != nil {
 				return err
 			}
@@ -105,7 +100,6 @@ func newLogsCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&targetUser, "user", "u", "", "Operate on a specific user")
 	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
 	cmd.Flags().StringVarP(&lines, "lines", "n", "", "Show the most recent N lines")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow the journal output")

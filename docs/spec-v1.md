@@ -8,7 +8,6 @@ v1 focuses on:
 
 - `timertab list` / `timertab print-config` (with `-l` shorthand)
 - `timertab edit` (with `-e` shorthand)
-- `timertab <command> -u <user>` (target another user when privileges allow)
 - `on_success` and `on_failure` hooks
 
 ## 2. Compatibility Baseline
@@ -186,5 +185,4 @@ Safety rule:
 - `timertab list` (or `timertab -l`): list current jobs from source-of-truth config
 - `timertab edit` (or `timertab -e`): open editor, validate, persist IDs, apply on success
 - successful `timertab edit` apply runs auto-commit config changes unless disabled with `--no-commit` or `git.auto_commit: false`
-- `timertab <command> -u <user>`: target another user (privilege gated)
 - `sudo timertab edit` (or `sudo timertab -e`): root context by default

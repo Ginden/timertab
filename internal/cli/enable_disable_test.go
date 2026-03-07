@@ -27,7 +27,7 @@ func TestDisableCommandSetsEnabledFalseAndApplies(t *testing.T) {
 	}
 
 	var applyCalls int
-	runSystemctlApply = func(_ context.Context, loaded *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, loaded *config.File) (applyReport, error) {
 		applyCalls++
 		if loaded == nil {
 			t.Fatalf("loaded config = nil")
@@ -92,7 +92,7 @@ func TestEnableCommandSetsEnabledTrueAndApplies(t *testing.T) {
 	})
 
 	ensureSystemdBaseline = func() error { return nil }
-	runSystemctlApply = func(_ context.Context, loaded *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, loaded *config.File) (applyReport, error) {
 		if loaded.Jobs[0].Enabled == nil || !*loaded.Jobs[0].Enabled {
 			t.Fatalf("target enabled = %#v, want true", loaded.Jobs[0].Enabled)
 		}
@@ -139,7 +139,7 @@ func TestEnableDisableCommandsFailForUnknownID(t *testing.T) {
 		ensureSystemdBaseline = originalEnsure
 	})
 
-	runSystemctlApply = func(_ context.Context, _ *config.File, _ string) (applyReport, error) {
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
 		return applyReport{}, errors.New("apply should not run")
 	}
 	ensureSystemdBaseline = func() error {
@@ -173,14 +173,10 @@ func TestEnableDisableCommandsFailForUnknownID(t *testing.T) {
 }
 
 func TestEnableDisableCommandsCompleteKnownJobIDs(t *testing.T) {
-	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
 	t.Cleanup(func() {
-		validateTargetUserPermission = originalValidateTargetUserPermission
 		resolveConfigPath = originalResolveConfigPath
 	})
-
-	validateTargetUserPermission = func(string) error { return nil }
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
 	if err := saveConfig(cfgPath, &config.File{
@@ -193,7 +189,7 @@ func TestEnableDisableCommandsCompleteKnownJobIDs(t *testing.T) {
 		t.Fatalf("saveConfig() error = %v", err)
 	}
 
-	resolveConfigPath = func(_, override string) (string, error) {
+	resolveConfigPath = func(override string) (string, error) {
 		if override != cfgPath {
 			t.Fatalf("override = %q, want %q", override, cfgPath)
 		}

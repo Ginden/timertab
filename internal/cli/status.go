@@ -64,7 +64,6 @@ var runSystemctlShow = func(ctx context.Context, args ...string) (string, string
 
 func newStatusCommand() *cobra.Command {
 	var (
-		targetUser   string
 		overridePath string
 		outputJSON   bool
 	)
@@ -77,14 +76,10 @@ func newStatusCommand() *cobra.Command {
 			if len(args) > 0 {
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
-			return completeJobIDs(targetUser, overridePath, toComplete)
+			return completeJobIDs(overridePath, toComplete)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validateTargetUserPermission(targetUser); err != nil {
-				return err
-			}
-
-			cfgPath, err := resolveConfigPath(targetUser, overridePath)
+			cfgPath, err := resolveConfigPath(overridePath)
 			if err != nil {
 				return err
 			}
@@ -101,7 +96,7 @@ func newStatusCommand() *cobra.Command {
 				return err
 			}
 
-			targetUID, err := resolveTargetUID(targetUser)
+			targetUID, err := resolveCurrentUID()
 			if err != nil {
 				return err
 			}
@@ -135,7 +130,7 @@ func newStatusCommand() *cobra.Command {
 				return fmt.Errorf("job %q not found", jobID)
 			}
 
-			unitDir, err := resolveSystemdUserUnitDir(targetUser)
+			unitDir, err := resolveSystemdUserUnitDir()
 			if err != nil {
 				return err
 			}
@@ -150,7 +145,6 @@ func newStatusCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&targetUser, "user", "u", "", "Operate on a specific user")
 	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
 	cmd.Flags().BoolVar(&outputJSON, "json", false, "Print machine-readable JSON output")
 

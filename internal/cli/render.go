@@ -18,10 +18,9 @@ const defaultRenderUID uint32 = 1000
 
 func newRenderCommand() *cobra.Command {
 	var (
-		fromStdin  bool
-		targetUser string
-		outputDir  string
-		uid        uint32
+		fromStdin bool
+		outputDir string
+		uid       uint32
 	)
 
 	cmd := &cobra.Command{
@@ -37,16 +36,7 @@ Example (Docker):
   crontab -l | docker run --rm -i -v "$PWD/output:/output" ghcr.io/ginden/timertab-import`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			effectiveUID := uid
-			if targetUser != "" {
-				resolved, err := resolveTargetUID(targetUser)
-				if err != nil {
-					return err
-				}
-				effectiveUID = resolved
-			}
-
-			rawCrontab, err := loadCrontabInput(cmd.Context(), cmd.InOrStdin(), fromStdin, targetUser)
+			rawCrontab, err := loadCrontabInput(cmd.Context(), cmd.InOrStdin(), fromStdin)
 			if err != nil {
 				return err
 			}
@@ -56,12 +46,11 @@ Example (Docker):
 				return err
 			}
 
-			return renderBundle(cmd, imported, warnings, outputDir, effectiveUID)
+			return renderBundle(cmd, imported, warnings, outputDir, uid)
 		},
 	}
 
 	cmd.Flags().BoolVar(&fromStdin, "stdin", false, "Read crontab input from stdin")
-	cmd.Flags().StringVarP(&targetUser, "user", "u", "", "Import another user's crontab (resolves UID)")
 	cmd.Flags().StringVarP(&outputDir, "output", "o", "output", "Output directory for the rendered bundle")
 	cmd.Flags().Uint32Var(&uid, "uid", defaultRenderUID, "UID to embed in generated unit names")
 

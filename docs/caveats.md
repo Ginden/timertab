@@ -13,8 +13,6 @@ Resolution order is:
 
 `TIMERTAB_CONFIG_DIR` replaces only the `timertab` config directory. It does not move the `systemd` user unit directory.
 
-When `-u/--user` targets another user, `timertab` resolves paths from that user's home directory and ignores the caller's environment-based config location overrides.
-
 ## Instance Identity
 
 `timertab` supports multiple logical instances per user through top-level `instance_id`.

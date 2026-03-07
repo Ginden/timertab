@@ -7,21 +7,14 @@ import (
 )
 
 func newDiffCommand() *cobra.Command {
-	var (
-		targetUser   string
-		overridePath string
-	)
+	var overridePath string
 
 	cmd := &cobra.Command{
 		Use:   "diff",
 		Short: "Preview create/modify/delete unit changes without writing",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := validateTargetUserPermission(targetUser); err != nil {
-				return err
-			}
-
-			cfgPath, err := resolveConfigPath(targetUser, overridePath)
+			cfgPath, err := resolveConfigPath(overridePath)
 			if err != nil {
 				return err
 			}
@@ -34,7 +27,7 @@ func newDiffCommand() *cobra.Command {
 				return err
 			}
 
-			report, err := runDryRunPlan(cmd.Context(), loaded, targetUser)
+			report, err := runDryRunPlan(cmd.Context(), loaded)
 			if err != nil {
 				return err
 			}
@@ -44,7 +37,6 @@ func newDiffCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&targetUser, "user", "u", "", "Operate on a specific user")
 	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
 
 	return cmd
