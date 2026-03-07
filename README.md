@@ -175,46 +175,9 @@ git:
 
 - [v1 Specification](docs/spec-v1.md) — full behavioral spec
 - [JSON Schema](schema/v1.json) — for editor integration and validation
+- [Technical Details](docs/technical-details.md) — implementation, release, and maintenance notes
 - [Libraries](docs/libraries.md) — third-party dependencies
-
-## Development
-
-```bash
-make build    # compile
-make test     # run tests
-make run      # run without building
-make install-hooks  # enable local git hooks (.githooks)
-```
-
-Git hooks include:
-- `pre-commit`: checks staged Go files with `gofmt` and lints changed workflow files with `actionlint`.
-- `pre-push`: runs `go vet`, `go build ./cmd/timertab`, and `go test ./...`.
-
-Install `actionlint` once if you edit workflows:
-
-```bash
-go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.4
-```
-
-## Releases
-
-Tagging `v*` now triggers GitHub Actions release automation:
-
-- Linux binaries via GoReleaser (`amd64`, `arm64`)
-- GitHub-native generated release notes/changelog
-- `checksums.txt` plus GitHub artifact provenance attestations
-
-Example:
-
-```bash
-git tag v1.2.3
-git push origin v1.2.3
-```
 
 ## License
 
 [MIT](LICENSE) © Michał Wadas
-
-## Disclosure
-
-Large parts of this project were written with OpenAI Codex. The intent here is not to ask for blind trust: the core logic is still compact enough to review end-to-end, and releases ship with provenance attestations so distributed artifacts can be tied back to the published build process.
