@@ -235,19 +235,17 @@ func collectStatusDetail(ctx context.Context, cfgPath, unitDir string, targetUID
 
 func printStatusTable(cmd *cobra.Command, rows []statusRow) {
 	out := cmd.OutOrStdout()
-	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "id\tlast_run\tnext_trigger\tresult")
+	tableRows := make([][]string, 0, len(rows)+1)
+	tableRows = append(tableRows, []string{"id", "last_run", "next_trigger", "result"})
 	for _, row := range rows {
-		_, _ = fmt.Fprintf(
-			tw,
-			"%s\t%s\t%s\t%s\n",
+		tableRows = append(tableRows, []string{
 			colorizeStatusJobID(out, row.ID),
 			row.LastRun,
 			row.NextTrigger,
 			colorizeStatusSummaryResult(out, row.Result),
-		)
+		})
 	}
-	_ = tw.Flush()
+	printStatusAlignedTable(out, tableRows, 2)
 }
 
 func printStatusJSON(cmd *cobra.Command, rows []statusRow) error {
@@ -342,6 +340,40 @@ func printStatusCommandsSection(out io.Writer, steps []statusDiagnosticStep) {
 func printStatusSectionTitle(out io.Writer, title string) {
 	_, _ = fmt.Fprintln(out, colorizeStatusSectionTitle(out, title))
 	_, _ = fmt.Fprintln(out, strings.Repeat("-", len(title)))
+}
+
+func printStatusAlignedTable(out io.Writer, rows [][]string, gap int) {
+	if len(rows) == 0 {
+		return
+	}
+
+	widths := make([]int, len(rows[0]))
+	for _, row := range rows {
+		for idx, cell := range row {
+			if idx >= len(widths) {
+				break
+			}
+			width := statusPrintableWidth(cell)
+			if width > widths[idx] {
+				widths[idx] = width
+			}
+		}
+	}
+
+	for _, row := range rows {
+		for idx, cell := range row {
+			_, _ = io.WriteString(out, cell)
+			if idx == len(row)-1 || idx >= len(widths)-1 {
+				continue
+			}
+			padding := widths[idx] - statusPrintableWidth(cell) + gap
+			if padding < gap {
+				padding = gap
+			}
+			_, _ = io.WriteString(out, strings.Repeat(" ", padding))
+		}
+		_, _ = io.WriteString(out, "\n")
+	}
 }
 
 func showUnitProperties(ctx context.Context, unit string, properties ...string) (map[string]string, bool, error) {
@@ -460,6 +492,23 @@ func indentBlock(content, prefix string) string {
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+func statusPrintableWidth(value string) int {
+	width := 0
+	for idx := 0; idx < len(value); {
+		if value[idx] == '\x1b' {
+			end := strings.IndexByte(value[idx:], 'm')
+			if end < 0 {
+				break
+			}
+			idx += end + 1
+			continue
+		}
+		width++
+		idx++
+	}
+	return width
 }
 
 func statusDiagnosticSteps(detail statusDetail) []statusDiagnosticStep {

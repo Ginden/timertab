@@ -112,6 +112,13 @@ func TestStatusCommandPrintsRowsAndHandlesMissingUnits(t *testing.T) {
 	}
 }
 
+func TestStatusPrintableWidthIgnoresANSIEscapes(t *testing.T) {
+	value := "\x1b[1;34malpha\x1b[0m"
+	if got := statusPrintableWidth(value); got != len("alpha") {
+		t.Fatalf("statusPrintableWidth(%q) = %d, want %d", value, got, len("alpha"))
+	}
+}
+
 func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 	originalValidateTargetUserPermission := validateTargetUserPermission
 	originalResolveConfigPath := resolveConfigPath
