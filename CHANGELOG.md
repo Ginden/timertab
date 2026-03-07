@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2026-03-07
+
+### Bug Fixes
+
+- Use supported goreleaser changelog mode
+
+## [1.0.3] - 2026-03-07
+
+### Bug Fixes
+
+- Keep release checkout clean
+
+## [1.0.2] - 2026-03-07
+
+### Bug Fixes
+
+- Github CI
+
+### Miscellaneous Tasks
+
+- Update CHANGELOG.md for v1.0.0
+
 ## [1.0.0] - 2026-03-07
 
 ### Bug Fixes
