@@ -4,28 +4,88 @@
 
 If you've ever wished `crontab -e` gave you systemd timers instead of 1970s cron, this is that tool. You write a simple YAML config, `timertab` turns it into proper `.service` and `.timer` units. No daemon, no lock-in — just plain systemd.
 
-## Why not just use crontab?
+## See what your crontab looks like as systemd timers
 
-Systemd timers are better than cron in almost every way: structured logging through journald, resource controls, dependency ordering, per-user isolation. But managing them by hand means writing two unit files per job and juggling `systemctl enable`, `daemon-reload`, and cleanup yourself.
+No install needed. Pipe your crontab in, get rendered systemd units out:
 
-`timertab` takes care of all of that. You get the simplicity of crontab with the power of systemd timers.
+```bash
+crontab -l | docker run --network none --rm -i -v "$PWD/output:/output" ghcr.io/ginden/timertab-import
+```
 
-## Why not just write unit files?
+This produces a full review bundle — `timertab.yaml`, rendered `.service` and `.timer` files, and a `REPORT.md` with migration notes — all without touching your system. Runs sandboxed with `--network none`.
 
-You absolutely can — and `timertab` won't stop you. In fact, that's the point: the generated units are standard systemd, human-readable, and work without `timertab` installed. If you ever want to stop using this tool, run `timertab eject <id>` and your timer keeps running on its own.
+## Why timertab?
 
-## Features
+### 🔓 True zero lock-in
+
+Generated units are standard, human-readable systemd files. They work without `timertab` installed — your timers keep running whether `timertab` is present or not. When you outgrow YAML and want to manage units directly:
+
+```bash
+timertab eject <id>
+```
+
+This removes ownership markers and leaves a standalone systemd timer. No proprietary format, no runtime dependency.
+
+### 🪝 Success and failure hooks
+
+Run a command when a job succeeds or fails — send a notification, dump logs, trigger another script. Hooks are first-class, not an afterthought:
+
+```yaml
+on_success:
+  command: "echo ok"
+on_failure:
+  command: 'notify-send "Backup failed"'
+```
+
+Hooks receive rich context: `TIMERTAB_JOB_ID`, `TIMERTAB_UNIT`, `SERVICE_RESULT`, `EXIT_CODE`, `EXIT_STATUS`.
+
+### 🛡️ Atomic reconcile
+
+If your config is invalid, **nothing gets written or pruned**. No partial state, no orphaned units. Ever.
+
+### 🔀 Multiple schedules per job
+
+One job can fire at different times — no need to duplicate entries:
+
+```yaml
+when:
+  - "0 9 * * *"
+  - "0 18 * * *"
+```
+
+### 📦 Multiple instances per user
+
+Run separate job namespaces (work, personal, project-specific) on the same machine. Each instance manages its own units and never touches the others:
+
+```yaml
+instance_id: work
+```
+
+### ⚙️ Raw systemd when you need it
+
+Sensible defaults for everything, full systemd control when you want it:
+
+```yaml
+systemd:
+  service:
+    Restart: "on-failure"
+    RestartSec: "30s"
+  timer:
+    AccuracySec: "1m"
+```
+
+### 📝 Git auto-commit
+
+Every successful edit is automatically committed to a local git repo. Full audit trail of every change, with no extra effort. Disable with `--no-commit` or in config.
+
+## All features
 
 - **One YAML file** — all your scheduled jobs in one place, version-control friendly.
-- **Success and failure hooks** — run a command when a job succeeds or fails (send a notification, dump logs, trigger another script).
 - **Cron syntax you already know** — `@hourly`, `@daily`, or standard 5-field cron expressions.
 - **Multiline scripts** — these just work, run multiple commands without `&&` abuse.
-- **Multiple schedules per job** — `when` accepts a list, so one job can fire at different times.
-- **Zero lock-in** — eject any job and it keeps running as a standalone systemd timer.
 - **Per-user isolation** — units are scoped to your UID; `timertab` never touches units it didn't create.
-- **Raw systemd overrides when needed** — set extra `[Service]` / `[Timer]` directives per job.
 - **JSON Schema** — get autocomplete and validation in editors that support it.
-- **Safe reconcile** — if your config is invalid, nothing gets written or pruned. No partial state.
+- **Shell completions** — bash, zsh, and fish.
 
 ## Quick start
 
@@ -142,7 +202,7 @@ Unlike `edit`, `render` never touches `~/.config/systemd/user`, never calls `sys
 If you want the same review flow without installing `timertab` locally, use the published container image:
 
 ```bash
-crontab -l | docker run --rm -i -v "$PWD/output:/output" ghcr.io/ginden/timertab-import
+crontab -l | docker run --network none --rm -i -v "$PWD/output:/output" ghcr.io/ginden/timertab-import
 ```
 
 ### Shell Completions
