@@ -108,6 +108,7 @@ jobs:
 | `timertab logs <id>` | Tail/query journald logs for one job |
 | `timertab diff` | Preview create/modify/delete reconcile operations |
 | `timertab import` | Convert crontab entries into timertab YAML |
+| `timertab render` | Convert crontab input into a review bundle with `timertab.yaml`, rendered units, and `REPORT.md` |
 | `timertab validate --config <path>` | Validate a config file without applying |
 | `timertab print-path` (or `timertab --print-path`) | Show where the config file lives |
 
@@ -115,6 +116,34 @@ Config file location:
 - `--config <path>` if provided
 - `${TIMERTAB_CONFIG_DIR}/timertab.yaml` if `TIMERTAB_CONFIG_DIR` is set
 - otherwise `${XDG_CONFIG_HOME:-$HOME/.config}/timertab/timertab.yaml`
+
+### Import or Review an Existing Crontab
+
+To convert your current crontab into `timertab` YAML without applying anything:
+
+```bash
+timertab import --stdout > timertab.yaml
+```
+
+To generate a review bundle with rendered `systemd` units:
+
+```bash
+crontab -l | timertab render --stdin --output output
+```
+
+`render` writes:
+
+- `output/timertab.yaml`
+- one `.service` and one `.timer` file per imported job
+- `output/REPORT.md` with imported jobs, warnings, and cron-vs-systemd caveats
+
+Unlike `edit`, `render` never touches `~/.config/systemd/user`, never calls `systemctl`, and does not require `systemd` to be installed.
+
+If you want the same review flow without installing `timertab` locally, use the published container image:
+
+```bash
+crontab -l | docker run --rm -i -v "$PWD/output:/output" ghcr.io/ginden/timertab-import
+```
 
 ### Shell Completions
 

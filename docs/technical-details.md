@@ -53,6 +53,12 @@ This document collects implementation, release, and maintenance notes that are u
 - Imported entries are compared using command, schedule, cwd, and environment.
 - This avoids creating duplicate timers when the same crontab entry is imported multiple times under different labels.
 
+### Render behavior
+
+- `timertab render` reuses the import pipeline, then renders a review bundle instead of touching live `systemd --user` state.
+- The bundle contains generated unit files, generated `timertab.yaml`, and `REPORT.md`.
+- This path never writes to `~/.config/systemd/user`, never calls `systemctl`, and is intended to work even when `systemd` is not installed.
+
 ### Auto-commit behavior
 
 - Successful `timertab edit` apply runs auto-commit the config by default.
@@ -110,6 +116,7 @@ Tagging `v*` triggers GitHub Actions release automation.
 Current release flow:
 
 - Linux binaries via GoReleaser (`amd64`, `arm64`)
+- Multi-arch import/render container image published to `ghcr.io/ginden/timertab-import`
 - GitHub-generated release notes/changelog
 - `checksums.txt`
 - GitHub artifact provenance attestations

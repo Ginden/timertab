@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"text/tabwriter"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 
@@ -105,7 +105,7 @@ func renderBundle(cmd *cobra.Command, cfg *config.File, importWarnings []string,
 	}
 
 	// Print summary to stderr
-	cmd.Printf("rendered %d job(s) to %s\n", len(rendered), outputDir)
+	cmd.Printf("rendered %d job(s) to %s\n", len(rendered), colorizeRenderOutputPath(cmd.OutOrStdout(), outputDir))
 	for _, w := range importWarnings {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s %s\n", warningPrefix, w)
 	}
@@ -138,33 +138,26 @@ func buildRenderReport(
 	fmt.Fprintf(&b, "- **Instance ID:** %s\n", instanceID)
 	b.WriteString("\n")
 
-	// Imported jobs table
+	// Imported jobs sections
 	if len(rendered) > 0 {
 		b.WriteString("## Imported Jobs\n\n")
 
-		tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "| ID\t| Name\t| Schedule\t| Service Unit\t| Timer Unit\t|")
-		fmt.Fprintln(tw, "| ---\t| ---\t| ---\t| ---\t| ---\t|")
-		for _, r := range rendered {
-			name := r.job.Name
-			if name == "" {
-				name = "(none)"
-			}
-			schedule := strings.Join([]string(r.job.When), ", ")
-			fmt.Fprintf(tw, "| %s\t| %s\t| %s\t| %s\t| %s\t|\n",
-				r.job.ID, name, schedule, r.units.ServiceName, r.units.TimerName)
+		for idx, r := range rendered {
+			fmt.Fprintf(&b, "### %d. %s\n\n", idx+1, reportJobTitle(r.job))
+			fmt.Fprintf(&b, "- Schedule: %s\n", markdownScheduleList(r.job.When))
+			fmt.Fprintf(&b, "- Job ID: `%s`\n", r.job.ID)
+			fmt.Fprintf(&b, "- Service unit: `%s`\n", r.units.ServiceName)
+			fmt.Fprintf(&b, "- Timer unit: `%s`\n", r.units.TimerName)
+			b.WriteString("- Command:\n\n```sh\n")
+			b.WriteString(strings.TrimSpace(r.job.Run))
+			b.WriteString("\n```\n\n")
 		}
-		tw.Flush()
-		b.WriteString("\n")
 	}
 
 	// Files listing
 	b.WriteString("## Generated Files\n\n")
 	b.WriteString("- `timertab.yaml` — YAML source used to render units\n")
-	for _, r := range rendered {
-		fmt.Fprintf(&b, "- `%s` — service unit for job %q\n", r.units.ServiceName, r.job.ID)
-		fmt.Fprintf(&b, "- `%s` — timer unit for job %q\n", r.units.TimerName, r.job.ID)
-	}
+	b.WriteString("- One `.service` and one `.timer` file per imported job (see job sections above for exact filenames)\n")
 	b.WriteString("- `REPORT.md` — this report\n")
 	b.WriteString("\n")
 
@@ -258,4 +251,82 @@ func collectCaveats(cfg *config.File) []caveat {
 	sort.Slice(out, func(i, j int) bool { return out[i].title < out[j].title })
 
 	return out
+}
+
+func reportJobTitle(job config.Job) string {
+	if name := strings.TrimSpace(job.Name); name != "" {
+		return name
+	}
+
+	summary := strings.Join(strings.Fields(firstLine(job.Run)), " ")
+	if summary == "" {
+		return "(unnamed job)"
+	}
+
+	if strings.Contains(strings.TrimSpace(job.Run), "\n") {
+		summary += " ..."
+	}
+
+	return truncateRunes(summary, 72)
+}
+
+func markdownScheduleList(schedules config.ScheduleList) string {
+	if len(schedules) == 0 {
+		return "(none)"
+	}
+
+	quoted := make([]string, 0, len(schedules))
+	for _, schedule := range schedules {
+		quoted = append(quoted, fmt.Sprintf("`%s`", schedule))
+	}
+
+	return strings.Join(quoted, ", ")
+}
+
+func firstLine(text string) string {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return ""
+	}
+
+	if idx := strings.IndexByte(trimmed, '\n'); idx >= 0 {
+		return trimmed[:idx]
+	}
+
+	return trimmed
+}
+
+func truncateRunes(text string, max int) string {
+	if max <= 0 || utf8.RuneCountInString(text) <= max {
+		return text
+	}
+	if max <= 3 {
+		return strings.Repeat(".", max)
+	}
+
+	runes := []rune(text)
+	return string(runes[:max-3]) + "..."
+}
+
+func colorizeRenderOutputPath(out any, path string) string {
+	display := displayCLIPath(path)
+	writer, ok := out.(interface{ Write([]byte) (int, error) })
+	if !ok || !statusWriterSupportsANSI(writer) {
+		return display
+	}
+	return "\x1b[1;36m" + display + "\x1b[0m"
+}
+
+func displayCLIPath(path string) string {
+	cleaned := filepath.Clean(strings.TrimSpace(path))
+	if cleaned == "." || cleaned == ".." {
+		return cleaned
+	}
+	if filepath.IsAbs(cleaned) {
+		return cleaned
+	}
+	if strings.HasPrefix(cleaned, "."+string(filepath.Separator)) || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
+		return cleaned
+	}
+	return "." + string(filepath.Separator) + cleaned
 }
