@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-03-17
+
+### Bug Fixes
+
+- Missing render
+
+### Documentation
+
+- Rewrite README a bit
+
+### Miscellaneous Tasks
+
+- Update CHANGELOG.md for v1.0.4
+
+### Other
+
+- AI description: Introduce RunCommand abstraction with shell‑shorthand and explicit argv support, updating config, rendering, docs, schema, and related tests.
+- AI description: Add LogPeek field to statusDetail, display recent logs in status output, and implement journalctl fallback handling.
+- AI description: WIP: broaden CLI commands, add instance_id handling and config path hierarchy, align README and schema, implement unit reconciliation and import/render workflows, and tighten naming and safety rules.
+- AI description: Add CLI reference documentation and update the README with a link to it.
+- AI description: Update docs/cli-reference.md and related CLI notes when adding, removing, renaming, or changing command flags or behavior.
+
 ## [1.0.4] - 2026-03-07
 
 ### Bug Fixes
