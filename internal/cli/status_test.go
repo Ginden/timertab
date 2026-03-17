@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -118,11 +119,13 @@ func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 	originalResolveSystemdUserUnitDir := resolveSystemdUserUnitDir
 	originalResolveCurrentUID := resolveCurrentUID
 	originalRunSystemctlShow := runSystemctlShow
+	originalRunJournalctl := runJournalctl
 	t.Cleanup(func() {
 		resolveConfigPath = originalResolveConfigPath
 		resolveSystemdUserUnitDir = originalResolveSystemdUserUnitDir
 		resolveCurrentUID = originalResolveCurrentUID
 		runSystemctlShow = originalRunSystemctlShow
+		runJournalctl = originalRunJournalctl
 	})
 
 	resolveCurrentUID = func() (uint32, error) { return 1000, nil }
@@ -188,6 +191,14 @@ func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 			return "", "", fmt.Errorf("unexpected unit %q", unit)
 		}
 	}
+	runJournalctl = func(_ context.Context, _ io.Reader, stdout, _ io.Writer, args ...string) error {
+		want := []string{"--user", "-u", rendered.ServiceName, "-n", "20", "--no-pager"}
+		if strings.Join(args, "\x00") != strings.Join(want, "\x00") {
+			t.Fatalf("journalctl args = %v, want %v", args, want)
+		}
+		_, err := stdout.Write([]byte("Mar 17 10:00:00 host echo alpha\nMar 17 10:00:01 host done\n"))
+		return err
+	}
 
 	stdout := &bytes.Buffer{}
 	cmd := NewRootCommand()
@@ -224,6 +235,9 @@ func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 		"  ExecStart=/bin/sh -lc \"echo alpha\"",
 		"Timer Unit",
 		"  Persistent=true",
+		"Recent Logs",
+		"  Mar 17 10:00:00 host echo alpha",
+		"  Mar 17 10:00:01 host done",
 		"Diagnostics",
 		"Start with the first command, then continue only if you need more detail.",
 		"1. Check the last service run",
@@ -241,6 +255,80 @@ func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 		if !strings.Contains(out, needle) {
 			t.Fatalf("detail output missing %q, got:\n%s", needle, out)
 		}
+	}
+}
+
+func TestStatusCommandShowsLogPeekFallbackWhenJournalctlFails(t *testing.T) {
+	originalResolveConfigPath := resolveConfigPath
+	originalResolveSystemdUserUnitDir := resolveSystemdUserUnitDir
+	originalResolveCurrentUID := resolveCurrentUID
+	originalRunSystemctlShow := runSystemctlShow
+	originalRunJournalctl := runJournalctl
+	t.Cleanup(func() {
+		resolveConfigPath = originalResolveConfigPath
+		resolveSystemdUserUnitDir = originalResolveSystemdUserUnitDir
+		resolveCurrentUID = originalResolveCurrentUID
+		runSystemctlShow = originalRunSystemctlShow
+		runJournalctl = originalRunJournalctl
+	})
+
+	resolveCurrentUID = func() (uint32, error) { return 1000, nil }
+
+	tempDir := t.TempDir()
+	cfgPath := filepath.Join(tempDir, "timertab.yaml")
+	unitDir := filepath.Join(tempDir, "systemd-user")
+	cfg := &config.File{
+		Version: 1,
+		Jobs: []config.Job{{
+			ID:   "alpha",
+			When: config.ScheduleList{"@hourly"},
+			Run:  config.ShellCommand("echo alpha"),
+		}},
+	}
+	if err := saveConfig(cfgPath, cfg); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	resolveConfigPath = func(string) (string, error) { return cfgPath, nil }
+	resolveSystemdUserUnitDir = func() (string, error) { return unitDir, nil }
+
+	rendered, err := systemd.RenderJobUnits(1000, config.DefaultInstanceID, cfg.Jobs[0])
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
+		unit := args[2]
+		switch unit {
+		case rendered.ServiceName:
+			return "LoadState=loaded\nActiveState=active\nSubState=exited\nResult=success\nFragmentPath=/tmp/service\nUnitFileState=static\n", "", nil
+		case rendered.TimerName:
+			return "LoadState=loaded\nActiveState=active\nSubState=waiting\nLastTriggerUSec=n/a\nNextElapseUSecRealtime=n/a\nFragmentPath=/tmp/timer\nUnitFileState=enabled\n", "", nil
+		default:
+			return "", "", fmt.Errorf("unexpected unit %q", unit)
+		}
+	}
+	runJournalctl = func(_ context.Context, _ io.Reader, _ io.Writer, stderr io.Writer, _ ...string) error {
+		_, _ = stderr.Write([]byte("journal unavailable"))
+		return errors.New("exit status 1")
+	}
+
+	stdout := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"status", "alpha", "--config", cfgPath})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "Recent Logs") {
+		t.Fatalf("detail output missing Recent Logs section, got:\n%s", out)
+	}
+	if !strings.Contains(out, "log preview unavailable: journal unavailable") {
+		t.Fatalf("detail output missing log peek fallback, got:\n%s", out)
 	}
 }
 

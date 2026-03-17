@@ -44,6 +44,7 @@ type statusDetail struct {
 	TimerMissing   bool
 	ServiceBody    string
 	TimerBody      string
+	LogPeek        string
 }
 
 type statusDiagnosticStep struct {
@@ -225,6 +226,7 @@ func collectStatusDetail(ctx context.Context, cfgPath, unitDir string, targetUID
 		TimerMissing:   timerMissing,
 		ServiceBody:    rendered.ServiceContent,
 		TimerBody:      rendered.TimerContent,
+		LogPeek:        collectStatusLogPeek(ctx, rendered.ServiceName),
 	}, nil
 }
 
@@ -287,6 +289,7 @@ func printStatusDetail(cmd *cobra.Command, detail statusDetail) {
 	printStatusBlockSection(out, "Job YAML", jobYAML)
 	printStatusBlockSection(out, "Service Unit", detail.ServiceBody)
 	printStatusBlockSection(out, "Timer Unit", detail.TimerBody)
+	printStatusBlockSection(out, "Recent Logs", detail.LogPeek)
 	printStatusCommandsSection(out, statusDiagnosticSteps(detail))
 }
 
@@ -404,6 +407,26 @@ func showUnitProperties(ctx context.Context, unit string, properties ...string) 
 	}
 
 	return values, false, nil
+}
+
+func collectStatusLogPeek(ctx context.Context, serviceName string) string {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := runJournalctl(ctx, bytes.NewReader(nil), &stdout, &stderr, "--user", "-u", serviceName, "-n", "20", "--no-pager")
+	if err != nil {
+		message := strings.TrimSpace(stderr.String())
+		if message == "" {
+			message = err.Error()
+		}
+		return "log preview unavailable: " + message + "\n"
+	}
+
+	output := strings.TrimRight(stdout.String(), "\n")
+	if strings.TrimSpace(output) == "" {
+		return "(no recent logs)\n"
+	}
+	return output + "\n"
 }
 
 func isMissingUnitError(stderr string) bool {
