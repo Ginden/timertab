@@ -45,6 +45,7 @@ If the README/spec drift from the code, follow the code and update docs to match
 
 - Prefer small, testable packages under `internal/`.
 - Keep README, YAML behavior, and schema aligned with the code.
+- When adding, removing, renaming, or changing command behavior/flags/output, update `docs/cli-reference.md` and any affected CLI notes in this file in the same change.
 - Keep generated unit files human-readable.
 - Do not introduce runtime dependency on `timertab` binary in generated units.
 
