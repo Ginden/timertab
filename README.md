@@ -273,6 +273,7 @@ git:
 
 - [v1 Specification](docs/spec-v1.md) — spec created for LLMs
 - [JSON Schema](schema/v1.json) — for editor integration and validation
+- [CLI Reference](docs/cli-reference.md) — command-by-command behavior and flags
 - [Technical Details](docs/technical-details.md) — implementation, release, and maintenance notes
 - [Caveats and Design Choices](docs/caveats.md) — weird edges and opinionated behavior
 - [Libraries](docs/libraries.md) — third-party dependencies
