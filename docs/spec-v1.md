@@ -88,6 +88,38 @@ Supported values:
 Unsupported in v1:
 
 - cron seconds/year extensions
+
+### 4.3 `run`
+
+`run` accepts either:
+
+- string shell shorthand
+- argv list
+
+Examples:
+
+```yaml
+run: "npm --global cache verify"
+```
+
+is shorthand for:
+
+```yaml
+run:
+  - /bin/sh
+  - -lc
+  - npm --global cache verify
+```
+
+Explicit argv form runs directly without an extra shell layer:
+
+```yaml
+run:
+  - /usr/bin/env
+  - bash
+  - -lc
+  - echo ok
+```
 - `CRON_TZ`
 
 ## 5. Hook Semantics
@@ -140,7 +172,8 @@ Per job:
 
 Service shape:
 
-- `ExecStart=/bin/sh -lc '<run>'`
+- string `run`: `ExecStart=/bin/sh -lc '<run>'`
+- argv `run`: `ExecStart=<argv[0]> <argv[1]> ...`
 - `ExecStopPost=/bin/sh -lc '<hook-dispatch>'`
 
 Hook dispatch uses `SERVICE_RESULT`/`EXIT_CODE`/`EXIT_STATUS` provided by `systemd`.

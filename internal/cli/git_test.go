@@ -57,7 +57,7 @@ func TestEditConfigApplyAutoCommitsChangedConfig(t *testing.T) {
 		Jobs: []config.Job{{
 			ID:   "existing",
 			When: config.ScheduleList{"@daily"},
-			Run:  "echo old",
+			Run:  config.ShellCommand("echo old"),
 		}},
 	}); err != nil {
 		t.Fatalf("saveConfig() error = %v", err)
@@ -231,12 +231,12 @@ func TestEditConfigWarnsWhenGitIsUnavailable(t *testing.T) {
 
 func TestBuildAutoCommitMessageIncludesAddRemoveEditDetails(t *testing.T) {
 	before := &config.File{Version: 1, Jobs: []config.Job{
-		{ID: "a", When: config.ScheduleList{"@daily"}, Run: "echo a"},
-		{ID: "b", When: config.ScheduleList{"@daily"}, Run: "echo b"},
+		{ID: "a", When: config.ScheduleList{"@daily"}, Run: config.ShellCommand("echo a")},
+		{ID: "b", When: config.ScheduleList{"@daily"}, Run: config.ShellCommand("echo b")},
 	}}
 	after := &config.File{Version: 1, Jobs: []config.Job{
-		{ID: "a", When: config.ScheduleList{"@daily"}, Run: "echo changed"},
-		{ID: "c", When: config.ScheduleList{"@hourly"}, Run: "echo c"},
+		{ID: "a", When: config.ScheduleList{"@daily"}, Run: config.ShellCommand("echo changed")},
+		{ID: "c", When: config.ScheduleList{"@hourly"}, Run: config.ShellCommand("echo c")},
 	}}
 
 	message := buildAutoCommitMessage(before, after)

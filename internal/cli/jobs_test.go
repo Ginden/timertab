@@ -31,7 +31,7 @@ func TestEjectCommandRemovesJobAndManagedMarkers(t *testing.T) {
 		Jobs: []config.Job{{
 			ID:   "demo",
 			When: config.ScheduleList{"@daily"},
-			Run:  "echo demo",
+			Run:  config.ShellCommand("echo demo"),
 		}},
 	}
 	if err := saveConfig(cfgPath, cfg); err != nil {
@@ -98,7 +98,7 @@ func TestEjectCommandReturnsNotFound(t *testing.T) {
 		Jobs: []config.Job{{
 			ID:   "existing",
 			When: config.ScheduleList{"@daily"},
-			Run:  "echo existing",
+			Run:  config.ShellCommand("echo existing"),
 		}},
 	}
 	if err := saveConfig(cfgPath, cfg); err != nil {
@@ -129,8 +129,8 @@ func TestEjectCommandCompletesKnownJobIDs(t *testing.T) {
 	if err := saveConfig(cfgPath, &config.File{
 		Version: 1,
 		Jobs: []config.Job{
-			{ID: "alpha", When: config.ScheduleList{"@daily"}, Run: "echo alpha"},
-			{ID: "beta", When: config.ScheduleList{"@hourly"}, Run: "echo beta"},
+			{ID: "alpha", When: config.ScheduleList{"@daily"}, Run: config.ShellCommand("echo alpha")},
+			{ID: "beta", When: config.ScheduleList{"@hourly"}, Run: config.ShellCommand("echo beta")},
 		},
 	}); err != nil {
 		t.Fatalf("saveConfig() error = %v", err)

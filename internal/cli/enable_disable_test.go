@@ -49,8 +49,8 @@ func TestDisableCommandSetsEnabledFalseAndApplies(t *testing.T) {
 	if err := saveConfig(cfgPath, &config.File{
 		Version: 1,
 		Jobs: []config.Job{
-			{ID: "target", When: config.ScheduleList{"@daily"}, Run: "echo target"},
-			{ID: "other", When: config.ScheduleList{"@hourly"}, Run: "echo other", Enabled: &trueValue},
+			{ID: "target", When: config.ScheduleList{"@daily"}, Run: config.ShellCommand("echo target")},
+			{ID: "other", When: config.ScheduleList{"@hourly"}, Run: config.ShellCommand("echo other"), Enabled: &trueValue},
 		},
 	}); err != nil {
 		t.Fatalf("saveConfig() error = %v", err)
@@ -106,7 +106,7 @@ func TestEnableCommandSetsEnabledTrueAndApplies(t *testing.T) {
 		Jobs: []config.Job{{
 			ID:      "target",
 			When:    config.ScheduleList{"@daily"},
-			Run:     "echo target",
+			Run:     config.ShellCommand("echo target"),
 			Enabled: &falseValue,
 		}},
 	}); err != nil {
@@ -152,7 +152,7 @@ func TestEnableDisableCommandsFailForUnknownID(t *testing.T) {
 		Jobs: []config.Job{{
 			ID:   "existing",
 			When: config.ScheduleList{"@daily"},
-			Run:  "echo existing",
+			Run:  config.ShellCommand("echo existing"),
 		}},
 	}); err != nil {
 		t.Fatalf("saveConfig() error = %v", err)
@@ -182,8 +182,8 @@ func TestEnableDisableCommandsCompleteKnownJobIDs(t *testing.T) {
 	if err := saveConfig(cfgPath, &config.File{
 		Version: 1,
 		Jobs: []config.Job{
-			{ID: "alpha", When: config.ScheduleList{"@daily"}, Run: "echo alpha"},
-			{ID: "beta", When: config.ScheduleList{"@hourly"}, Run: "echo beta"},
+			{ID: "alpha", When: config.ScheduleList{"@daily"}, Run: config.ShellCommand("echo alpha")},
+			{ID: "beta", When: config.ScheduleList{"@hourly"}, Run: config.ShellCommand("echo beta")},
 		},
 	}); err != nil {
 		t.Fatalf("saveConfig() error = %v", err)

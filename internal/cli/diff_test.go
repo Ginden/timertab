@@ -24,7 +24,7 @@ func TestDiffCommandPrintsDryRunReport(t *testing.T) {
 		Jobs: []config.Job{{
 			ID:   "job-1",
 			When: config.ScheduleList{"@hourly"},
-			Run:  "echo run",
+			Run:  config.ShellCommand("echo run"),
 		}},
 	}); err != nil {
 		t.Fatalf("saveConfig() error = %v", err)

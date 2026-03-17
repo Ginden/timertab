@@ -149,7 +149,7 @@ func buildRenderReport(
 			fmt.Fprintf(&b, "- Service unit: `%s`\n", r.units.ServiceName)
 			fmt.Fprintf(&b, "- Timer unit: `%s`\n", r.units.TimerName)
 			b.WriteString("- Command:\n\n```sh\n")
-			b.WriteString(strings.TrimSpace(r.job.Run))
+			b.WriteString(strings.TrimSpace(r.job.Run.Display()))
 			b.WriteString("\n```\n\n")
 		}
 	}
@@ -204,7 +204,7 @@ func collectCaveats(cfg *config.File) []caveat {
 		},
 		{
 			title:  "Shell",
-			detail: "Cron uses `/bin/sh` (or `$SHELL`). timertab wraps commands in `/bin/sh -lc` to source the login profile, but the shell is not configurable per-job in v1.",
+			detail: "Cron uses `/bin/sh` (or `$SHELL`). timertab string `run` values use `/bin/sh -lc`, while list-form `run` values execute exact argv without an extra shell.",
 		},
 		{
 			title:  "Output handling",
@@ -258,12 +258,13 @@ func reportJobTitle(job config.Job) string {
 		return name
 	}
 
-	summary := strings.Join(strings.Fields(firstLine(job.Run)), " ")
+	command := job.Run.Display()
+	summary := strings.Join(strings.Fields(firstLine(command)), " ")
 	if summary == "" {
 		return "(unnamed job)"
 	}
 
-	if strings.Contains(strings.TrimSpace(job.Run), "\n") {
+	if strings.Contains(strings.TrimSpace(command), "\n") {
 		summary += " ..."
 	}
 

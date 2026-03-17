@@ -326,8 +326,8 @@ func validateJob(job Job) error {
 	if job.ID != "" && !validID.MatchString(job.ID) {
 		return fmt.Errorf("id must match %s", validID.String())
 	}
-	if strings.TrimSpace(job.Run) == "" {
-		return fmt.Errorf("run is required")
+	if err := job.Run.Validate(); err != nil {
+		return err
 	}
 	if len(job.When) == 0 {
 		return fmt.Errorf("when is required")
@@ -506,6 +506,7 @@ func slugify(input string) string {
 func jobDigest(job Job) string {
 	copyJob := job
 	copyJob.ID = ""
+	copyJob.Run = copyJob.Run.CanonicalArgv()
 
 	if len(copyJob.When) > 1 {
 		// Schedule order is not semantically meaningful, so sort before hashing to

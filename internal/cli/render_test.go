@@ -15,7 +15,7 @@ func TestBuildRenderReportUsesReadableJobSections(t *testing.T) {
 	job := config.Job{
 		ID:   "job-aaa9ac542175",
 		When: config.ScheduleList{"*/5 * * * *"},
-		Run:  "echo tick",
+		Run:  config.ShellCommand("echo tick"),
 	}
 	cfg := &config.File{
 		Version: 1,
@@ -55,12 +55,12 @@ func TestBuildRenderReportUsesReadableJobSections(t *testing.T) {
 func TestReportJobTitlePrefersNameAndFallsBackToCommandPreview(t *testing.T) {
 	t.Parallel()
 
-	if got := reportJobTitle(config.Job{Name: "Nightly backup", Run: "echo ignored"}); got != "Nightly backup" {
+	if got := reportJobTitle(config.Job{Name: "Nightly backup", Run: config.ShellCommand("echo ignored")}); got != "Nightly backup" {
 		t.Fatalf("reportJobTitle() with name = %q, want %q", got, "Nightly backup")
 	}
 
 	got := reportJobTitle(config.Job{
-		Run: "python /opt/scripts/very-long-task.py --flag one --flag two --flag three\nprintf done\n",
+		Run: config.ShellCommand("python /opt/scripts/very-long-task.py --flag one --flag two --flag three\nprintf done\n"),
 	})
 	if !strings.HasPrefix(got, "python /opt/scripts/very-long-task.py") {
 		t.Fatalf("reportJobTitle() fallback = %q, want command preview", got)

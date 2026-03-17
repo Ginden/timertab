@@ -14,8 +14,8 @@ jobs:
   - name: "example"
     when: "@daily"
     run: |-
-      echo 'timertab executes commands via /bin/sh -lc'
-      echo 'direct executable mode is planned for v2'
+      echo 'string run values use /bin/sh -lc'
+      echo 'use run: ["/usr/bin/env", "bash", "-lc", "echo ok"] for direct argv mode'
 `
 
 func LoadFromFile(path string) (*File, error) {

@@ -48,7 +48,7 @@ func TestImportCommandReadsFromStdinAndProducesConfig(t *testing.T) {
 	if got := loaded.Jobs[0].When[0]; got != "*/5 * * * *" {
 		t.Fatalf("jobs[0].when = %q, want cron schedule", got)
 	}
-	if got := loaded.Jobs[0].Run; got != "echo tick" {
+	if got := loaded.Jobs[0].Run.Display(); got != "echo tick" {
 		t.Fatalf("jobs[0].run = %q, want %q", got, "echo tick")
 	}
 	if got := loaded.Jobs[1].When[0]; got != "@daily" {
@@ -114,8 +114,8 @@ func TestImportCommandReadsFromCrontabByDefault(t *testing.T) {
 	if loaded.Jobs[0].When[0] != "0 12 * * 1" {
 		t.Fatalf("job.when = %q, want %q", loaded.Jobs[0].When[0], "0 12 * * 1")
 	}
-	if loaded.Jobs[0].Run != "/usr/bin/date" {
-		t.Fatalf("job.run = %q, want %q", loaded.Jobs[0].Run, "/usr/bin/date")
+	if got := loaded.Jobs[0].Run.Display(); got != "/usr/bin/date" {
+		t.Fatalf("job.run = %q, want %q", got, "/usr/bin/date")
 	}
 }
 
@@ -260,8 +260,8 @@ func TestImportCrontabInlineCommentWarning(t *testing.T) {
 	if len(cfg.Jobs) != 1 {
 		t.Fatalf("jobs count = %d, want 1", len(cfg.Jobs))
 	}
-	if cfg.Jobs[0].Run != "/backup.sh" {
-		t.Errorf("run = %q, want %q", cfg.Jobs[0].Run, "/backup.sh")
+	if got := cfg.Jobs[0].Run.Display(); got != "/backup.sh" {
+		t.Errorf("run = %q, want %q", got, "/backup.sh")
 	}
 	found := false
 	for _, w := range warnings {
@@ -284,8 +284,8 @@ func TestImportCrontabPercentWarning(t *testing.T) {
 	if len(cfg.Jobs) != 1 {
 		t.Fatalf("jobs count = %d, want 1", len(cfg.Jobs))
 	}
-	if cfg.Jobs[0].Run != `mail -s "Report" user@host` {
-		t.Errorf("run = %q, want command without %%", cfg.Jobs[0].Run)
+	if got := cfg.Jobs[0].Run.Display(); got != `mail -s "Report" user@host` {
+		t.Errorf("run = %q, want command without %%", got)
 	}
 	found := false
 	for _, w := range warnings {
@@ -428,7 +428,7 @@ func TestMergeImportedJobsSkipsDuplicatesAgainstExisting(t *testing.T) {
 			ID:   "nightly",
 			Name: "Nightly backup",
 			When: config.ScheduleList{"@daily"},
-			Run:  "/usr/local/bin/backup",
+			Run:  config.ShellCommand("/usr/local/bin/backup"),
 			Env: map[string]string{
 				"PATH": "/usr/local/bin:/usr/bin",
 			},
@@ -440,14 +440,14 @@ func TestMergeImportedJobsSkipsDuplicatesAgainstExisting(t *testing.T) {
 			ID:   "ignored-id",
 			Name: "Same job, different label",
 			When: config.ScheduleList{"@daily"},
-			Run:  "/usr/local/bin/backup",
+			Run:  config.ShellCommand("/usr/local/bin/backup"),
 			Env: map[string]string{
 				"PATH": "/usr/local/bin:/usr/bin",
 			},
 		},
 		{
 			When: config.ScheduleList{"0 12 * * 1"},
-			Run:  "/usr/bin/date",
+			Run:  config.ShellCommand("/usr/bin/date"),
 		},
 	}
 
@@ -465,7 +465,7 @@ func TestMergeImportedJobsSkipsDuplicatesAgainstExisting(t *testing.T) {
 	if len(merged.AddedJobs) != 1 {
 		t.Fatalf("added jobs = %d, want 1", len(merged.AddedJobs))
 	}
-	if got := merged.AddedJobs[0].Run; got != "/usr/bin/date" {
+	if got := merged.AddedJobs[0].Run.Display(); got != "/usr/bin/date" {
 		t.Fatalf("added job run = %q, want %q", got, "/usr/bin/date")
 	}
 }
@@ -475,12 +475,12 @@ func TestMergeImportedJobsSkipsDuplicatesInsideImportedBatch(t *testing.T) {
 		{
 			Name: "tick-1",
 			When: config.ScheduleList{"*/5 * * * *"},
-			Run:  "echo tick",
+			Run:  config.ShellCommand("echo tick"),
 		},
 		{
 			Name: "tick-2",
 			When: config.ScheduleList{"*/5 * * * *"},
-			Run:  "echo tick",
+			Run:  config.ShellCommand("echo tick"),
 		},
 	}
 
@@ -494,5 +494,22 @@ func TestMergeImportedJobsSkipsDuplicatesInsideImportedBatch(t *testing.T) {
 	}
 	if len(merged.Jobs) != 1 {
 		t.Fatalf("merged jobs = %d, want 1", len(merged.Jobs))
+	}
+}
+
+func TestMergeImportedJobsTreatsShellShorthandAndExplicitShellArgvAsDuplicates(t *testing.T) {
+	existing := []config.Job{{
+		When: config.ScheduleList{"@daily"},
+		Run:  config.ShellCommand("echo tick"),
+	}}
+	imported := []config.Job{{
+		When: config.ScheduleList{"@daily"},
+		Run:  config.ExecCommand("/bin/sh", "-lc", "echo tick"),
+	}}
+
+	merged := mergeImportedJobs(existing, imported)
+
+	if merged.Added != 0 || merged.Skipped != 1 {
+		t.Fatalf("merge result = %#v, want explicit shell argv treated as duplicate shorthand", merged)
 	}
 }

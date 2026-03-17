@@ -82,7 +82,8 @@ Every successful edit is automatically committed to a local git repo. Full audit
 
 - **One YAML file** — all your scheduled jobs in one place, version-control friendly.
 - **Cron syntax you already know** — `@hourly`, `@daily`, or standard 5-field cron expressions.
-- **Multiline scripts** — these just work, run multiple commands without `&&` abuse.
+- **Shell shorthand or explicit argv** — use a string for `/bin/sh -lc`, or a YAML list for direct execution.
+- **Multiline scripts** — these just work in string mode, run multiple commands without `&&` abuse.
 - **Per-user isolation** — units are scoped to your UID; `timertab` never touches units it didn't create.
 - **JSON Schema** — get autocomplete and validation in editors that support it.
 - **Shell completions** — bash, zsh, and fish.
@@ -141,7 +142,11 @@ jobs:
     when:
       - "0 9 * * *"
       - "0 18 * * *"
-    run: "rsync -a ~/Documents /mnt/backup/"
+    run:
+      - /usr/bin/rsync
+      - -a
+      - /home/user/Documents/
+      - /mnt/backup/
     cwd: "/home/user"
     systemd:
       service:
@@ -152,6 +157,8 @@ jobs:
     on_failure:
       command: 'notify-send "Backup failed"'
 ```
+
+String `run` values are shorthand for `["/bin/sh", "-lc", "..."]`. Use the list form when you want exact argv execution without an extra shell.
 
 ## Usage
 

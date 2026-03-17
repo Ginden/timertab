@@ -30,8 +30,8 @@ func TestStatusCommandPrintsRowsAndHandlesMissingUnits(t *testing.T) {
 	cfg := &config.File{
 		Version: 1,
 		Jobs: []config.Job{
-			{ID: "alpha", When: config.ScheduleList{"@hourly"}, Run: "echo alpha"},
-			{ID: "beta", When: config.ScheduleList{"@daily"}, Run: "echo beta"},
+			{ID: "alpha", When: config.ScheduleList{"@hourly"}, Run: config.ShellCommand("echo alpha")},
+			{ID: "beta", When: config.ScheduleList{"@daily"}, Run: config.ShellCommand("echo beta")},
 		},
 	}
 	if err := saveConfig(cfgPath, cfg); err != nil {
@@ -136,7 +136,7 @@ func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 			ID:         "alpha",
 			Name:       "Alpha job",
 			When:       config.ScheduleList{"@hourly"},
-			Run:        "echo alpha",
+			Run:        config.ShellCommand("echo alpha"),
 			Cwd:        "/srv/alpha",
 			OnFailure:  &config.Hook{Command: "echo failed"},
 			Persistent: func() *bool { v := true; return &v }(),
@@ -262,7 +262,7 @@ func TestStatusCommandReturnsErrorForSystemctlFailure(t *testing.T) {
 		Jobs: []config.Job{{
 			ID:   "alpha",
 			When: config.ScheduleList{"@hourly"},
-			Run:  "echo alpha",
+			Run:  config.ShellCommand("echo alpha"),
 		}},
 	}); err != nil {
 		t.Fatalf("saveConfig() error = %v", err)
@@ -308,7 +308,7 @@ func TestStatusCommandJSONOutput(t *testing.T) {
 		Jobs: []config.Job{{
 			ID:   "alpha",
 			When: config.ScheduleList{"@hourly"},
-			Run:  "echo alpha",
+			Run:  config.ShellCommand("echo alpha"),
 		}},
 	}
 	if err := saveConfig(cfgPath, cfg); err != nil {
@@ -386,7 +386,7 @@ func TestStatusCommandRejectsJSONForDetailedView(t *testing.T) {
 		Jobs: []config.Job{{
 			ID:   "alpha",
 			When: config.ScheduleList{"@hourly"},
-			Run:  "echo alpha",
+			Run:  config.ShellCommand("echo alpha"),
 		}},
 	}); err != nil {
 		t.Fatalf("saveConfig() error = %v", err)

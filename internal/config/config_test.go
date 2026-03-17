@@ -12,7 +12,7 @@ func TestNormalizeIDsGeneratesMissingID(t *testing.T) {
 		Jobs: []Job{{
 			Name: "NPM cache verify",
 			When: ScheduleList{"@hourly"},
-			Run:  "npm --global cache verify",
+			Run:  ShellCommand("npm --global cache verify"),
 		}},
 	}
 
@@ -22,6 +22,33 @@ func TestNormalizeIDsGeneratesMissingID(t *testing.T) {
 
 	if cfg.Jobs[0].ID == "" {
 		t.Fatalf("expected generated ID")
+	}
+}
+
+func TestNormalizeIDsTreatsShellShorthandAndExplicitShellArgvAsSameJobDigest(t *testing.T) {
+	shorthand := File{
+		Version: 1,
+		Jobs: []Job{{
+			When: ScheduleList{"@hourly"},
+			Run:  ShellCommand("echo ok"),
+		}},
+	}
+	explicit := File{
+		Version: 1,
+		Jobs: []Job{{
+			When: ScheduleList{"@hourly"},
+			Run:  ExecCommand("/bin/sh", "-lc", "echo ok"),
+		}},
+	}
+
+	if err := shorthand.NormalizeIDs(); err != nil {
+		t.Fatalf("shorthand NormalizeIDs() error = %v", err)
+	}
+	if err := explicit.NormalizeIDs(); err != nil {
+		t.Fatalf("explicit NormalizeIDs() error = %v", err)
+	}
+	if shorthand.Jobs[0].ID != explicit.Jobs[0].ID {
+		t.Fatalf("generated ids differ for equivalent shell commands: %q vs %q", shorthand.Jobs[0].ID, explicit.Jobs[0].ID)
 	}
 }
 
@@ -51,6 +78,32 @@ func TestLoadFromBytesSchemaValidSample(t *testing.T) {
 	}
 	if cfg.InstanceID != "work" {
 		t.Fatalf("instance_id = %q, want %q", cfg.InstanceID, "work")
+	}
+}
+
+func TestLoadFromBytesSchemaValidRunArgv(t *testing.T) {
+	input := strings.Join([]string{
+		"version: 1",
+		"jobs:",
+		"  - id: exec-job",
+		"    when: '@daily'",
+		"    run:",
+		`      - /usr/bin/env`,
+		`      - bash`,
+		`      - -lc`,
+		`      - echo ok`,
+	}, "\n")
+
+	cfg, err := LoadFromBytes([]byte(input))
+	if err != nil {
+		t.Fatalf("unexpected error for argv run: %v", err)
+	}
+
+	if got := cfg.Jobs[0].Run.Argv(); len(got) != 4 || got[0] != "/usr/bin/env" || got[3] != "echo ok" {
+		t.Fatalf("jobs[0].run argv = %#v, want explicit argv", got)
+	}
+	if _, ok := cfg.Jobs[0].Run.Shell(); ok {
+		t.Fatalf("jobs[0].run unexpectedly reported shell shorthand")
 	}
 }
 

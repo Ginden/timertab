@@ -111,8 +111,8 @@ func renderServiceContent(targetUID uint32, instanceID string, job config.Job, s
 	appendServiceLimits(&b, job.Limits)
 	appendRawDirectives(&b, job.Systemd, false)
 
-	b.WriteString("ExecStart=/bin/sh -lc ")
-	b.WriteString(systemdQuoted(job.Run))
+	b.WriteString("ExecStart=")
+	b.WriteString(systemdExecStart(job.Run))
 	b.WriteString("\n")
 
 	b.WriteString("ExecStopPost=/bin/sh -lc ")
@@ -345,6 +345,21 @@ func sanitizeUnitComponent(value string) string {
 	}
 
 	return out
+}
+
+func systemdExecStart(run config.RunCommand) string {
+	if shell, ok := run.Shell(); ok {
+		return "/bin/sh -lc " + systemdQuoted(shell)
+	}
+	return systemdExecCommand(run.Argv())
+}
+
+func systemdExecCommand(argv []string) string {
+	parts := make([]string, 0, len(argv))
+	for _, arg := range argv {
+		parts = append(parts, systemdQuoted(arg))
+	}
+	return strings.Join(parts, " ")
 }
 
 func shellQuoted(value string) string {

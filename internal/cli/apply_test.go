@@ -23,7 +23,7 @@ func TestApplyEditedConfigReconcilesUnitsAndRunsSystemctl(t *testing.T) {
 	keepJob := config.Job{
 		ID:   "job-keep",
 		When: config.ScheduleList{"@hourly"},
-		Run:  "echo keep",
+		Run:  config.ShellCommand("echo keep"),
 	}
 	rendered, err := systemd.RenderJobUnits(targetUID, config.DefaultInstanceID, keepJob)
 	if err != nil {
@@ -103,7 +103,7 @@ func TestApplyEditedConfigDisablesExistingTimersForDisabledJobs(t *testing.T) {
 	job := config.Job{
 		ID:      "job-disabled",
 		When:    config.ScheduleList{"@daily"},
-		Run:     "echo disabled",
+		Run:     config.ShellCommand("echo disabled"),
 		Enabled: &disabled,
 	}
 	rendered, err := systemd.RenderJobUnits(targetUID, config.DefaultInstanceID, job)

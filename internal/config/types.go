@@ -23,7 +23,7 @@ type Job struct {
 	ID         string            `yaml:"id,omitempty"`
 	Name       string            `yaml:"name,omitempty"`
 	When       ScheduleList      `yaml:"when"`
-	Run        string            `yaml:"run"`
+	Run        RunCommand        `yaml:"run"`
 	Env        map[string]string `yaml:"env,omitempty"`
 	Cwd        string            `yaml:"cwd,omitempty"`
 	Enabled    *bool             `yaml:"enabled,omitempty"`

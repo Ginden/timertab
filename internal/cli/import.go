@@ -209,7 +209,7 @@ func importCrontab(raw string) (*config.File, []string, error) {
 		job := config.Job{
 			Name: prevComment,
 			When: config.ScheduleList{schedule},
-			Run:  command,
+			Run:  config.ShellCommand(command),
 		}
 		if len(globalEnv) > 0 {
 			job.Env = cloneEnv(globalEnv)
@@ -308,7 +308,7 @@ func importDryRun(cmd *cobra.Command, cfgPath string, imported *config.File) err
 		if len(job.When) > 0 {
 			schedule = job.When[0]
 		}
-		cmd.Printf("  + %-30s  %-20s  %s\n", name, schedule, job.Run)
+		cmd.Printf("  + %-30s  %-20s  %s\n", name, schedule, job.Run.Display())
 	}
 
 	return nil
@@ -572,7 +572,7 @@ func importJobIdentity(job config.Job) string {
 	var b strings.Builder
 	b.Grow(128)
 	b.WriteString("run:")
-	b.WriteString(strings.TrimSpace(job.Run))
+	b.WriteString(job.Run.DigestKey())
 	b.WriteByte('\x1f')
 	b.WriteString("cwd:")
 	b.WriteString(strings.TrimSpace(job.Cwd))

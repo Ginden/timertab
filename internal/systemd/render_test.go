@@ -26,7 +26,7 @@ func TestRenderJobUnitsGolden(t *testing.T) {
 			job: config.Job{
 				ID:   "npm-cache-verify",
 				When: config.ScheduleList{"@hourly"},
-				Run:  "npm --global cache verify",
+				Run:  config.ShellCommand("npm --global cache verify"),
 			},
 			wantBaseName:      "timertab-u1000-npm-cache-verify-3e70124b9a",
 			wantServiceGolden: "hookless.service.golden",
@@ -38,7 +38,7 @@ func TestRenderJobUnitsGolden(t *testing.T) {
 			job: config.Job{
 				ID:   "journal-scan",
 				When: config.ScheduleList{"15 2 * * 1-5"},
-				Run:  "echo run && date",
+				Run:  config.ShellCommand("echo run && date"),
 				Env: map[string]string{
 					"LANG": "C.UTF-8",
 					"TZ":   "UTC",
@@ -103,7 +103,7 @@ func TestRenderJobUnitsErrors(t *testing.T) {
 
 	_, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		When: config.ScheduleList{"@hourly"},
-		Run:  "echo hi",
+		Run:  config.ShellCommand("echo hi"),
 	})
 	if err == nil {
 		t.Fatalf("RenderJobUnits() error = nil for empty id")
@@ -112,7 +112,7 @@ func TestRenderJobUnitsErrors(t *testing.T) {
 	_, err = RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "ok-id",
 		When: config.ScheduleList{"@every-second"},
-		Run:  "echo hi",
+		Run:  config.ShellCommand("echo hi"),
 	})
 	if err == nil {
 		t.Fatalf("RenderJobUnits() error = nil for unsupported shorthand")
@@ -125,7 +125,7 @@ func TestRenderJobUnitsUsesOnBootSecForRebootSchedule(t *testing.T) {
 	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "reboot-job",
 		When: config.ScheduleList{"@reboot"},
-		Run:  "echo hi",
+		Run:  config.ShellCommand("echo hi"),
 	})
 	if err != nil {
 		t.Fatalf("RenderJobUnits() error = %v", err)
@@ -146,7 +146,7 @@ func TestRenderJobUnitsIncludesPersistentForEnabledPersistentTimers(t *testing.T
 	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:         "persistent-job",
 		When:       config.ScheduleList{"@daily"},
-		Run:        "echo hi",
+		Run:        config.ShellCommand("echo hi"),
 		Persistent: &persistent,
 	})
 	if err != nil {
@@ -164,7 +164,7 @@ func TestRenderJobUnitsOmitsPersistentByDefault(t *testing.T) {
 	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "default-persistent",
 		When: config.ScheduleList{"@daily"},
-		Run:  "echo hi",
+		Run:  config.ShellCommand("echo hi"),
 	})
 	if err != nil {
 		t.Fatalf("RenderJobUnits() error = %v", err)
@@ -181,7 +181,7 @@ func TestRenderJobUnitsIncludesRandomizedDelaySecWhenJitterIsSet(t *testing.T) {
 	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:     "jitter-job",
 		When:   config.ScheduleList{"@daily"},
-		Run:    "echo hi",
+		Run:    config.ShellCommand("echo hi"),
 		Jitter: "5m",
 	})
 	if err != nil {
@@ -200,7 +200,7 @@ func TestRenderJobUnitsIncludesServiceLimits(t *testing.T) {
 	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "limited-job",
 		When: config.ScheduleList{"@daily"},
-		Run:  "echo hi",
+		Run:  config.ShellCommand("echo hi"),
 		Limits: &config.Limits{
 			MemoryMax: "512M",
 			CPUQuota:  "60%",
@@ -228,7 +228,7 @@ func TestRenderJobUnitsIncludesRawSystemdOverridesFromMap(t *testing.T) {
 	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "raw-map",
 		When: config.ScheduleList{"@daily"},
-		Run:  "echo hi",
+		Run:  config.ShellCommand("echo hi"),
 		Systemd: &config.Systemd{
 			Service: &config.SystemdDirectiveSet{
 				Map: map[string]string{
@@ -268,7 +268,7 @@ func TestRenderJobUnitsPreservesRawSystemdOverrideOrderForList(t *testing.T) {
 	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "raw-list",
 		When: config.ScheduleList{"@daily"},
-		Run:  "echo hi",
+		Run:  config.ShellCommand("echo hi"),
 		Systemd: &config.Systemd{
 			Service: &config.SystemdDirectiveSet{
 				Items: []config.SystemdDirective{
@@ -330,7 +330,7 @@ func TestRenderJobUnitsSupportsMultilineCommandWithoutBreakingDirectiveLine(t *t
 	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "trim-test",
 		When: config.ScheduleList{"@hourly"},
-		Run:  "echo hello\n",
+		Run:  config.ShellCommand("echo hello\n"),
 		OnSuccess: &config.Hook{
 			Command: "echo ok\n",
 		},
@@ -350,13 +350,33 @@ func TestRenderJobUnitsSupportsMultilineCommandWithoutBreakingDirectiveLine(t *t
 	}
 }
 
+func TestRenderJobUnitsExecutesExplicitArgvWithoutShellWrapper(t *testing.T) {
+	t.Parallel()
+
+	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
+		ID:   "argv-job",
+		When: config.ScheduleList{"@hourly"},
+		Run:  config.ExecCommand("/usr/bin/env", "bash", "-lc", "echo hello"),
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if strings.Contains(units.ServiceContent, `ExecStart=/bin/sh -lc`) {
+		t.Fatalf("ServiceContent unexpectedly used shell shorthand:\n%s", units.ServiceContent)
+	}
+	if !strings.Contains(units.ServiceContent, `ExecStart="/usr/bin/env" "bash" "-lc" "echo hello"`) {
+		t.Fatalf("ServiceContent missing explicit argv ExecStart:\n%s", units.ServiceContent)
+	}
+}
+
 func TestRenderJobUnitsPrefixesCustomInstanceID(t *testing.T) {
 	t.Parallel()
 
 	units, err := RenderJobUnits(1000, "work", config.Job{
 		ID:   "trim-test",
 		When: config.ScheduleList{"@hourly"},
-		Run:  "echo hello",
+		Run:  config.ShellCommand("echo hello"),
 	})
 	if err != nil {
 		t.Fatalf("RenderJobUnits() error = %v", err)
