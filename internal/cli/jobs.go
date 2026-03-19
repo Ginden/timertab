@@ -12,7 +12,7 @@ import (
 	"github.com/ginden/timertab/internal/config"
 )
 
-const defaultSchemaURL = "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
+const defaultSchemaURL = "https://raw.githubusercontent.com/ginden/timertab/v1.1.0/schema/v1.json"
 
 func newEjectCommand() *cobra.Command {
 	var overridePath string

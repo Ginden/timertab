@@ -111,7 +111,7 @@ timertab -e
 This opens your `$EDITOR` with the config file. Add a job:
 
 ```yaml
-$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
+$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.1.0/schema/v1.json"
 version: 1
 instance_id: work
 jobs:
@@ -125,7 +125,7 @@ Save and close — `timertab` validates the config, generates the systemd units,
 ### A more complete example
 
 ```yaml
-$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
+$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.1.0/schema/v1.json"
 version: 1
 jobs:
   - name: NPM cache verify

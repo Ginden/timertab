@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const DefaultTemplate = `$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
+const DefaultTemplate = `$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.1.0/schema/v1.json"
 version: 1
 jobs:
   - name: "example"

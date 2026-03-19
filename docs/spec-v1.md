@@ -30,7 +30,7 @@ The YAML config file is the source of truth. Generated unit files are derived ar
 Top-level is an object (not an array), to support `$schema`:
 
 ```yaml
-$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"
+$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.1.0/schema/v1.json"
 version: 1
 instance_id: "work"
 jobs:

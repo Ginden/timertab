@@ -54,7 +54,7 @@ func TestNormalizeIDsTreatsShellShorthandAndExplicitShellArgvAsSameJobDigest(t *
 
 func TestLoadFromBytesSchemaValidSample(t *testing.T) {
 	input := strings.Join([]string{
-		`$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json"`,
+		`$schema: "https://raw.githubusercontent.com/ginden/timertab/v1.1.0/schema/v1.json"`,
 		"version: 1",
 		"instance_id: work",
 		"jobs:",

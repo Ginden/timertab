@@ -1,5 +1,5 @@
 {
-  "$id": "https://raw.githubusercontent.com/ginden/timertab/v1.0.0/schema/v1.json",
+  "$id": "https://raw.githubusercontent.com/ginden/timertab/v1.1.0/schema/v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "timertab v1",
   "type": "object",
