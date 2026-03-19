@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/tabwriter"
 
@@ -64,6 +65,8 @@ var runSystemctlShow = func(ctx context.Context, args ...string) (string, string
 	err := cmd.Run()
 	return stdout.String(), stderr.String(), err
 }
+
+var statusWholeMinuteTimestampPattern = regexp.MustCompile(`(\d{2}:\d{2}):00(\b)`)
 
 func newStatusCommand() *cobra.Command {
 	var (
@@ -450,7 +453,7 @@ func statusTimeValue(raw string, missing bool) string {
 	if trimmed == "" || trimmed == "n/a" {
 		return "unknown"
 	}
-	return trimmed
+	return statusWholeMinuteTimestampPattern.ReplaceAllString(trimmed, `$1$2`)
 }
 
 func statusResultValue(raw string, missing bool) string {

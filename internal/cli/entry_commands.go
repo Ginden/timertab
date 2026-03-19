@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/ginden/timertab/internal/progress"
 )
 
 func newListCommand() *cobra.Command {
@@ -46,12 +48,16 @@ func newEditCommand() *cobra.Command {
 				return fmt.Errorf("--dry-run cannot be combined with --no-apply")
 			}
 
+			ctx := progress.WithWriter(cmd.Context(), cmd.ErrOrStderr())
+			cmd.SetContext(ctx)
+
 			cfgPath, err := resolveConfigPath(overridePath)
 			if err != nil {
 				return err
 			}
 
 			if !noApply && !dryRun {
+				progress.Printf(ctx, "timertab: checking systemd baseline")
 				if err := ensureSystemdBaseline(); err != nil {
 					return err
 				}

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ginden/timertab/internal/config"
+	"github.com/ginden/timertab/internal/progress"
 	"github.com/spf13/cobra"
 )
 
@@ -79,7 +80,9 @@ EOF
 	cmd := &cobra.Command{}
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
+	stderr := &bytes.Buffer{}
+	cmd.SetErr(stderr)
+	cmd.SetContext(progress.WithWriter(context.Background(), stderr))
 
 	if err := editConfig(cmd, cfgPath, false, false, false); err != nil {
 		t.Fatalf("editConfig() error = %v", err)
@@ -103,6 +106,9 @@ EOF
 
 	if !strings.Contains(commitMessage, "add job added") || !strings.Contains(commitMessage, "edit job existing") {
 		t.Fatalf("commit message = %q, want add/edit job details", commitMessage)
+	}
+	if !strings.Contains(stderr.String(), "timertab: auto-committing config change\n") {
+		t.Fatalf("stderr missing auto-commit progress, got:\n%s", stderr.String())
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/ginden/timertab/internal/config"
+	"github.com/ginden/timertab/internal/progress"
 )
 
 var findGitBinary = exec.LookPath
@@ -41,6 +42,8 @@ func maybeAutoCommitEditedConfig(
 	if !changed || after == nil || !after.AutoCommitEnabled() {
 		return
 	}
+
+	progress.Printf(ctx, "timertab: auto-committing config change")
 
 	if _, err := findGitBinary("git"); err != nil {
 		_, _ = fmt.Fprintf(stderr, "%s git binary is unavailable; skipping config auto-commit\n", warningPrefix)

@@ -1,11 +1,14 @@
 package systemctl
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/ginden/timertab/internal/progress"
 )
 
 type fakeExecutor struct {
@@ -198,5 +201,37 @@ func TestRunPlanReloadsDaemonWhenUnitsChangedWithoutTimersToEnable(t *testing.T)
 	}
 	if !reflect.DeepEqual(executor.calls, wantCalls) {
 		t.Fatalf("calls = %v, want %v", executor.calls, wantCalls)
+	}
+}
+
+func TestRunPlanEmitsProgressMessages(t *testing.T) {
+	executor := &fakeBatchExecutor{}
+	stderr := &bytes.Buffer{}
+	ctx := progress.WithWriter(context.Background(), stderr)
+
+	err := RunPlan(
+		ctx,
+		executor,
+		Plan{
+			TimersToDisable: []string{"old.timer"},
+			TimersToEnable:  []string{"alpha.timer", "beta.timer"},
+			ReloadDaemon:    true,
+		},
+	)
+	if err != nil {
+		t.Fatalf("RunPlan() error = %v, want nil", err)
+	}
+
+	output := stderr.String()
+	for _, needle := range []string{
+		"timertab: disabling 1 stale timer(s)\n",
+		"timertab: stopping 1 stale timer(s)\n",
+		"timertab: reloading systemd state\n",
+		"timertab: enabling 2 timer(s)\n",
+		"timertab: starting 2 timer(s)\n",
+	} {
+		if !strings.Contains(output, needle) {
+			t.Fatalf("progress output missing %q, got:\n%s", needle, output)
+		}
 	}
 }

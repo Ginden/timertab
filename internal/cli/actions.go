@@ -14,6 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/ginden/timertab/internal/config"
+	"github.com/ginden/timertab/internal/progress"
 	"github.com/ginden/timertab/internal/systemctl"
 )
 
@@ -101,6 +102,7 @@ func editConfig(cmd *cobra.Command, cfgPath string, noApply, dryRun, noCommit bo
 			return err
 		}
 
+		progress.Printf(cmd.Context(), "timertab: validating edited config")
 		loaded, out, err := prepareEditedConfigForSave(editedRaw)
 		if err != nil {
 			printEditValidationError(cmd, err)
@@ -110,6 +112,7 @@ func editConfig(cmd *cobra.Command, cfgPath string, noApply, dryRun, noCommit bo
 		configChanged := !bytes.Equal(existing, out)
 
 		if dryRun {
+			progress.Printf(cmd.Context(), "timertab: building reconcile preview")
 			report, err := runDryRunPlan(cmd.Context(), loaded)
 			if err != nil {
 				return err
@@ -118,6 +121,7 @@ func editConfig(cmd *cobra.Command, cfgPath string, noApply, dryRun, noCommit bo
 			return nil
 		}
 
+		progress.Printf(cmd.Context(), "timertab: saving config to %s", cfgPath)
 		if err := os.WriteFile(cfgPath, out, 0o644); err != nil {
 			return err
 		}
@@ -127,6 +131,7 @@ func editConfig(cmd *cobra.Command, cfgPath string, noApply, dryRun, noCommit bo
 			return nil
 		}
 
+		progress.Printf(cmd.Context(), "timertab: reconciling systemd units")
 		report, err := runSystemctlApply(cmd.Context(), loaded)
 		if err != nil {
 			return err

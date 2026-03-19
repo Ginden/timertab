@@ -128,8 +128,9 @@ Behavior:
 Apply behavior:
 
 - Without `--no-apply`, `edit` checks the `systemd >= 247` baseline first.
-- On successful validation it writes the config file, reconciles unit files, reloads the user daemon, and enables/starts or disables/stops timers as needed.
+- On successful validation it writes the config file, reconciles unit files, reloads the target systemd manager, and enables/starts or disables/stops timers as needed.
 - If validation fails, nothing is written or pruned.
+- During successful `edit` runs, progress lines such as validation, save, reconcile, reload, and auto-commit phases are printed to stderr.
 
 Git behavior:
 

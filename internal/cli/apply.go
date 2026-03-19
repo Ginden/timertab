@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ginden/timertab/internal/config"
+	"github.com/ginden/timertab/internal/progress"
 	"github.com/ginden/timertab/internal/reconcile"
 	"github.com/ginden/timertab/internal/systemctl"
 	"github.com/ginden/timertab/internal/systemd"
@@ -61,11 +62,13 @@ func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, erro
 		return applyReport{}, err
 	}
 
+	progress.Printf(ctx, "timertab: rendering desired units")
 	desiredState, err := buildDesiredState(targetUID, instanceID, cfg.Jobs)
 	if err != nil {
 		return applyReport{}, err
 	}
 
+	progress.Printf(ctx, "timertab: scanning existing systemd units in %s", unitDir)
 	existing, err := discoverExistingUnits(unitDir, targetUID, instanceID)
 	if err != nil {
 		return applyReport{}, err
@@ -88,6 +91,7 @@ func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, erro
 	}
 
 	systemctlPlan := buildSystemctlPlan(desiredState, existing, plan)
+	progress.Printf(ctx, "timertab: applying systemd manager operations")
 	if err := systemctl.RunPlan(ctx, executor, systemctlPlan); err != nil {
 		return applyReport{}, err
 	}

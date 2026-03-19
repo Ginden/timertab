@@ -88,6 +88,44 @@ func TestRootCommandEditDryRunSkipsSystemdCheck(t *testing.T) {
 	}
 }
 
+func TestRootCommandEditPrintsProgressOnHappyPath(t *testing.T) {
+	originalCheck := ensureSystemdBaseline
+	originalApply := runSystemctlApply
+	t.Cleanup(func() {
+		ensureSystemdBaseline = originalCheck
+		runSystemctlApply = originalApply
+	})
+
+	ensureSystemdBaseline = func() error { return nil }
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
+		return applyReport{}, nil
+	}
+
+	t.Setenv("EDITOR", "true")
+
+	stderr := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"edit", "--no-commit", "--config", filepath.Join(t.TempDir(), "timertab.yaml")})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(stderr)
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	out := stderr.String()
+	for _, needle := range []string{
+		"timertab: checking systemd baseline\n",
+		"timertab: validating edited config\n",
+		"timertab: saving config to ",
+		"timertab: reconciling systemd units\n",
+	} {
+		if !strings.Contains(out, needle) {
+			t.Fatalf("stderr missing %q, got:\n%s", needle, out)
+		}
+	}
+}
+
 func TestRootCommandPrintConfigAliasListsConfig(t *testing.T) {
 	originalResolveConfigPath := resolveConfigPath
 	t.Cleanup(func() {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/ginden/timertab/internal/progress"
 )
 
 var errMissingExecutor = errors.New("systemctl executor is required")
@@ -28,6 +30,7 @@ func RunPlan(ctx context.Context, executor Executor, plan Plan) error {
 		return err
 	}
 	if plan.ReloadDaemon && len(plan.TimersToEnable) == 0 {
+		progress.Printf(ctx, "timertab: reloading systemd state")
 		if err := executor.DaemonReload(ctx); err != nil {
 			return fmt.Errorf("failed to daemon-reload after unit changes: %w", err)
 		}
@@ -47,20 +50,24 @@ func EnableAndStartTimers(ctx context.Context, executor Executor, timerUnits []s
 		return nil
 	}
 
+	progress.Printf(ctx, "timertab: reloading systemd state")
 	if err := executor.DaemonReload(ctx); err != nil {
 		return fmt.Errorf("failed to daemon-reload before enabling timers: %w", err)
 	}
 
 	if batch, ok := executor.(batchExecutor); ok {
+		progress.Printf(ctx, "timertab: enabling %d timer(s)", len(timerUnits))
 		if err := batch.EnableTimers(ctx, timerUnits); err != nil {
 			return fmt.Errorf("failed to enable timers: %w", err)
 		}
+		progress.Printf(ctx, "timertab: starting %d timer(s)", len(timerUnits))
 		if err := batch.StartTimers(ctx, timerUnits); err != nil {
 			return fmt.Errorf("failed to start timers: %w", err)
 		}
 		return nil
 	}
 
+	progress.Printf(ctx, "timertab: enabling and starting %d timer(s)", len(timerUnits))
 	for _, timerUnit := range timerUnits {
 		if err := executor.EnableTimer(ctx, timerUnit); err != nil {
 			return fmt.Errorf("failed to enable timer %q: %w", timerUnit, err)
@@ -84,15 +91,18 @@ func DisableAndStopTimers(ctx context.Context, executor Executor, timerUnits []s
 	}
 
 	if batch, ok := executor.(batchExecutor); ok {
+		progress.Printf(ctx, "timertab: disabling %d stale timer(s)", len(timerUnits))
 		if err := batch.DisableTimers(ctx, timerUnits); err != nil {
 			return fmt.Errorf("failed to disable timers: %w", err)
 		}
+		progress.Printf(ctx, "timertab: stopping %d stale timer(s)", len(timerUnits))
 		if err := batch.StopTimers(ctx, timerUnits); err != nil {
 			return fmt.Errorf("failed to stop timers: %w", err)
 		}
 		return nil
 	}
 
+	progress.Printf(ctx, "timertab: disabling and stopping %d stale timer(s)", len(timerUnits))
 	for _, timerUnit := range timerUnits {
 		if err := executor.DisableTimer(ctx, timerUnit); err != nil {
 			return fmt.Errorf("failed to disable timer %q: %w", timerUnit, err)

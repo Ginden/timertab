@@ -90,8 +90,8 @@ func TestStatusCommandPrintsRowsAndHandlesMissingUnits(t *testing.T) {
 		t.Fatalf("status output missing header, got:\n%s", out)
 	}
 	if !strings.Contains(out, "alpha") ||
-		!strings.Contains(out, "Fri 2026-03-06 10:00:00 CET") ||
-		!strings.Contains(out, "Fri 2026-03-06 11:00:00 CET") ||
+		!strings.Contains(out, "Fri 2026-03-06 10:00 CET") ||
+		!strings.Contains(out, "Fri 2026-03-06 11:00 CET") ||
 		!strings.Contains(out, "pass") {
 		t.Fatalf("status output missing alpha row, got:\n%s", out)
 	}
@@ -183,6 +183,13 @@ func TestStatusPrintableWidthIgnoresANSIEscapes(t *testing.T) {
 	value := "\x1b[1;34malpha\x1b[0m"
 	if got := statusPrintableWidth(value); got != len("alpha") {
 		t.Fatalf("statusPrintableWidth(%q) = %d, want %d", value, got, len("alpha"))
+	}
+}
+
+func TestStatusTimeValueKeepsNonZeroSeconds(t *testing.T) {
+	got := statusTimeValue("Fri 2026-03-06 10:00:07 CET", false)
+	if got != "Fri 2026-03-06 10:00:07 CET" {
+		t.Fatalf("statusTimeValue() = %q, want %q", got, "Fri 2026-03-06 10:00:07 CET")
 	}
 }
 
@@ -295,8 +302,8 @@ func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 		"field         value",
 		"job           alpha",
 		"name          Alpha job",
-		"last run      Fri 2026-03-06 10:00:00 CET",
-		"next trigger  Fri 2026-03-06 11:00:00 CET",
+		"last run      Fri 2026-03-06 10:00 CET",
+		"next trigger  Fri 2026-03-06 11:00 CET",
 		"config        " + cfgPath,
 		"unit dir      " + unitDir,
 		"Units",
@@ -529,10 +536,10 @@ func TestStatusCommandJSONOutput(t *testing.T) {
 	if payload.Jobs[0].ID != "alpha" {
 		t.Fatalf("job id = %q, want %q", payload.Jobs[0].ID, "alpha")
 	}
-	if payload.Jobs[0].LastRun != "Fri 2026-03-06 10:00:00 CET" {
+	if payload.Jobs[0].LastRun != "Fri 2026-03-06 10:00 CET" {
 		t.Fatalf("last_run = %q", payload.Jobs[0].LastRun)
 	}
-	if payload.Jobs[0].NextTrigger != "Fri 2026-03-06 11:00:00 CET" {
+	if payload.Jobs[0].NextTrigger != "Fri 2026-03-06 11:00 CET" {
 		t.Fatalf("next_trigger = %q", payload.Jobs[0].NextTrigger)
 	}
 	if payload.Jobs[0].Result != "pass" {
