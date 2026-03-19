@@ -14,6 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/ginden/timertab/internal/config"
+	"github.com/ginden/timertab/internal/systemctl"
 )
 
 var runSystemctlApply = applyEditedConfig
@@ -309,7 +310,11 @@ func printApplyReport(cmd *cobra.Command, report applyReport) {
 		cmd.Printf("stopped %s\n", unit)
 	}
 	if report.ReloadedDaemon {
-		cmd.Println("reloaded systemd --user daemon")
+		label := strings.TrimSpace(report.DaemonLabel)
+		if label == "" {
+			label = systemctl.UserScope.DaemonLabel()
+		}
+		cmd.Printf("reloaded %s\n", label)
 	}
 	for _, unit := range report.EnabledTimers {
 		cmd.Printf("enabled %s\n", unit)

@@ -107,6 +107,78 @@ func TestStatusCommandPrintsRowsAndHandlesMissingUnits(t *testing.T) {
 	}
 }
 
+func TestStatusCommandForRootUsesSystemManager(t *testing.T) {
+	originalResolveConfigPath := resolveConfigPath
+	originalResolveCurrentUID := resolveCurrentUID
+	originalRunSystemctlShow := runSystemctlShow
+	t.Cleanup(func() {
+		resolveConfigPath = originalResolveConfigPath
+		resolveCurrentUID = originalResolveCurrentUID
+		runSystemctlShow = originalRunSystemctlShow
+	})
+
+	resolveCurrentUID = func() (uint32, error) { return 0, nil }
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	cfg := &config.File{
+		Version: 1,
+		Jobs: []config.Job{{
+			ID:   "alpha",
+			When: config.ScheduleList{"@hourly"},
+			Run:  config.ShellCommand("echo alpha"),
+		}},
+	}
+	if err := saveConfig(cfgPath, cfg); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	resolveConfigPath = func(string) (string, error) { return cfgPath, nil }
+
+	rendered, err := systemd.RenderJobUnits(0, config.DefaultInstanceID, cfg.Jobs[0])
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	calls := make([][]string, 0, 2)
+	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
+		calls = append(calls, append([]string(nil), args...))
+		if len(args) < 2 {
+			return "", "", fmt.Errorf("unexpected args: %v", args)
+		}
+		unit := args[1]
+		switch unit {
+		case rendered.TimerName:
+			return "LastTriggerUSec=n/a\nNextElapseUSecRealtime=n/a\n", "", nil
+		case rendered.ServiceName:
+			return "Result=success\n", "", nil
+		default:
+			return "", "", fmt.Errorf("unexpected unit %q", unit)
+		}
+	}
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"status", "--config", cfgPath})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	want := [][]string{
+		{"show", rendered.TimerName, "--property=LastTriggerUSec", "--property=NextElapseUSecRealtime"},
+		{"show", rendered.ServiceName, "--property=Result"},
+	}
+	if len(calls) != len(want) {
+		t.Fatalf("runSystemctlShow call count = %d, want %d (%v)", len(calls), len(want), calls)
+	}
+	for idx := range want {
+		if strings.Join(calls[idx], "\x00") != strings.Join(want[idx], "\x00") {
+			t.Fatalf("call[%d] = %v, want %v", idx, calls[idx], want[idx])
+		}
+	}
+}
+
 func TestStatusPrintableWidthIgnoresANSIEscapes(t *testing.T) {
 	value := "\x1b[1;34malpha\x1b[0m"
 	if got := statusPrintableWidth(value); got != len("alpha") {
@@ -116,13 +188,13 @@ func TestStatusPrintableWidthIgnoresANSIEscapes(t *testing.T) {
 
 func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 	originalResolveConfigPath := resolveConfigPath
-	originalResolveSystemdUserUnitDir := resolveSystemdUserUnitDir
+	originalResolveSystemdUnitDir := resolveSystemdUnitDir
 	originalResolveCurrentUID := resolveCurrentUID
 	originalRunSystemctlShow := runSystemctlShow
 	originalRunJournalctl := runJournalctl
 	t.Cleanup(func() {
 		resolveConfigPath = originalResolveConfigPath
-		resolveSystemdUserUnitDir = originalResolveSystemdUserUnitDir
+		resolveSystemdUnitDir = originalResolveSystemdUnitDir
 		resolveCurrentUID = originalResolveCurrentUID
 		runSystemctlShow = originalRunSystemctlShow
 		runJournalctl = originalRunJournalctl
@@ -155,7 +227,12 @@ func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 		}
 		return cfgPath, nil
 	}
-	resolveSystemdUserUnitDir = func() (string, error) { return unitDir, nil }
+	resolveSystemdUnitDir = func(gotUID uint32) (string, error) {
+		if gotUID != 1000 {
+			t.Fatalf("resolveSystemdUnitDir() uid = %d, want %d", gotUID, 1000)
+		}
+		return unitDir, nil
+	}
 
 	rendered, err := systemd.RenderJobUnits(1000, config.DefaultInstanceID, cfg.Jobs[0])
 	if err != nil {
@@ -260,13 +337,13 @@ func TestStatusCommandPrintsDetailedStatusForJob(t *testing.T) {
 
 func TestStatusCommandShowsLogPeekFallbackWhenJournalctlFails(t *testing.T) {
 	originalResolveConfigPath := resolveConfigPath
-	originalResolveSystemdUserUnitDir := resolveSystemdUserUnitDir
+	originalResolveSystemdUnitDir := resolveSystemdUnitDir
 	originalResolveCurrentUID := resolveCurrentUID
 	originalRunSystemctlShow := runSystemctlShow
 	originalRunJournalctl := runJournalctl
 	t.Cleanup(func() {
 		resolveConfigPath = originalResolveConfigPath
-		resolveSystemdUserUnitDir = originalResolveSystemdUserUnitDir
+		resolveSystemdUnitDir = originalResolveSystemdUnitDir
 		resolveCurrentUID = originalResolveCurrentUID
 		runSystemctlShow = originalRunSystemctlShow
 		runJournalctl = originalRunJournalctl
@@ -290,7 +367,12 @@ func TestStatusCommandShowsLogPeekFallbackWhenJournalctlFails(t *testing.T) {
 	}
 
 	resolveConfigPath = func(string) (string, error) { return cfgPath, nil }
-	resolveSystemdUserUnitDir = func() (string, error) { return unitDir, nil }
+	resolveSystemdUnitDir = func(gotUID uint32) (string, error) {
+		if gotUID != 1000 {
+			t.Fatalf("resolveSystemdUnitDir() uid = %d, want %d", gotUID, 1000)
+		}
+		return unitDir, nil
+	}
 
 	rendered, err := systemd.RenderJobUnits(1000, config.DefaultInstanceID, cfg.Jobs[0])
 	if err != nil {

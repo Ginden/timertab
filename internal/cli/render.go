@@ -29,7 +29,7 @@ func newRenderCommand() *cobra.Command {
 		Long: `Render converts crontab input into a directory of systemd unit files,
 the generated timertab.yaml source, and a human-readable report.
 
-This command never touches ~/.config/systemd/user or calls systemctl.
+This command never touches live systemd unit directories or calls systemctl.
 It works without systemd installed at all.
 
 Example (Docker):

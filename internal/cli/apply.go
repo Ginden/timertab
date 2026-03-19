@@ -18,12 +18,12 @@ import (
 )
 
 var (
-	resolveCurrentUID         = config.ResolveCurrentUID
-	resolveSystemdUserUnitDir = config.ResolveSystemdUserUnitDir
-	renderJobUnits            = systemd.RenderJobUnits
-	newSystemctlExecutor      = func() systemctl.Executor { return systemctl.NewCommandExecutor() }
-	lookupUserByUID           = user.LookupId
-	statPath                  = os.Stat
+	resolveCurrentUID     = config.ResolveCurrentUID
+	resolveSystemdUnitDir = config.ResolveSystemdUnitDirForUID
+	renderJobUnits        = systemd.RenderJobUnits
+	newSystemctlExecutor  = func(targetUID uint32) systemctl.Executor { return systemctl.NewCommandExecutorForUID(targetUID) }
+	lookupUserByUID       = user.LookupId
+	statPath              = os.Stat
 )
 
 type applyDesiredState struct {
@@ -42,6 +42,7 @@ type applyReport struct {
 	EnabledTimers  []string
 	StartedTimers  []string
 	Warnings       []string
+	DaemonLabel    string
 }
 
 func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, error) {
@@ -55,7 +56,7 @@ func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, erro
 	}
 	instanceID := cfg.EffectiveInstanceID()
 
-	unitDir, err := resolveSystemdUserUnitDir()
+	unitDir, err := resolveSystemdUnitDir(targetUID)
 	if err != nil {
 		return applyReport{}, err
 	}
@@ -70,7 +71,7 @@ func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, erro
 		return applyReport{}, err
 	}
 
-	executor := newSystemctlExecutor()
+	executor := newSystemctlExecutor(targetUID)
 	mutator := &filesystemMutator{
 		unitDir:  unitDir,
 		executor: executor,
@@ -91,7 +92,7 @@ func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, erro
 		return applyReport{}, err
 	}
 
-	report, err := buildApplyReport(unitDir, plan, systemctlPlan)
+	report, err := buildApplyReport(targetUID, unitDir, plan, systemctlPlan)
 	if err != nil {
 		return applyReport{}, err
 	}
@@ -113,7 +114,7 @@ func previewEditedConfig(_ context.Context, cfg *config.File) (applyReport, erro
 	}
 	instanceID := cfg.EffectiveInstanceID()
 
-	unitDir, err := resolveSystemdUserUnitDir()
+	unitDir, err := resolveSystemdUnitDir(targetUID)
 	if err != nil {
 		return applyReport{}, err
 	}
@@ -363,7 +364,7 @@ func sortedUniqueStrings(values []string) []string {
 	return unique
 }
 
-func buildApplyReport(unitDir string, plan reconcile.Plan, systemctlPlan systemctl.Plan) (applyReport, error) {
+func buildApplyReport(targetUID uint32, unitDir string, plan reconcile.Plan, systemctlPlan systemctl.Plan) (applyReport, error) {
 	report := applyReport{
 		Created:        make([]string, 0, len(plan.Create)),
 		Modified:       make([]string, 0, len(plan.Update)),
@@ -373,6 +374,7 @@ func buildApplyReport(unitDir string, plan reconcile.Plan, systemctlPlan systemc
 		EnabledTimers:  append([]string(nil), systemctlPlan.TimersToEnable...),
 		StartedTimers:  append([]string(nil), systemctlPlan.TimersToEnable...),
 		ReloadedDaemon: systemctlPlan.ReloadDaemon,
+		DaemonLabel:    systemctl.ScopeForUID(targetUID).DaemonLabel(),
 	}
 
 	for _, unit := range plan.Create {

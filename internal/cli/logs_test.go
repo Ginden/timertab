@@ -82,6 +82,60 @@ func TestLogsCommandResolvesJobAndRunsJournalctl(t *testing.T) {
 	}
 }
 
+func TestLogsCommandForRootUsesSystemJournal(t *testing.T) {
+	originalResolveConfigPath := resolveConfigPath
+	originalResolveCurrentUID := resolveCurrentUID
+	originalRunJournalctl := runJournalctl
+	t.Cleanup(func() {
+		resolveConfigPath = originalResolveConfigPath
+		resolveCurrentUID = originalResolveCurrentUID
+		runJournalctl = originalRunJournalctl
+	})
+
+	resolveCurrentUID = func() (uint32, error) { return 0, nil }
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	cfg := &config.File{
+		Version: 1,
+		Jobs: []config.Job{{
+			ID:   "job-a",
+			When: config.ScheduleList{"@hourly"},
+			Run:  config.ShellCommand("echo hi"),
+		}},
+	}
+	if err := saveConfig(cfgPath, cfg); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	resolveConfigPath = func(string) (string, error) { return cfgPath, nil }
+
+	rendered, err := systemd.RenderJobUnits(0, config.DefaultInstanceID, cfg.Jobs[0])
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	var gotArgs []string
+	runJournalctl = func(_ context.Context, _ io.Reader, _ io.Writer, _ io.Writer, args ...string) error {
+		gotArgs = append([]string(nil), args...)
+		return nil
+	}
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetIn(bytes.NewBuffer(nil))
+	cmd.SetArgs([]string{"logs", "job-a", "--config", cfgPath})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	want := []string{"-u", rendered.ServiceName}
+	if !reflect.DeepEqual(gotArgs, want) {
+		t.Fatalf("journalctl args = %v, want %v", gotArgs, want)
+	}
+}
+
 func TestLogsCommandReturnsClearErrorForUnknownID(t *testing.T) {
 	originalResolveConfigPath := resolveConfigPath
 	originalRunJournalctl := runJournalctl

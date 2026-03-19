@@ -4,7 +4,7 @@ This document describes the current `timertab` command-line interface as impleme
 
 ## Root Command
 
-`timertab` manages `systemd` user timers from a YAML config file.
+`timertab` manages native `systemd` timers from a YAML config file.
 
 Running `timertab` with no arguments prints help.
 
@@ -30,10 +30,11 @@ Commands that work with the main config file resolve its path in this order:
 3. `${XDG_CONFIG_HOME}/timertab/timertab.yaml`
 4. `$HOME/.config/timertab/timertab.yaml`
 
-Generated unit files live under the user `systemd` unit directory:
+Generated unit files live under the target manager's unit directory:
 
-- `${XDG_CONFIG_HOME}/systemd/user`
-- or `$HOME/.config/systemd/user` when `XDG_CONFIG_HOME` is unset
+- for non-root users: `${XDG_CONFIG_HOME}/systemd/user`
+- for non-root users when `XDG_CONFIG_HOME` is unset: `$HOME/.config/systemd/user`
+- for root: `/etc/systemd/system`
 
 ## Command Summary
 
@@ -185,9 +186,9 @@ Detail mode:
 
 Behavior notes:
 
-- Summary and detail modes use `systemctl --user show` to inspect units.
+- Non-root mode inspects units with `systemctl --user show`; root mode uses `systemctl show`.
 - Missing units are reported as `unknown` or `missing` instead of hard-failing.
-- The detailed log preview uses `journalctl --user -u <service> -n 20 --no-pager`.
+- The detailed log preview uses `journalctl --user -u <service> -n 20 --no-pager` for non-root users and `journalctl -u <service> -n 20 --no-pager` for root.
 
 ## `timertab logs`
 
@@ -200,7 +201,7 @@ timertab logs <id> [--config <path>] [-n <lines>] [-f] [--since <date>] [--until
 Behavior:
 
 - Resolves the service unit name for the given job ID.
-- Runs `journalctl --user -u <service unit>` with the selected filters.
+- Runs `journalctl --user -u <service unit>` for non-root users and `journalctl -u <service unit>` for root.
 - Streams output directly from `journalctl`.
 
 Flags:
@@ -344,7 +345,7 @@ Flags:
 
 Important properties:
 
-- `render` never touches `~/.config/systemd/user`.
+- `render` never touches live systemd unit directories.
 - `render` never calls `systemctl`.
 - `render` works even when `systemd` is not installed.
 - `REPORT.md` includes imported jobs, warnings, and cron-vs-systemd caveats.

@@ -9,7 +9,7 @@ import (
 )
 
 func TestCommandExecutorEnableTimerIncludesActionableError(t *testing.T) {
-	expectedArgs := []string{"enable", "sample.timer"}
+	expectedArgs := []string{"--user", "enable", "sample.timer"}
 
 	executor := &CommandExecutor{
 		invoke: func(_ context.Context, args ...string) (string, error) {
@@ -37,6 +37,10 @@ func TestCommandExecutorEnableTimerIncludesActionableError(t *testing.T) {
 func TestCommandExecutorStopTimerWithoutStderrKeepsErrorReadable(t *testing.T) {
 	executor := &CommandExecutor{
 		invoke: func(_ context.Context, args ...string) (string, error) {
+			expectedArgs := []string{"--user", "stop", "sample.timer"}
+			if !reflect.DeepEqual(args, expectedArgs) {
+				t.Fatalf("args = %v, want %v", args, expectedArgs)
+			}
 			return "", errors.New("exit status 1")
 		},
 	}
@@ -52,7 +56,7 @@ func TestCommandExecutorStopTimerWithoutStderrKeepsErrorReadable(t *testing.T) {
 }
 
 func TestCommandExecutorEnableTimersRunsSingleCommand(t *testing.T) {
-	expectedArgs := []string{"enable", "sample-a.timer", "sample-b.timer"}
+	expectedArgs := []string{"--user", "enable", "sample-a.timer", "sample-b.timer"}
 	invoked := 0
 
 	executor := &CommandExecutor{
@@ -70,5 +74,27 @@ func TestCommandExecutorEnableTimersRunsSingleCommand(t *testing.T) {
 	}
 	if invoked != 1 {
 		t.Fatalf("invoke count = %d, want 1", invoked)
+	}
+}
+
+func TestCommandExecutorForRootOmitsUserScope(t *testing.T) {
+	expectedArgs := []string{"daemon-reload"}
+
+	executor := &CommandExecutor{
+		scope: SystemScope,
+		invoke: func(_ context.Context, args ...string) (string, error) {
+			if !reflect.DeepEqual(args, expectedArgs) {
+				t.Fatalf("args = %v, want %v", args, expectedArgs)
+			}
+			return "", errors.New("exit status 1")
+		},
+	}
+
+	err := executor.DaemonReload(context.Background())
+	if err == nil {
+		t.Fatalf("DaemonReload() error = nil, want non-nil")
+	}
+	if got, want := err.Error(), "systemctl daemon-reload failed: exit status 1"; got != want {
+		t.Fatalf("DaemonReload() error = %q, want %q", got, want)
 	}
 }

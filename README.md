@@ -204,7 +204,7 @@ crontab -l | timertab render --stdin --output output
 - one `.service` and one `.timer` file per imported job
 - `output/REPORT.md` with imported jobs, warnings, and cron-vs-systemd caveats
 
-Unlike `edit`, `render` never touches `~/.config/systemd/user`, never calls `systemctl`, and does not require `systemd` to be installed.
+Unlike `edit`, `render` never touches live systemd unit directories, never calls `systemctl`, and does not require `systemd` to be installed.
 
 If you want the same review flow without installing `timertab` locally, use the published container image:
 
@@ -239,7 +239,8 @@ timertab completion fish > ~/.config/fish/completions/timertab.fish
 ## Requirements
 
 - Linux with **systemd ≥ 247**
-- A running user session (`systemctl --user` must work)
+- For non-root use: a running user session (`systemctl --user` must work)
+- For root use: access to the system manager (`systemctl` without `--user`)
 
 If you need timers to fire while you're logged out:
 

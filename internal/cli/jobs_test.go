@@ -14,16 +14,21 @@ import (
 
 func TestEjectCommandRemovesJobAndManagedMarkers(t *testing.T) {
 	originalResolveCurrentUID := resolveCurrentUID
-	originalResolveSystemdUserUnitDir := resolveSystemdUserUnitDir
+	originalResolveSystemdUnitDir := resolveSystemdUnitDir
 	t.Cleanup(func() {
 		resolveCurrentUID = originalResolveCurrentUID
-		resolveSystemdUserUnitDir = originalResolveSystemdUserUnitDir
+		resolveSystemdUnitDir = originalResolveSystemdUnitDir
 	})
 
 	targetUID := uint32(1000)
 	unitDir := t.TempDir()
 	resolveCurrentUID = func() (uint32, error) { return targetUID, nil }
-	resolveSystemdUserUnitDir = func() (string, error) { return unitDir, nil }
+	resolveSystemdUnitDir = func(gotUID uint32) (string, error) {
+		if gotUID != targetUID {
+			t.Fatalf("resolveSystemdUnitDir() uid = %d, want %d", gotUID, targetUID)
+		}
+		return unitDir, nil
+	}
 
 	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
 	cfg := &config.File{

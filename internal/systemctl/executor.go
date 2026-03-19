@@ -19,13 +19,57 @@ type Executor interface {
 
 type invokeSystemctlFunc func(ctx context.Context, args ...string) (stderr string, err error)
 
+type Scope int
+
+const (
+	UserScope Scope = iota
+	SystemScope
+)
+
+func ScopeForUID(targetUID uint32) Scope {
+	if targetUID == 0 {
+		return SystemScope
+	}
+	return UserScope
+}
+
+func (s Scope) ScopedArgs(args ...string) []string {
+	if s == UserScope {
+		return append([]string{"--user"}, args...)
+	}
+	return append([]string(nil), args...)
+}
+
+func (s Scope) CommandString(binary string, args ...string) string {
+	scopedArgs := s.ScopedArgs(args...)
+	if len(scopedArgs) == 0 {
+		return binary
+	}
+	return binary + " " + strings.Join(scopedArgs, " ")
+}
+
+func (s Scope) DaemonLabel() string {
+	if s == UserScope {
+		return "systemd --user daemon"
+	}
+	return "systemd daemon"
+}
+
 // CommandExecutor is the production implementation that shells out to systemctl.
 type CommandExecutor struct {
 	invoke invokeSystemctlFunc
+	scope  Scope
 }
 
 func NewCommandExecutor() *CommandExecutor {
-	return &CommandExecutor{invoke: runSystemctl}
+	return &CommandExecutor{invoke: runSystemctl, scope: UserScope}
+}
+
+func NewCommandExecutorForUID(targetUID uint32) *CommandExecutor {
+	return &CommandExecutor{
+		invoke: runSystemctl,
+		scope:  ScopeForUID(targetUID),
+	}
 }
 
 func (e *CommandExecutor) DaemonReload(ctx context.Context) error {
@@ -70,12 +114,13 @@ func (e *CommandExecutor) run(ctx context.Context, args ...string) error {
 		invoke = runSystemctl
 	}
 
-	stderr, err := invoke(ctx, args...)
+	scopedArgs := e.scope.ScopedArgs(args...)
+	stderr, err := invoke(ctx, scopedArgs...)
 	if err == nil {
 		return nil
 	}
 
-	cmdText := "systemctl --user " + strings.Join(args, " ")
+	cmdText := e.scope.CommandString("systemctl", args...)
 	msg := strings.TrimSpace(stderr)
 	if msg == "" {
 		return fmt.Errorf("%s failed: %w", cmdText, err)
@@ -95,8 +140,7 @@ func (e *CommandExecutor) runForTimers(ctx context.Context, action string, timer
 }
 
 func runSystemctl(ctx context.Context, args ...string) (string, error) {
-	systemctlArgs := append([]string{"--user"}, args...)
-	cmd := exec.CommandContext(ctx, "systemctl", systemctlArgs...)
+	cmd := exec.CommandContext(ctx, "systemctl", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	err := cmd.Run()

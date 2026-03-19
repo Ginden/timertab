@@ -17,6 +17,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/ginden/timertab/internal/config"
+	"github.com/ginden/timertab/internal/systemctl"
 )
 
 type statusRow struct {
@@ -45,6 +46,7 @@ type statusDetail struct {
 	ServiceBody    string
 	TimerBody      string
 	LogPeek        string
+	Scope          systemctl.Scope
 }
 
 type statusDiagnosticStep struct {
@@ -102,9 +104,10 @@ func newStatusCommand() *cobra.Command {
 				return err
 			}
 			instanceID := loaded.EffectiveInstanceID()
+			scope := systemctl.ScopeForUID(targetUID)
 
 			if len(args) == 0 {
-				rows, err := collectStatusRows(cmd.Context(), targetUID, instanceID, loaded.Jobs)
+				rows, err := collectStatusRows(cmd.Context(), scope, targetUID, instanceID, loaded.Jobs)
 				if err != nil {
 					return err
 				}
@@ -131,12 +134,12 @@ func newStatusCommand() *cobra.Command {
 				return fmt.Errorf("job %q not found", jobID)
 			}
 
-			unitDir, err := resolveSystemdUserUnitDir()
+			unitDir, err := resolveSystemdUnitDir(targetUID)
 			if err != nil {
 				return err
 			}
 
-			detail, err := collectStatusDetail(cmd.Context(), cfgPath, unitDir, targetUID, instanceID, loaded.Jobs[jobIndex])
+			detail, err := collectStatusDetail(cmd.Context(), cfgPath, unitDir, scope, targetUID, instanceID, loaded.Jobs[jobIndex])
 			if err != nil {
 				return err
 			}
@@ -152,7 +155,7 @@ func newStatusCommand() *cobra.Command {
 	return cmd
 }
 
-func collectStatusRows(ctx context.Context, targetUID uint32, instanceID string, jobs []config.Job) ([]statusRow, error) {
+func collectStatusRows(ctx context.Context, scope systemctl.Scope, targetUID uint32, instanceID string, jobs []config.Job) ([]statusRow, error) {
 	rows := make([]statusRow, 0, len(jobs))
 	for _, job := range jobs {
 		rendered, err := renderJobUnits(targetUID, instanceID, job)
@@ -160,12 +163,12 @@ func collectStatusRows(ctx context.Context, targetUID uint32, instanceID string,
 			return nil, err
 		}
 
-		timerProps, timerMissing, err := showUnitProperties(ctx, rendered.TimerName, "LastTriggerUSec", "NextElapseUSecRealtime")
+		timerProps, timerMissing, err := showUnitProperties(ctx, scope, rendered.TimerName, "LastTriggerUSec", "NextElapseUSecRealtime")
 		if err != nil {
 			return nil, err
 		}
 
-		serviceProps, serviceMissing, err := showUnitProperties(ctx, rendered.ServiceName, "Result")
+		serviceProps, serviceMissing, err := showUnitProperties(ctx, scope, rendered.ServiceName, "Result")
 		if err != nil {
 			return nil, err
 		}
@@ -181,13 +184,13 @@ func collectStatusRows(ctx context.Context, targetUID uint32, instanceID string,
 	return rows, nil
 }
 
-func collectStatusDetail(ctx context.Context, cfgPath, unitDir string, targetUID uint32, instanceID string, job config.Job) (statusDetail, error) {
+func collectStatusDetail(ctx context.Context, cfgPath, unitDir string, scope systemctl.Scope, targetUID uint32, instanceID string, job config.Job) (statusDetail, error) {
 	rendered, err := renderJobUnits(targetUID, instanceID, job)
 	if err != nil {
 		return statusDetail{}, err
 	}
 
-	serviceProps, serviceMissing, err := showUnitProperties(ctx, rendered.ServiceName,
+	serviceProps, serviceMissing, err := showUnitProperties(ctx, scope, rendered.ServiceName,
 		"LoadState",
 		"ActiveState",
 		"SubState",
@@ -199,7 +202,7 @@ func collectStatusDetail(ctx context.Context, cfgPath, unitDir string, targetUID
 		return statusDetail{}, err
 	}
 
-	timerProps, timerMissing, err := showUnitProperties(ctx, rendered.TimerName,
+	timerProps, timerMissing, err := showUnitProperties(ctx, scope, rendered.TimerName,
 		"LoadState",
 		"ActiveState",
 		"SubState",
@@ -226,7 +229,8 @@ func collectStatusDetail(ctx context.Context, cfgPath, unitDir string, targetUID
 		TimerMissing:   timerMissing,
 		ServiceBody:    rendered.ServiceContent,
 		TimerBody:      rendered.TimerContent,
-		LogPeek:        collectStatusLogPeek(ctx, rendered.ServiceName),
+		LogPeek:        collectStatusLogPeek(ctx, scope, rendered.ServiceName),
+		Scope:          scope,
 	}, nil
 }
 
@@ -374,9 +378,9 @@ func printStatusAlignedTable(out io.Writer, rows [][]string, gap int) {
 	}
 }
 
-func showUnitProperties(ctx context.Context, unit string, properties ...string) (map[string]string, bool, error) {
+func showUnitProperties(ctx context.Context, scope systemctl.Scope, unit string, properties ...string) (map[string]string, bool, error) {
 	args := make([]string, 0, len(properties)+4)
-	args = append(args, "--user", "show", unit)
+	args = append(args, scope.ScopedArgs("show", unit)...)
 	for _, property := range properties {
 		args = append(args, "--property="+property)
 	}
@@ -390,7 +394,7 @@ func showUnitProperties(ctx context.Context, unit string, properties ...string) 
 		if message == "" {
 			message = err.Error()
 		}
-		return nil, false, fmt.Errorf("systemctl --user show %s failed: %s", unit, message)
+		return nil, false, fmt.Errorf("%s failed: %s", scope.CommandString("systemctl", "show", unit), message)
 	}
 
 	values := make(map[string]string, len(properties))
@@ -409,11 +413,11 @@ func showUnitProperties(ctx context.Context, unit string, properties ...string) 
 	return values, false, nil
 }
 
-func collectStatusLogPeek(ctx context.Context, serviceName string) string {
+func collectStatusLogPeek(ctx context.Context, scope systemctl.Scope, serviceName string) string {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	err := runJournalctl(ctx, bytes.NewReader(nil), &stdout, &stderr, "--user", "-u", serviceName, "-n", "20", "--no-pager")
+	err := runJournalctl(ctx, bytes.NewReader(nil), &stdout, &stderr, scope.ScopedArgs("-u", serviceName, "-n", "20", "--no-pager")...)
 	if err != nil {
 		message := strings.TrimSpace(stderr.String())
 		if message == "" {
@@ -534,37 +538,37 @@ func statusDiagnosticSteps(detail statusDetail) []statusDiagnosticStep {
 		{
 			Title:   "Check the last service run",
 			Why:     "Shows whether the job failed, the recent exit summary, and the most relevant status lines.",
-			Command: fmt.Sprintf("systemctl --user status %s", detail.ServiceName),
+			Command: detail.Scope.CommandString("systemctl", "status", detail.ServiceName),
 		},
 		{
 			Title:   "Check whether the timer is armed",
 			Why:     "Confirms that the timer unit is loaded and whether systemd believes it is waiting for the next trigger.",
-			Command: fmt.Sprintf("systemctl --user status %s", detail.TimerName),
+			Command: detail.Scope.CommandString("systemctl", "status", detail.TimerName),
 		},
 		{
 			Title:   "Read recent logs",
 			Why:     "Best next step when the service failed or exited unexpectedly; journal output usually contains the real error.",
-			Command: fmt.Sprintf("journalctl --user -u %s -n 100 --no-pager", detail.ServiceName),
+			Command: detail.Scope.CommandString("journalctl", "-u", detail.ServiceName, "-n", "100", "--no-pager"),
 		},
 		{
 			Title:   "Inspect service metadata only",
 			Why:     "Useful when you want the exact result code and the resolved unit file path without the extra prose from status.",
-			Command: fmt.Sprintf("systemctl --user show %s --property=Result,ExecMainStatus,FragmentPath", detail.ServiceName),
+			Command: detail.Scope.CommandString("systemctl", "show", detail.ServiceName, "--property=Result,ExecMainStatus,FragmentPath"),
 		},
 		{
 			Title:   "View the loaded service unit",
 			Why:     "Shows the final unit content that systemd sees, including drop-ins and the generated ExecStart/ExecStopPost lines.",
-			Command: fmt.Sprintf("systemctl --user cat %s", detail.ServiceName),
+			Command: detail.Scope.CommandString("systemctl", "cat", detail.ServiceName),
 		},
 		{
 			Title:   "View the loaded timer unit",
 			Why:     "Lets you confirm the real OnCalendar schedule, persistence, and timer-specific overrides after generation.",
-			Command: fmt.Sprintf("systemctl --user cat %s", detail.TimerName),
+			Command: detail.Scope.CommandString("systemctl", "cat", detail.TimerName),
 		},
 		{
 			Title:   "List timer scheduling details",
-			Why:     "Shows the next and previous trigger times in the context of all active user timers.",
-			Command: fmt.Sprintf("systemctl --user list-timers %s", detail.TimerName),
+			Why:     "Shows the next and previous trigger times in the context of the active timers managed by this systemd instance.",
+			Command: detail.Scope.CommandString("systemctl", "list-timers", detail.TimerName),
 		},
 	}
 }

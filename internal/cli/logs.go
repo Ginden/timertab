@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ginden/timertab/internal/config"
+	"github.com/ginden/timertab/internal/systemctl"
 )
 
 var runJournalctl = func(ctx context.Context, stdin io.Reader, stdout, stderr io.Writer, args ...string) error {
@@ -69,13 +70,14 @@ func newLogsCommand() *cobra.Command {
 				return err
 			}
 			instanceID := loaded.EffectiveInstanceID()
+			scope := systemctl.ScopeForUID(targetUID)
 
 			rendered, err := renderJobUnits(targetUID, instanceID, loaded.Jobs[jobIndex])
 			if err != nil {
 				return err
 			}
 
-			journalctlArgs := []string{"--user", "-u", rendered.ServiceName}
+			journalctlArgs := scope.ScopedArgs("-u", rendered.ServiceName)
 			if lines != "" {
 				journalctlArgs = append(journalctlArgs, "-n", lines)
 			}

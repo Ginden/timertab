@@ -57,7 +57,7 @@ func newEjectCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			unitDir, err := resolveSystemdUserUnitDir()
+			unitDir, err := resolveSystemdUnitDir(targetUID)
 			if err != nil {
 				return err
 			}

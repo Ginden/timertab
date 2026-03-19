@@ -19,6 +19,10 @@ func ResolveSystemdUserUnitDir() (string, error) {
 	return resolveSystemdUserUnitDir(os.Getenv, os.UserHomeDir)
 }
 
+func ResolveSystemdUnitDirForUID(targetUID uint32) (string, error) {
+	return resolveSystemdUnitDirForUID(targetUID, os.Getenv, os.UserHomeDir)
+}
+
 func ResolveCurrentUID() (uint32, error) {
 	return resolveCurrentUID(os.Getuid)
 }
@@ -64,6 +68,17 @@ func resolveSystemdUserUnitDir(
 	}
 
 	return filepath.Join(home, ".config", "systemd", "user"), nil
+}
+
+func resolveSystemdUnitDirForUID(
+	targetUID uint32,
+	getenv func(string) string,
+	resolveHomeDir func() (string, error),
+) (string, error) {
+	if targetUID == 0 {
+		return "/etc/systemd/system", nil
+	}
+	return resolveSystemdUserUnitDir(getenv, resolveHomeDir)
 }
 
 func resolveCurrentUID(getuid func() int) (uint32, error) {

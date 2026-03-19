@@ -72,6 +72,7 @@ func TestApplyEditedConfigReconcilesUnitsAndRunsSystemctl(t *testing.T) {
 		StoppedTimers:  nil,
 		EnabledTimers:  []string{rendered.TimerName},
 		StartedTimers:  []string{rendered.TimerName},
+		DaemonLabel:    systemctl.UserScope.DaemonLabel(),
 	}
 	if !reflect.DeepEqual(report, wantReport) {
 		t.Fatalf("apply report = %#v, want %#v", report, wantReport)
@@ -139,6 +140,7 @@ func TestApplyEditedConfigDisablesExistingTimersForDisabledJobs(t *testing.T) {
 		StoppedTimers:  []string{rendered.TimerName},
 		EnabledTimers:  nil,
 		StartedTimers:  nil,
+		DaemonLabel:    systemctl.UserScope.DaemonLabel(),
 	}
 	if !reflect.DeepEqual(report, wantReport) {
 		t.Fatalf("apply report = %#v, want %#v", report, wantReport)
@@ -191,6 +193,7 @@ func TestApplyEditedConfigReloadsDaemonAfterPruningWithoutEnabledTimers(t *testi
 		StoppedTimers:  nil,
 		EnabledTimers:  nil,
 		StartedTimers:  nil,
+		DaemonLabel:    systemctl.UserScope.DaemonLabel(),
 	}
 	if !reflect.DeepEqual(report, wantReport) {
 		t.Fatalf("apply report = %#v, want %#v", report, wantReport)
@@ -241,14 +244,24 @@ func stubApplyDeps(t *testing.T, targetUID uint32, unitDir string, executor syst
 	t.Helper()
 
 	originalResolveCurrentUID := resolveCurrentUID
-	originalResolveSystemdUserUnitDir := resolveSystemdUserUnitDir
+	originalResolveSystemdUnitDir := resolveSystemdUnitDir
 	originalNewSystemctlExecutor := newSystemctlExecutor
 	originalLookupUserByUID := lookupUserByUID
 	originalStatPath := statPath
 
 	resolveCurrentUID = func() (uint32, error) { return targetUID, nil }
-	resolveSystemdUserUnitDir = func() (string, error) { return unitDir, nil }
-	newSystemctlExecutor = func() systemctl.Executor { return executor }
+	resolveSystemdUnitDir = func(gotUID uint32) (string, error) {
+		if gotUID != targetUID {
+			t.Fatalf("resolveSystemdUnitDir() uid = %d, want %d", gotUID, targetUID)
+		}
+		return unitDir, nil
+	}
+	newSystemctlExecutor = func(gotUID uint32) systemctl.Executor {
+		if gotUID != targetUID {
+			t.Fatalf("newSystemctlExecutor() uid = %d, want %d", gotUID, targetUID)
+		}
+		return executor
+	}
 	lookupUserByUID = func(uid string) (*user.User, error) {
 		return &user.User{Username: "test-user", Uid: uid}, nil
 	}
@@ -258,7 +271,7 @@ func stubApplyDeps(t *testing.T, targetUID uint32, unitDir string, executor syst
 
 	return func() {
 		resolveCurrentUID = originalResolveCurrentUID
-		resolveSystemdUserUnitDir = originalResolveSystemdUserUnitDir
+		resolveSystemdUnitDir = originalResolveSystemdUnitDir
 		newSystemctlExecutor = originalNewSystemctlExecutor
 		lookupUserByUID = originalLookupUserByUID
 		statPath = originalStatPath

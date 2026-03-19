@@ -57,7 +57,7 @@ This document collects implementation, release, and maintenance notes that are u
 
 - `timertab render` reuses the import pipeline, then renders a review bundle instead of touching live `systemd --user` state.
 - The bundle contains generated unit files, generated `timertab.yaml`, and `REPORT.md`.
-- This path never writes to `~/.config/systemd/user`, never calls `systemctl`, and is intended to work even when `systemd` is not installed.
+- This path never writes to live systemd unit directories, never calls `systemctl`, and is intended to work even when `systemd` is not installed.
 
 ### Auto-commit behavior
 

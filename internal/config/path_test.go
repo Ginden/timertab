@@ -131,6 +131,50 @@ func TestResolveSystemdUserUnitDirFallsBackToHome(t *testing.T) {
 	}
 }
 
+func TestResolveSystemdUnitDirForRootUsesSystemUnitDirectory(t *testing.T) {
+	dir, err := resolveSystemdUnitDirForUID(
+		0,
+		func(string) string {
+			t.Fatalf("resolveSystemdUnitDirForUID() should not read env for root")
+			return ""
+		},
+		func() (string, error) {
+			t.Fatalf("resolveSystemdUnitDirForUID() should not resolve home for root")
+			return "", nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("resolveSystemdUnitDirForUID() error = %v", err)
+	}
+	if dir != "/etc/systemd/system" {
+		t.Fatalf("resolveSystemdUnitDirForUID() = %q, want %q", dir, "/etc/systemd/system")
+	}
+}
+
+func TestResolveSystemdUnitDirForNonRootUsesUserUnitDirectory(t *testing.T) {
+	dir, err := resolveSystemdUnitDirForUID(
+		1000,
+		func(key string) string {
+			if key == "XDG_CONFIG_HOME" {
+				return "/tmp/xdg"
+			}
+			return ""
+		},
+		func() (string, error) {
+			t.Fatalf("resolveSystemdUnitDirForUID() should not resolve home when XDG_CONFIG_HOME is set")
+			return "", nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("resolveSystemdUnitDirForUID() error = %v", err)
+	}
+
+	want := filepath.Join("/tmp/xdg", "systemd", "user")
+	if dir != want {
+		t.Fatalf("resolveSystemdUnitDirForUID() = %q, want %q", dir, want)
+	}
+}
+
 func TestResolveCurrentUID(t *testing.T) {
 	uid, err := resolveCurrentUID(func() int { return 1000 })
 	if err != nil {
