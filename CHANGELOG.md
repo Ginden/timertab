@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-03-19
+
+### Miscellaneous Tasks
+
+- Update CHANGELOG.md for v1.1.0
+
+### Other
+
+- AI description: Update schema references to v1.1.0.
+- AI description: Add root‑aware systemd scope handling, refactor unit‑directory resolution, update docs, tests, and CLI commands to use the new scope logic.
+
 ## [1.1.0] - 2026-03-17
 
 ### Bug Fixes
