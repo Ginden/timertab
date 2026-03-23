@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.2] - 2026-03-23
+
+### Bug Fixes
+
+- Treat legacy default‑instance units as managed Added logic to consider units without an instance marker as managed when the instance is the default. Included tests for this behavior in both the systemd renderer and the CLI discovery code.
+
+### Documentation
+
+- Add detailed descriptions to v1 JSON schema Enhanced schema with comprehensive description fields for top‑level metadata, properties, and definitions, improving editor integration and documentation.
+- Add release flow documentation Explain the tag‑driven release process, GitHub Actions automation, and example commands for creating and pushing a version tag.
+
+### Features
+
+- Better logs
+
+### Miscellaneous Tasks
+
+- Update CHANGELOG.md for v1.1.1
+
 ## [1.1.1] - 2026-03-19
 
 ### Miscellaneous Tasks
