@@ -240,6 +240,35 @@ func TestDiscoverExistingUnitsTracksManagedMetadata(t *testing.T) {
 	}
 }
 
+func TestDiscoverExistingUnitsTreatsLegacyDefaultInstanceUnitsAsManaged(t *testing.T) {
+	unitDir := t.TempDir()
+
+	legacyManagedName := "timertab-u1000-legacy.timer"
+	legacyManagedContent := strings.Join([]string{
+		"# timertab-managed: true",
+		"# timertab-uid: 1000",
+		"# timertab-job-id: legacy",
+		"[Timer]",
+		"OnCalendar=@hourly",
+	}, "\n")
+
+	if err := os.WriteFile(filepath.Join(unitDir, legacyManagedName), []byte(legacyManagedContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(legacy managed) error = %v", err)
+	}
+
+	got, err := discoverExistingUnits(unitDir, 1000, config.DefaultInstanceID)
+	if err != nil {
+		t.Fatalf("discoverExistingUnits() error = %v", err)
+	}
+
+	want := []reconcile.ExistingUnit{
+		{Name: legacyManagedName, Content: legacyManagedContent, Managed: true},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("discoverExistingUnits() = %#v, want %#v", got, want)
+	}
+}
+
 func stubApplyDeps(t *testing.T, targetUID uint32, unitDir string, executor systemctl.Executor) func() {
 	t.Helper()
 

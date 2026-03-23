@@ -324,6 +324,25 @@ func TestIsManagedUnitContentForUID(t *testing.T) {
 	}
 }
 
+func TestIsManagedUnitContentForUIDAcceptsLegacyDefaultInstanceUnits(t *testing.T) {
+	t.Parallel()
+
+	content := strings.Join([]string{
+		"# timertab-managed: true",
+		"# timertab-uid: 1000",
+		"# timertab-job-id: sample",
+		"[Unit]",
+		"Description=sample",
+	}, "\n")
+
+	if !IsManagedUnitContentForUID(content, 1000, config.DefaultInstanceID) {
+		t.Fatalf("IsManagedUnitContentForUID() = false for legacy default-instance markers")
+	}
+	if IsManagedUnitContentForUID(content, 1000, "work") {
+		t.Fatalf("IsManagedUnitContentForUID() = true for custom instance without marker")
+	}
+}
+
 func TestRenderJobUnitsSupportsMultilineCommandWithoutBreakingDirectiveLine(t *testing.T) {
 	t.Parallel()
 

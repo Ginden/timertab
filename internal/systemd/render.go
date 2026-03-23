@@ -31,6 +31,7 @@ func IsManagedUnitContentForUID(content string, targetUID uint32, instanceID str
 		hasManagedMarker  bool
 		hasUIDMarker      bool
 		hasInstanceMarker bool
+		sawInstanceMarker bool
 		hasJobIDMarker    bool
 	)
 
@@ -45,12 +46,20 @@ func IsManagedUnitContentForUID(content string, targetUID uint32, instanceID str
 			uidValue := strings.TrimSpace(strings.TrimPrefix(line, uidMarkerPrefix))
 			hasUIDMarker = uidValue == targetUIDString
 		case strings.HasPrefix(line, instanceMarkerPrefix):
+			sawInstanceMarker = true
 			instanceValue := strings.TrimSpace(strings.TrimPrefix(line, instanceMarkerPrefix))
 			hasInstanceMarker = instanceValue == effectiveInstanceID
 		case strings.HasPrefix(line, jobIDMarkerPrefix):
 			jobIDValue := strings.TrimSpace(strings.TrimPrefix(line, jobIDMarkerPrefix))
 			hasJobIDMarker = jobIDValue != ""
 		}
+	}
+
+	// Units created before instance support did not carry an instance marker.
+	// Treat those as managed only for the default instance so reconcile can
+	// upgrade them in place without weakening custom-instance isolation.
+	if !sawInstanceMarker && effectiveInstanceID == config.DefaultInstanceID {
+		hasInstanceMarker = true
 	}
 
 	return hasManagedMarker && hasUIDMarker && hasInstanceMarker && hasJobIDMarker
