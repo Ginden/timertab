@@ -49,6 +49,14 @@ If the README/spec drift from the code, follow the code and update docs to match
 - Keep generated unit files human-readable.
 - Do not introduce runtime dependency on `timertab` binary in generated units.
 
+## Release Flow
+
+- Releasing is tag-driven: pushing a `v*` tag triggers GitHub Actions release automation.
+- Current release automation publishes Linux binaries, the `ghcr.io/ginden/timertab-import` image, release notes, checksums, and provenance attestations.
+- Example:
+  `git tag v1.2.3`
+  `git push origin v1.2.3`
+
 ## Operational Safety
 
 - Validate and normalize config before any write/prune action.
