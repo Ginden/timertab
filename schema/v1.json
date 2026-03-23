@@ -2,6 +2,7 @@
   "$id": "https://raw.githubusercontent.com/ginden/timertab/v1.1.0/schema/v1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "timertab v1",
+  "description": "Configuration file for timertab — manages native systemd timers from a crontab-like YAML config. The YAML config is the source of truth; generated .service and .timer unit files are derived artifacts.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,22 +12,27 @@
   "properties": {
     "$schema": {
       "type": "string",
-      "format": "uri"
+      "format": "uri",
+      "description": "JSON Schema URI for editor integration and validation."
     },
     "version": {
-      "const": 1
+      "const": 1,
+      "description": "Schema version. Must be 1."
     },
     "instance_id": {
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+      "description": "Logical instance namespace for generated units. Allows multiple independent job namespaces (e.g. work, personal) for the same user. Each instance manages its own units and never touches the others. Omitting this uses the default instance. Unit naming: default instance uses prefix 'timertab-u<uid>-', custom instance uses 'timertab-<instance_id>-u<uid>-'."
     },
     "git": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Git integration settings. By default, every successful 'timertab edit' apply auto-commits the config file. If the config directory is not already in a git work tree, timertab initializes one before committing.",
       "properties": {
         "auto_commit": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "When true (default), successful edit/apply runs automatically stage and commit the config file. Disable persistently here or per-run with 'timertab edit --no-commit'."
         }
       }
     },
@@ -35,12 +41,14 @@
       "items": {
         "$ref": "#/$defs/job"
       },
-      "default": []
+      "default": [],
+      "description": "List of scheduled jobs. Each job produces a .service and .timer systemd unit pair."
     }
   },
   "$defs": {
     "env": {
       "type": "object",
+      "description": "Environment variables passed to the command. Keys must be valid POSIX variable names, values must be strings.",
       "propertyNames": {
         "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
       },
@@ -51,47 +59,56 @@
     },
     "schedule": {
       "type": "string",
+      "description": "A cron schedule expression. Accepts standard 5-field cron expressions (minute hour day-of-month month day-of-week) or shorthands: @hourly, @daily, @weekly, @monthly, @yearly, @annually, @reboot.",
       "minLength": 1,
       "pattern": "^(?:@(?:hourly|daily|weekly|monthly|yearly|annually|reboot)|\\S+\\s+\\S+\\s+\\S+\\s+\\S+\\s+\\S+)$"
     },
     "hook": {
       "type": "object",
       "additionalProperties": false,
+      "description": "A lifecycle hook executed after the main job completes. Hooks are dispatched via ExecStopPost in the generated service unit and receive rich context: TIMERTAB_JOB_ID, TIMERTAB_UNIT, SERVICE_RESULT, EXIT_CODE, EXIT_STATUS.",
       "required": [
         "command"
       ],
       "properties": {
         "command": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Shell command to execute when the hook fires."
         },
         "env": {
-          "$ref": "#/$defs/env"
+          "$ref": "#/$defs/env",
+          "description": "Additional environment variables for the hook command, merged with the hook context variables."
         }
       }
     },
     "limits": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Resource limits applied to the generated systemd service unit.",
       "properties": {
         "MemoryMax": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Maximum memory limit for the service (e.g. '512M', '2G'). Maps to systemd MemoryMax= directive."
         },
         "CPUQuota": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "CPU time quota for the service (e.g. '50%', '200%'). Maps to systemd CPUQuota= directive."
         },
         "IOWeight": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 10000
+          "maximum": 10000,
+          "description": "IO scheduling weight for the service (1–10000). Maps to systemd IOWeight= directive."
         }
       }
     },
     "systemd_directive": {
       "type": "object",
       "additionalProperties": false,
+      "description": "A single systemd unit directive as a name/value pair. Used in the ordered list form of systemd overrides.",
       "required": [
         "name",
         "value"
@@ -99,17 +116,21 @@
       "properties": {
         "name": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Systemd directive name (e.g. 'Restart', 'AccuracySec')."
         },
         "value": {
-          "type": "string"
+          "type": "string",
+          "description": "Systemd directive value (e.g. 'on-failure', '1m')."
         }
       }
     },
     "systemd_directive_set": {
+      "description": "A set of raw systemd unit directives. Accepts either an object map (Record<string, string>) or an ordered list of {name, value} pairs. The list form allows duplicate directive names.",
       "oneOf": [
         {
           "type": "object",
+          "description": "Object map form — directive names as keys, directive values as values.",
           "propertyNames": {
             "minLength": 1
           },
@@ -119,6 +140,7 @@
         },
         {
           "type": "array",
+          "description": "Ordered list form — allows duplicate directive names.",
           "minItems": 1,
           "items": {
             "$ref": "#/$defs/systemd_directive"
@@ -129,18 +151,22 @@
     "systemd_overrides": {
       "type": "object",
       "additionalProperties": false,
+      "description": "Raw native systemd directive overrides injected into the generated unit files. Use this for fine-grained control when the high-level fields are not sufficient.",
       "properties": {
         "service": {
-          "$ref": "#/$defs/systemd_directive_set"
+          "$ref": "#/$defs/systemd_directive_set",
+          "description": "Directives injected into the [Service] section of the generated .service unit."
         },
         "timer": {
-          "$ref": "#/$defs/systemd_directive_set"
+          "$ref": "#/$defs/systemd_directive_set",
+          "description": "Directives injected into the [Timer] section of the generated .timer unit."
         }
       }
     },
     "job": {
       "type": "object",
       "additionalProperties": false,
+      "description": "A scheduled job. Each job produces a .service and .timer systemd unit pair. Generated units are fully native and work without timertab installed.",
       "required": [
         "when",
         "run"
@@ -148,14 +174,17 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
+          "description": "Stable identifier for this job. Optional in user input — auto-generated from the job name or content hash and persisted back to the config file. Must be unique across all jobs."
         },
         "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 120
+          "maxLength": 120,
+          "description": "Human-readable description of the job. Used as the systemd unit Description and as a seed for auto-generated IDs."
         },
         "when": {
+          "description": "Schedule for the job. A single cron expression or a list of cron expressions. Accepts 5-field cron syntax and shorthands (@hourly, @daily, @weekly, @monthly, @yearly, @annually, @reboot). Multiple schedules cause the job to fire at each specified time.",
           "oneOf": [
             {
               "$ref": "#/$defs/schedule"
@@ -170,6 +199,7 @@
           ]
         },
         "run": {
+          "description": "Command to execute. A string is shell shorthand and runs as '/bin/sh -lc \"<command>\"'. A list of strings is an explicit argv executed directly without a shell layer.",
           "oneOf": [
             {
               "type": "string",
@@ -185,34 +215,43 @@
           ]
         },
         "env": {
-          "$ref": "#/$defs/env"
+          "$ref": "#/$defs/env",
+          "description": "Environment variables set for the job's main command."
         },
         "cwd": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Working directory for the job. Maps to systemd WorkingDirectory= directive."
         },
         "enabled": {
           "type": "boolean",
-          "default": true
+          "default": true,
+          "description": "Whether the job's timer is started. When false, the timer is disabled/stopped but the unit files are still written. Defaults to true."
         },
         "persistent": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "When true, if the system was off during a scheduled run, the job fires immediately on next boot. Maps to systemd Persistent= directive."
         },
         "jitter": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "description": "Random delay added before each run to spread load (e.g. '5m', '1h'). Maps to systemd RandomizedDelaySec= directive."
         },
         "limits": {
-          "$ref": "#/$defs/limits"
+          "$ref": "#/$defs/limits",
+          "description": "Resource limits (memory, CPU, IO) applied to the generated service unit."
         },
         "systemd": {
-          "$ref": "#/$defs/systemd_overrides"
+          "$ref": "#/$defs/systemd_overrides",
+          "description": "Raw systemd directive overrides for the generated .service and .timer units."
         },
         "on_success": {
-          "$ref": "#/$defs/hook"
+          "$ref": "#/$defs/hook",
+          "description": "Hook executed when the main job command succeeds (exit code 0)."
         },
         "on_failure": {
-          "$ref": "#/$defs/hook"
+          "$ref": "#/$defs/hook",
+          "description": "Hook executed when the main job command fails (non-zero exit code)."
         }
       }
     }
