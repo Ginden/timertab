@@ -46,6 +46,12 @@ type applyReport struct {
 	DaemonLabel    string
 }
 
+type timerRuntimeState struct {
+	Missing       bool
+	UnitFileState string
+	ActiveState   string
+}
+
 func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, error) {
 	if cfg == nil {
 		return applyReport{}, fmt.Errorf("config is required")
@@ -74,6 +80,7 @@ func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, erro
 		return applyReport{}, err
 	}
 
+	scope := systemctl.ScopeForUID(targetUID)
 	executor := newSystemctlExecutor(targetUID)
 	mutator := &filesystemMutator{
 		unitDir:  unitDir,
@@ -90,7 +97,12 @@ func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, erro
 		return applyReport{}, fmt.Errorf("reconcile apply: %w", err)
 	}
 
-	systemctlPlan := buildSystemctlPlan(desiredState, existing, plan)
+	timerStates, err := discoverTimerRuntimeStates(ctx, scope, plan)
+	if err != nil {
+		return applyReport{}, err
+	}
+
+	systemctlPlan := buildSystemctlPlan(desiredState, plan, timerStates)
 	progress.Printf(ctx, "timertab: applying systemd manager operations")
 	if err := systemctl.RunPlan(ctx, executor, systemctlPlan); err != nil {
 		return applyReport{}, err
@@ -235,38 +247,126 @@ func discoverExistingUnits(unitDir string, targetUID uint32, instanceID string) 
 	return existing, nil
 }
 
-func buildSystemctlPlan(state applyDesiredState, existing []reconcile.ExistingUnit, plan reconcile.Plan) systemctl.Plan {
-	existingManagedTimers := make(map[string]struct{}, len(existing))
-	for _, unit := range existing {
-		if !unit.Managed || !strings.HasSuffix(unit.Name, ".timer") {
-			continue
+func discoverTimerRuntimeStates(ctx context.Context, scope systemctl.Scope, plan reconcile.Plan) (map[string]timerRuntimeState, error) {
+	timerNames := make([]string, 0, len(plan.Keep)+len(plan.Update))
+	for _, unit := range plan.Update {
+		if strings.HasSuffix(unit.Name, ".timer") {
+			timerNames = append(timerNames, unit.Name)
 		}
-		existingManagedTimers[unit.Name] = struct{}{}
+	}
+	for _, unitName := range plan.Keep {
+		if strings.HasSuffix(unitName, ".timer") {
+			timerNames = append(timerNames, unitName)
+		}
 	}
 
-	removedTimers := make(map[string]struct{}, len(plan.Remove))
-	for _, unitName := range plan.Remove {
-		if strings.HasSuffix(unitName, ".timer") {
-			removedTimers[unitName] = struct{}{}
+	timerNames = sortedUniqueStrings(timerNames)
+	states := make(map[string]timerRuntimeState, len(timerNames))
+	for _, timerName := range timerNames {
+		props, missing, err := showUnitProperties(ctx, scope, timerName, "UnitFileState", "ActiveState")
+		if err != nil {
+			return nil, fmt.Errorf("inspect timer state for %q: %w", timerName, err)
 		}
+
+		state := timerRuntimeState{Missing: missing}
+		if !missing {
+			state.UnitFileState = strings.TrimSpace(props["UnitFileState"])
+			state.ActiveState = strings.TrimSpace(props["ActiveState"])
+		}
+		states[timerName] = state
+	}
+
+	return states, nil
+}
+
+func buildSystemctlPlan(state applyDesiredState, plan reconcile.Plan, timerStates map[string]timerRuntimeState) systemctl.Plan {
+	enabledTimers := make(map[string]struct{}, len(state.enabledTimers))
+	for _, timerName := range state.enabledTimers {
+		enabledTimers[timerName] = struct{}{}
+	}
+
+	disabledTimers := make(map[string]struct{}, len(state.disabledTimers))
+	for _, timerName := range state.disabledTimers {
+		disabledTimers[timerName] = struct{}{}
 	}
 
 	toDisable := make([]string, 0, len(state.disabledTimers))
-	for _, timerName := range state.disabledTimers {
-		if _, removed := removedTimers[timerName]; removed {
+	toEnable := make([]string, 0, len(state.enabledTimers))
+	for _, unit := range plan.Create {
+		if !strings.HasSuffix(unit.Name, ".timer") {
 			continue
 		}
-		if _, exists := existingManagedTimers[timerName]; exists {
-			toDisable = append(toDisable, timerName)
+		if _, enabled := enabledTimers[unit.Name]; enabled {
+			toEnable = append(toEnable, unit.Name)
+		}
+	}
+	for _, unit := range plan.Update {
+		if !strings.HasSuffix(unit.Name, ".timer") {
+			continue
+		}
+
+		if _, enabled := enabledTimers[unit.Name]; enabled {
+			toEnable = append(toEnable, unit.Name)
+			continue
+		}
+
+		if _, disabled := disabledTimers[unit.Name]; disabled && timerNeedsDisableStop(timerStates[unit.Name]) {
+			toDisable = append(toDisable, unit.Name)
+		}
+	}
+	for _, unitName := range plan.Keep {
+		if !strings.HasSuffix(unitName, ".timer") {
+			continue
+		}
+
+		if _, enabled := enabledTimers[unitName]; enabled {
+			if timerNeedsEnableStart(timerStates[unitName]) {
+				toEnable = append(toEnable, unitName)
+			}
+			continue
+		}
+
+		if _, disabled := disabledTimers[unitName]; disabled && timerNeedsDisableStop(timerStates[unitName]) {
+			toDisable = append(toDisable, unitName)
 		}
 	}
 
-	// Only disable timers that already exist and will remain on disk. New disabled
-	// jobs do not need a stop/disable cycle, and removed timers are handled by prune.
 	return systemctl.Plan{
 		TimersToDisable: sortedUniqueStrings(toDisable),
-		TimersToEnable:  sortedUniqueStrings(state.enabledTimers),
+		TimersToEnable:  sortedUniqueStrings(toEnable),
 		ReloadDaemon:    len(plan.Create) > 0 || len(plan.Update) > 0 || len(plan.Remove) > 0,
+	}
+}
+
+func timerNeedsEnableStart(state timerRuntimeState) bool {
+	if state.Missing {
+		return true
+	}
+	return !isEnabledTimerUnitFileState(state.UnitFileState) || !isStartedTimerActiveState(state.ActiveState)
+}
+
+func timerNeedsDisableStop(state timerRuntimeState) bool {
+	if state.Missing {
+		return false
+	}
+	return isEnabledTimerUnitFileState(state.UnitFileState) || isStartedTimerActiveState(state.ActiveState)
+}
+
+func isEnabledTimerUnitFileState(state string) bool {
+	switch strings.TrimSpace(state) {
+	case "enabled", "enabled-runtime", "linked", "linked-runtime", "alias":
+		return true
+	default:
+		return false
+	}
+}
+
+func isStartedTimerActiveState(state string) bool {
+	switch strings.TrimSpace(state) {
+	case "active", "activating", "reloading":
+		return true
+	default:
+		return false
 	}
 }
 

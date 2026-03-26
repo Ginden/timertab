@@ -24,15 +24,16 @@ type Plan struct {
 	ReloadDaemon    bool
 }
 
-// RunPlan executes disable/stop operations first, then daemon-reload/enable/start.
+// RunPlan executes disable/stop operations first, then daemon-reload if needed,
+// then enable/start operations.
 func RunPlan(ctx context.Context, executor Executor, plan Plan) error {
 	if err := DisableAndStopTimers(ctx, executor, plan.TimersToDisable); err != nil {
 		return err
 	}
-	if plan.ReloadDaemon && len(plan.TimersToEnable) == 0 {
+	if plan.ReloadDaemon {
 		progress.Printf(ctx, "timertab: reloading systemd state")
 		if err := executor.DaemonReload(ctx); err != nil {
-			return fmt.Errorf("failed to daemon-reload after unit changes: %w", err)
+			return fmt.Errorf("failed to daemon-reload: %w", err)
 		}
 	}
 	if err := EnableAndStartTimers(ctx, executor, plan.TimersToEnable); err != nil {
@@ -41,18 +42,13 @@ func RunPlan(ctx context.Context, executor Executor, plan Plan) error {
 	return nil
 }
 
-// EnableAndStartTimers reloads systemd state and then enables/starts timers.
+// EnableAndStartTimers enables and then starts timers.
 func EnableAndStartTimers(ctx context.Context, executor Executor, timerUnits []string) error {
 	if executor == nil {
 		return errMissingExecutor
 	}
 	if len(timerUnits) == 0 {
 		return nil
-	}
-
-	progress.Printf(ctx, "timertab: reloading systemd state")
-	if err := executor.DaemonReload(ctx); err != nil {
-		return fmt.Errorf("failed to daemon-reload before enabling timers: %w", err)
 	}
 
 	if batch, ok := executor.(batchExecutor); ok {

@@ -73,7 +73,6 @@ func TestEnableAndStartTimersCommandOrder(t *testing.T) {
 	}
 
 	wantCalls := []string{
-		"daemon-reload",
 		"enable alpha.timer",
 		"start alpha.timer",
 		"enable beta.timer",
@@ -153,7 +152,29 @@ func TestEnableAndStartTimersUsesBatchExecutorWhenAvailable(t *testing.T) {
 	}
 
 	wantCalls := []string{
-		"daemon-reload",
+		"enable-batch alpha.timer beta.timer",
+		"start-batch alpha.timer beta.timer",
+	}
+	if !reflect.DeepEqual(executor.calls, wantCalls) {
+		t.Fatalf("calls = %v, want %v", executor.calls, wantCalls)
+	}
+}
+
+func TestRunPlanSkipsReloadWhenOnlyTimerStateNeedsReconcile(t *testing.T) {
+	executor := &fakeBatchExecutor{}
+
+	err := RunPlan(
+		context.Background(),
+		executor,
+		Plan{
+			TimersToEnable: []string{"alpha.timer", "beta.timer"},
+		},
+	)
+	if err != nil {
+		t.Fatalf("RunPlan() error = %v, want nil", err)
+	}
+
+	wantCalls := []string{
 		"enable-batch alpha.timer beta.timer",
 		"start-batch alpha.timer beta.timer",
 	}

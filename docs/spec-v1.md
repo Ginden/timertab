@@ -206,8 +206,8 @@ Apply algorithm:
 4. Discover existing managed units for target UID and instance namespace
 5. Stop/disable/delete stale managed units
 6. Write desired units
-7. `daemon-reload`
-8. enable/start desired timers
+7. `daemon-reload` when unit files changed
+8. enable/start or disable/stop timers as needed to match config state
 
 Safety rule:
 

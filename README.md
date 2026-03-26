@@ -259,7 +259,7 @@ When you run `timertab edit` (or `timertab -e`), here's what happens:
 3. Missing job `id` fields are auto-generated and persisted back to the file.
 4. For each job, a `.service` and `.timer` unit is rendered.
 5. Stale units (from removed jobs) are stopped, disabled, and deleted.
-6. New/changed units are written, `daemon-reload` is called, and timers are started.
+6. New/changed units are written, `daemon-reload` is called when unit files changed, and timers are enabled/started or disabled/stopped only when needed to match the config.
 
 If validation fails at step 2, nothing else happens — no partial writes, no orphaned units.
 

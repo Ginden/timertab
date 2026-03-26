@@ -122,6 +122,17 @@ func TestApplyEditedConfigDisablesExistingTimersForDisabledJobs(t *testing.T) {
 	fakeExecutor := &recordingExecutor{}
 	restore := stubApplyDeps(t, targetUID, unitDir, fakeExecutor)
 	defer restore()
+	originalRunSystemctlShow := runSystemctlShow
+	t.Cleanup(func() {
+		runSystemctlShow = originalRunSystemctlShow
+	})
+	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
+		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState"}
+		if !reflect.DeepEqual(args, want) {
+			t.Fatalf("runSystemctlShow args = %v, want %v", args, want)
+		}
+		return "UnitFileState=enabled\nActiveState=active\n", "", nil
+	}
 
 	cfg := &config.File{
 		Version: 1,
@@ -149,6 +160,205 @@ func TestApplyEditedConfigDisablesExistingTimersForDisabledJobs(t *testing.T) {
 	wantCalls := []string{
 		"disable " + rendered.TimerName,
 		"stop " + rendered.TimerName,
+	}
+	if !reflect.DeepEqual(fakeExecutor.calls, wantCalls) {
+		t.Fatalf("systemctl calls = %v, want %v", fakeExecutor.calls, wantCalls)
+	}
+}
+
+func TestApplyEditedConfigSkipsUnchangedEnabledTimersAlreadyRunning(t *testing.T) {
+	unitDir := t.TempDir()
+	targetUID := uint32(1000)
+
+	job := config.Job{
+		ID:   "job-enabled",
+		When: config.ScheduleList{"@daily"},
+		Run:  config.ShellCommand("echo enabled"),
+	}
+	rendered, err := systemd.RenderJobUnits(targetUID, config.DefaultInstanceID, job)
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(unitDir, rendered.ServiceName), []byte(rendered.ServiceContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(service) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(unitDir, rendered.TimerName), []byte(rendered.TimerContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(timer) error = %v", err)
+	}
+
+	fakeExecutor := &recordingExecutor{}
+	restore := stubApplyDeps(t, targetUID, unitDir, fakeExecutor)
+	defer restore()
+	originalRunSystemctlShow := runSystemctlShow
+	t.Cleanup(func() {
+		runSystemctlShow = originalRunSystemctlShow
+	})
+	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
+		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState"}
+		if !reflect.DeepEqual(args, want) {
+			t.Fatalf("runSystemctlShow args = %v, want %v", args, want)
+		}
+		return "UnitFileState=enabled\nActiveState=active\n", "", nil
+	}
+
+	cfg := &config.File{
+		Version: 1,
+		Jobs:    []config.Job{job},
+	}
+	report, err := applyEditedConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("applyEditedConfig() error = %v", err)
+	}
+
+	wantReport := applyReport{
+		Created:        []string{},
+		Modified:       []string{},
+		Deleted:        []string{},
+		ReloadedDaemon: false,
+		DisabledTimers: nil,
+		StoppedTimers:  nil,
+		EnabledTimers:  nil,
+		StartedTimers:  nil,
+		DaemonLabel:    systemctl.UserScope.DaemonLabel(),
+	}
+	if !reflect.DeepEqual(report, wantReport) {
+		t.Fatalf("apply report = %#v, want %#v", report, wantReport)
+	}
+	if len(fakeExecutor.calls) != 0 {
+		t.Fatalf("systemctl calls = %v, want none", fakeExecutor.calls)
+	}
+}
+
+func TestApplyEditedConfigSkipsDisabledTimersAlreadyStopped(t *testing.T) {
+	unitDir := t.TempDir()
+	targetUID := uint32(1000)
+
+	disabled := false
+	job := config.Job{
+		ID:      "job-disabled",
+		When:    config.ScheduleList{"@daily"},
+		Run:     config.ShellCommand("echo disabled"),
+		Enabled: &disabled,
+	}
+	rendered, err := systemd.RenderJobUnits(targetUID, config.DefaultInstanceID, job)
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(unitDir, rendered.ServiceName), []byte(rendered.ServiceContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(service) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(unitDir, rendered.TimerName), []byte(rendered.TimerContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(timer) error = %v", err)
+	}
+
+	fakeExecutor := &recordingExecutor{}
+	restore := stubApplyDeps(t, targetUID, unitDir, fakeExecutor)
+	defer restore()
+	originalRunSystemctlShow := runSystemctlShow
+	t.Cleanup(func() {
+		runSystemctlShow = originalRunSystemctlShow
+	})
+	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
+		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState"}
+		if !reflect.DeepEqual(args, want) {
+			t.Fatalf("runSystemctlShow args = %v, want %v", args, want)
+		}
+		return "UnitFileState=disabled\nActiveState=inactive\n", "", nil
+	}
+
+	cfg := &config.File{
+		Version: 1,
+		Jobs:    []config.Job{job},
+	}
+	report, err := applyEditedConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("applyEditedConfig() error = %v", err)
+	}
+
+	wantReport := applyReport{
+		Created:        []string{},
+		Modified:       []string{},
+		Deleted:        []string{},
+		ReloadedDaemon: false,
+		DisabledTimers: nil,
+		StoppedTimers:  nil,
+		EnabledTimers:  nil,
+		StartedTimers:  nil,
+		DaemonLabel:    systemctl.UserScope.DaemonLabel(),
+	}
+	if !reflect.DeepEqual(report, wantReport) {
+		t.Fatalf("apply report = %#v, want %#v", report, wantReport)
+	}
+	if len(fakeExecutor.calls) != 0 {
+		t.Fatalf("systemctl calls = %v, want none", fakeExecutor.calls)
+	}
+}
+
+func TestApplyEditedConfigStartsExistingTimerWhenRuntimeStateDrifted(t *testing.T) {
+	unitDir := t.TempDir()
+	targetUID := uint32(1000)
+
+	job := config.Job{
+		ID:   "job-enabled",
+		When: config.ScheduleList{"@daily"},
+		Run:  config.ShellCommand("echo enabled"),
+	}
+	rendered, err := systemd.RenderJobUnits(targetUID, config.DefaultInstanceID, job)
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(unitDir, rendered.ServiceName), []byte(rendered.ServiceContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(service) error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(unitDir, rendered.TimerName), []byte(rendered.TimerContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(timer) error = %v", err)
+	}
+
+	fakeExecutor := &recordingExecutor{}
+	restore := stubApplyDeps(t, targetUID, unitDir, fakeExecutor)
+	defer restore()
+	originalRunSystemctlShow := runSystemctlShow
+	t.Cleanup(func() {
+		runSystemctlShow = originalRunSystemctlShow
+	})
+	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
+		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState"}
+		if !reflect.DeepEqual(args, want) {
+			t.Fatalf("runSystemctlShow args = %v, want %v", args, want)
+		}
+		return "UnitFileState=disabled\nActiveState=inactive\n", "", nil
+	}
+
+	cfg := &config.File{
+		Version: 1,
+		Jobs:    []config.Job{job},
+	}
+	report, err := applyEditedConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("applyEditedConfig() error = %v", err)
+	}
+
+	wantReport := applyReport{
+		Created:        []string{},
+		Modified:       []string{},
+		Deleted:        []string{},
+		ReloadedDaemon: false,
+		DisabledTimers: nil,
+		StoppedTimers:  nil,
+		EnabledTimers:  []string{rendered.TimerName},
+		StartedTimers:  []string{rendered.TimerName},
+		DaemonLabel:    systemctl.UserScope.DaemonLabel(),
+	}
+	if !reflect.DeepEqual(report, wantReport) {
+		t.Fatalf("apply report = %#v, want %#v", report, wantReport)
+	}
+
+	wantCalls := []string{
+		"enable " + rendered.TimerName,
+		"start " + rendered.TimerName,
 	}
 	if !reflect.DeepEqual(fakeExecutor.calls, wantCalls) {
 		t.Fatalf("systemctl calls = %v, want %v", fakeExecutor.calls, wantCalls)
