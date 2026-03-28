@@ -170,6 +170,7 @@ String `run` values are shorthand for `["/bin/sh", "-lc", "..."]`. Use the list 
 | `timertab list` / `timertab print-config` (or `timertab -l`) | Print current config |
 | `timertab status` / `timertab status --json` | Show last run, next trigger, and result for each job |
 | `timertab status <id>` | Show detailed runtime state, generated unit definitions, file locations, and diagnostic commands |
+| `timertab trigger <id>` | Run one job immediately by starting its generated service unit |
 | `timertab eject <id>` | Stop managing a job — its units stay and keep running |
 | `timertab enable <id>` / `timertab disable <id>` | Toggle one job on/off without removing it |
 | `timertab logs <id>` | Tail/query journald logs for one job |

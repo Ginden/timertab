@@ -32,7 +32,7 @@ If the README/spec drift from the code, follow the code and update docs to match
 
 ## Current Implementation Status
 
-- CLI is implemented for `edit`, `list`/`print-config`, `print-path`, `validate`, `diff`, `status`, `logs`, `enable`, `disable`, `eject`, `import`, `render`, and shell completion.
+- CLI is implemented for `edit`, `list`/`print-config`, `print-path`, `validate`, `diff`, `status`, `logs`, `trigger`, `enable`, `disable`, `eject`, `import`, `render`, and shell completion.
 - Legacy root shorthands `-e`, `-l`, and `--print-path` are still supported by argument rewriting.
 - YAML load/schema validation/semantic validation/ID normalization are implemented and covered by tests.
 - Reconcile is implemented: render desired units, detect existing managed units, build deterministic create/update/keep/remove plans, prune stale managed units, write unit files, `daemon-reload`, and enable/start or disable/stop timers as needed.

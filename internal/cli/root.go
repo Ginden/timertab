@@ -40,6 +40,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newEjectCommand())
 	cmd.AddCommand(newStatusCommand())
 	cmd.AddCommand(newLogsCommand())
+	cmd.AddCommand(newTriggerCommand())
 	cmd.AddCommand(newEnableCommand())
 	cmd.AddCommand(newDisableCommand())
 	cmd.AddCommand(newDiffCommand())

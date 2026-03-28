@@ -597,6 +597,11 @@ func (e *recordingExecutor) StartTimer(_ context.Context, timerUnit string) erro
 	return nil
 }
 
+func (e *recordingExecutor) StartService(_ context.Context, serviceUnit string) error {
+	e.calls = append(e.calls, "start-service "+serviceUnit)
+	return nil
+}
+
 func (e *recordingExecutor) DisableTimer(_ context.Context, timerUnit string) error {
 	e.calls = append(e.calls, "disable "+timerUnit)
 	return nil

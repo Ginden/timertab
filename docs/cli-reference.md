@@ -48,6 +48,7 @@ Generated unit files live under the target manager's unit directory:
 | `timertab status` | Show summary status for configured jobs |
 | `timertab status <id>` | Show a detailed report for one job |
 | `timertab logs <id>` | Show `journalctl` output for one job |
+| `timertab trigger <id>` | Start one job's generated service immediately |
 | `timertab enable <id>` | Mark a job enabled, save config, and apply |
 | `timertab disable <id>` | Mark a job disabled, save config, and apply |
 | `timertab eject <id>` | Stop managing a job but leave its unit files in place |
@@ -214,6 +215,21 @@ Flags:
 - `--until <DATE>`: pass an `--until` filter to `journalctl`
 - `--no-pager`: pass `--no-pager` to `journalctl`
 
+## `timertab trigger`
+
+Usage:
+
+```bash
+timertab trigger <id> [--config <path>]
+```
+
+Behavior:
+
+- Loads the config, normalizes IDs, and resolves the generated service unit name for the selected job.
+- Runs `systemctl --user start <service unit>` for non-root users and `systemctl start <service unit>` for root.
+- Does not modify the config file.
+- Prints a success line with the job ID and resolved service unit name.
+
 ## `timertab enable`
 
 Usage:
@@ -376,6 +392,7 @@ Behavior:
 Commands that modify managed units:
 
 - `edit` without `--no-apply`
+- `trigger`
 - `enable`
 - `disable`
 - interactive `import` without `--no-apply`

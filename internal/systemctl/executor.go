@@ -13,6 +13,7 @@ type Executor interface {
 	DaemonReload(ctx context.Context) error
 	EnableTimer(ctx context.Context, timerUnit string) error
 	StartTimer(ctx context.Context, timerUnit string) error
+	StartService(ctx context.Context, serviceUnit string) error
 	DisableTimer(ctx context.Context, timerUnit string) error
 	StopTimer(ctx context.Context, timerUnit string) error
 }
@@ -86,6 +87,10 @@ func (e *CommandExecutor) EnableTimers(ctx context.Context, timerUnits []string)
 
 func (e *CommandExecutor) StartTimer(ctx context.Context, timerUnit string) error {
 	return e.run(ctx, "start", timerUnit)
+}
+
+func (e *CommandExecutor) StartService(ctx context.Context, serviceUnit string) error {
+	return e.run(ctx, "start", serviceUnit)
 }
 
 func (e *CommandExecutor) StartTimers(ctx context.Context, timerUnits []string) error {

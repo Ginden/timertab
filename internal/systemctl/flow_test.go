@@ -28,6 +28,10 @@ func (f *fakeExecutor) StartTimer(_ context.Context, timerUnit string) error {
 	return f.record("start " + timerUnit)
 }
 
+func (f *fakeExecutor) StartService(_ context.Context, serviceUnit string) error {
+	return f.record("start-service " + serviceUnit)
+}
+
 func (f *fakeExecutor) DisableTimer(_ context.Context, timerUnit string) error {
 	return f.record("disable " + timerUnit)
 }

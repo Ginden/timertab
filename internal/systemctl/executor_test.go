@@ -55,6 +55,23 @@ func TestCommandExecutorStopTimerWithoutStderrKeepsErrorReadable(t *testing.T) {
 	}
 }
 
+func TestCommandExecutorStartServiceUsesScopedStart(t *testing.T) {
+	expectedArgs := []string{"--user", "start", "sample.service"}
+
+	executor := &CommandExecutor{
+		invoke: func(_ context.Context, args ...string) (string, error) {
+			if !reflect.DeepEqual(args, expectedArgs) {
+				t.Fatalf("args = %v, want %v", args, expectedArgs)
+			}
+			return "", nil
+		},
+	}
+
+	if err := executor.StartService(context.Background(), "sample.service"); err != nil {
+		t.Fatalf("StartService() error = %v, want nil", err)
+	}
+}
+
 func TestCommandExecutorEnableTimersRunsSingleCommand(t *testing.T) {
 	expectedArgs := []string{"--user", "enable", "sample-a.timer", "sample-b.timer"}
 	invoked := 0
