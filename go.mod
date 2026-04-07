@@ -1,6 +1,6 @@
 module github.com/ginden/timertab
 
-go 1.24.0
+go 1.22
 
 require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
