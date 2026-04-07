@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.3] - 2026-04-07
+
+### Features
+
+- Conditionally reload daemon and reconcile timers - Add timer runtime state discovery to avoid unnecessary enable/disable cycles. - Reload daemon only when unit files change. - Update documentation and tests accordingly. - Simplify flow: remove daemon-reload before enabling timers.
+- Add trigger command to run job immediately Introduce `timertab trigger` subcommand, update documentation, extend the systemctl executor with a StartService method, and add comprehensive tests for the new functionality.
+- Add deb and rpm package support
+
+### Miscellaneous Tasks
+
+- Update CHANGELOG.md for v1.1.2
+- Make builds reproducible Add -trimpath flag, commit-based timestamps, module proxy config, and update documentation to note reproducibility features.
+
 ## [1.1.2] - 2026-03-23
 
 ### Bug Fixes
