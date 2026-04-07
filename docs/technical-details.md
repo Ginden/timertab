@@ -121,6 +121,8 @@ Current release flow:
 - GitHub-generated release notes/changelog
 - `checksums.txt`
 - GitHub artifact provenance attestations
+- Tagged GoReleaser builds are configured for reproducibility/verifiability with
+  `-trimpath`, commit-based build timestamps, and Go module proxying
 
 Example:
 

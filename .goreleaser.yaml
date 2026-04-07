@@ -8,17 +8,27 @@ builds:
     main: ./cmd/timertab
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     goos:
       - linux
     goarch:
       - amd64
       - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
     ldflags:
       - >-
         -s -w
         -X github.com/ginden/timertab/internal/version.Version={{ .Version }}
         -X github.com/ginden/timertab/internal/version.Commit={{ .Commit }}
-        -X github.com/ginden/timertab/internal/version.Date={{ .Date }}
+        -X github.com/ginden/timertab/internal/version.Date={{ .CommitDate }}
+
+gomod:
+  proxy: true
+  mod: mod
+  env:
+    - GOPROXY=https://proxy.golang.org,direct
+    - GOSUMDB=sum.golang.org
 
 archives:
   - id: default
