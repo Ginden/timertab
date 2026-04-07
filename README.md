@@ -102,6 +102,22 @@ Or from a local clone:
 make install
 ```
 
+Tagged GitHub releases publish Linux `tar.gz`, `.deb`, and `.rpm` assets for both `amd64` and `arm64`.
+
+If you want a native package instead of `go install`, download one from the latest release:
+
+```bash
+# Debian/Ubuntu
+sudo dpkg -i timertab_*_amd64.deb
+# or
+sudo dpkg -i timertab_*_arm64.deb
+
+# Fedora/RHEL/openSUSE
+sudo rpm -i timertab-*.x86_64.rpm
+# or
+sudo rpm -i timertab-*.aarch64.rpm
+```
+
 ### Create your first job
 
 ```bash

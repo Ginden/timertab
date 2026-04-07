@@ -30,6 +30,26 @@ archives:
       - LICENSE
       - README.md
 
+nfpms:
+  - id: packages
+    ids:
+      - timertab
+    package_name: timertab
+    file_name_template: "{{ .ConventionalFileName }}"
+    homepage: https://github.com/ginden/timertab
+    maintainer: Michal Wadas <michalwadas@gmail.com>
+    description: Manage native systemd timers from a crontab-like YAML config.
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    contents:
+      - src: ./LICENSE
+        dst: /usr/share/doc/timertab/LICENSE
+      - src: ./README.md
+        dst: /usr/share/doc/timertab/README.md
+
 checksum:
   name_template: checksums.txt
 
