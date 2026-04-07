@@ -1,0 +1,5 @@
+timertab (0.0.0-1) unstable; urgency=medium
+
+  * Initial Debian packaging template for Launchpad PPA builds.
+
+ -- Michal Wadas <michalwadas@gmail.com>  Tue, 07 Apr 2026 23:30:00 +0200

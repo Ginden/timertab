@@ -1,0 +1,37 @@
+#!/usr/bin/make -f
+
+export CGO_ENABLED = 0
+export GOFLAGS = -buildvcs=false -mod=vendor -trimpath
+
+BUILDDIR := $(CURDIR)/debian/.build
+BINARY := $(BUILDDIR)/timertab
+PACKAGE_VERSION := $(shell dpkg-parsechangelog -SVersion)
+LDFLAGS := -s -w -X github.com/ginden/timertab/internal/version.Version=$(PACKAGE_VERSION)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	:
+
+override_dh_auto_build:
+	mkdir -p $(BUILDDIR)
+	go build -ldflags="$(LDFLAGS)" -o $(BINARY) ./cmd/timertab
+	$(BINARY) completion bash > $(BUILDDIR)/timertab.bash
+	$(BINARY) completion zsh > $(BUILDDIR)/_timertab
+	$(BINARY) completion fish > $(BUILDDIR)/timertab.fish
+
+override_dh_auto_test:
+	go test ./...
+
+override_dh_auto_install:
+	install -D -m0755 $(BINARY) $(CURDIR)/debian/timertab/usr/bin/timertab
+	install -D -m0644 $(BUILDDIR)/timertab.bash $(CURDIR)/debian/timertab/usr/share/bash-completion/completions/timertab
+	install -D -m0644 $(BUILDDIR)/_timertab $(CURDIR)/debian/timertab/usr/share/zsh/vendor-completions/_timertab
+	install -D -m0644 $(BUILDDIR)/timertab.fish $(CURDIR)/debian/timertab/usr/share/fish/vendor_completions.d/timertab.fish
+
+override_dh_dwz:
+	:
+
+override_dh_auto_clean:
+	rm -rf $(BUILDDIR)

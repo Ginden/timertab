@@ -1,0 +1,130 @@
+name: ppa
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag to package, for example v1.2.3
+        required: true
+        type: string
+      ppa_revision:
+        description: PPA revision suffix to use for this upload
+        required: false
+        default: "1"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - noble
+          - plucky
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Resolve build metadata
+        id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_PPA_REVISION: ${{ inputs.ppa_revision }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            tag="${INPUT_TAG}"
+            ppa_revision="${INPUT_PPA_REVISION:-1}"
+          else
+            tag="${REF_NAME}"
+            ppa_revision="1"
+          fi
+
+          case "${tag}" in
+            v*)
+              version="${tag#v}"
+              ;;
+            *)
+              echo "tag must start with v, got: ${tag}" >&2
+              exit 1
+              ;;
+          esac
+
+          printf 'tag=%s\n' "${tag}" >> "${GITHUB_OUTPUT}"
+          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
+          printf 'ppa_revision=%s\n' "${ppa_revision}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install Debian packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            debhelper \
+            devscripts \
+            dpkg-dev \
+            dput
+
+      - name: Import signing key
+        env:
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "${GNUPGHOME}"
+          printf 'GNUPGHOME=%s\n' "${GNUPGHOME}" >> "${GITHUB_ENV}"
+
+          printf '%s' "${GPG_SIGNING_KEY}" | base64 --decode | gpg --batch --import
+
+          key_id="$(gpg --batch --list-secret-keys --with-colons | awk -F: '$1 == "sec" { print $5; exit }')"
+          if [ -z "${key_id}" ]; then
+            echo "no secret signing key imported" >&2
+            exit 1
+          fi
+
+          printf 'DEBSIGN_KEYID=%s\n' "${key_id}" >> "${GITHUB_ENV}"
+
+      - name: Build signed source package
+        id: build
+        env:
+          DEBSIGN_KEYID: ${{ env.DEBSIGN_KEYID }}
+        run: |
+          set -euo pipefail
+
+          changes_path="$(
+            ./.github/scripts/build-ppa-source.sh \
+              "${{ matrix.suite }}" \
+              "${{ steps.meta.outputs.version }}" \
+              "${{ steps.meta.outputs.ppa_revision }}"
+          )"
+
+          printf 'changes_path=%s\n' "${changes_path}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload source package artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppa-${{ matrix.suite }}-${{ steps.meta.outputs.version }}
+          path: dist/ppa/${{ matrix.suite }}/*
+
+      - name: Upload to Launchpad PPA
+        run: |
+          set -euo pipefail
+          dput ppa:ginden/timertab "${{ steps.build.outputs.changes_path }}"

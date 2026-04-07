@@ -2,9 +2,30 @@ package config
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
 )
+
+func chdirTemp(t *testing.T) {
+	t.Helper()
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+
+	tempDir := t.TempDir()
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("Chdir(%q) error = %v", tempDir, err)
+	}
+
+	t.Cleanup(func() {
+		if err := os.Chdir(cwd); err != nil {
+			t.Fatalf("restore cwd to %q: %v", cwd, err)
+		}
+	})
+}
 
 func TestNormalizeIDsGeneratesMissingID(t *testing.T) {
 	cfg := File{
@@ -108,7 +129,7 @@ func TestLoadFromBytesSchemaValidRunArgv(t *testing.T) {
 }
 
 func TestLoadFromBytesUsesEmbeddedSchemaOutsideRepoRoot(t *testing.T) {
-	t.Chdir(t.TempDir())
+	chdirTemp(t)
 
 	input := strings.Join([]string{
 		"version: 1",

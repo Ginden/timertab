@@ -1,0 +1,20 @@
+Source: timertab
+Section: admin
+Priority: optional
+Maintainer: Michal Wadas <michalwadas@gmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ golang-any (>= 2:1.22~)
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://github.com/ginden/timertab
+
+Package: timertab
+Architecture: any
+Depends:
+ ${misc:Depends}
+Description: manage native systemd timers from a crontab-like YAML config
+ timertab manages native systemd timers from a single YAML configuration file.
+ It can validate config, reconcile generated service/timer units, inspect
+ runtime state, render review bundles for cron migration, and preserve an audit
+ trail of config edits through optional git auto-commit support.

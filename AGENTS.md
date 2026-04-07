@@ -52,7 +52,7 @@ If the README/spec drift from the code, follow the code and update docs to match
 ## Release Flow
 
 - Releasing is tag-driven: pushing a `v*` tag triggers GitHub Actions release automation.
-- Current release automation publishes Linux binaries, the `ghcr.io/ginden/timertab-import` image, release notes, checksums, and provenance attestations.
+- Current release automation publishes Linux binaries, the `ghcr.io/ginden/timertab-import` image, release notes, checksums, provenance attestations, and signed Launchpad PPA source uploads for Ubuntu `noble` and `plucky`.
 - Example:
   `git tag v1.2.3`
   `git push origin v1.2.3`
