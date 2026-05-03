@@ -89,7 +89,7 @@ fi
 
 (
   cd "${tree_dir}"
-  dpkg-buildpackage "${build_args[@]}"
+  dpkg-buildpackage "${build_args[@]}" >&2
 )
 
 mv "${build_root}/${package_name}_${upstream_version}.orig.tar.xz" "${artifact_dir}/"
