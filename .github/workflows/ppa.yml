@@ -68,9 +68,11 @@ jobs:
               ;;
           esac
 
-          printf 'tag=%s\n' "${tag}" >> "${GITHUB_OUTPUT}"
-          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
-          printf 'ppa_revision=%s\n' "${ppa_revision}" >> "${GITHUB_OUTPUT}"
+          {
+            printf 'tag=%s\n' "${tag}"
+            printf 'version=%s\n' "${version}"
+            printf 'ppa_revision=%s\n' "${ppa_revision}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Install Debian packaging tools
         run: |
@@ -87,7 +89,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          export GNUPGHOME="$(mktemp -d)"
+          GNUPGHOME="$(mktemp -d)"
+          export GNUPGHOME
           chmod 700 "${GNUPGHOME}"
           printf 'GNUPGHOME=%s\n' "${GNUPGHOME}" >> "${GITHUB_ENV}"
 
