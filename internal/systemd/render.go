@@ -112,7 +112,7 @@ func renderServiceContent(targetUID uint32, instanceID string, job config.Job, s
 
 	if job.Cwd != "" {
 		b.WriteString("WorkingDirectory=")
-		b.WriteString(systemdQuoted(job.Cwd))
+		b.WriteString(systemdPath(job.Cwd))
 		b.WriteString("\n")
 	}
 
@@ -384,4 +384,28 @@ func systemdQuoted(value string) string {
 		"\t", `\t`,
 	)
 	return `"` + replacer.Replace(value) + `"`
+}
+
+func systemdPath(value string) string {
+	var b strings.Builder
+	b.Grow(len(value))
+
+	for _, r := range value {
+		switch r {
+		case '\\':
+			b.WriteString(`\\`)
+		case ' ':
+			b.WriteString(`\x20`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			b.WriteRune(r)
+		}
+	}
+
+	return b.String()
 }

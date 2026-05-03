@@ -7,7 +7,7 @@ Description="timertab job journal-scan"
 
 [Service]
 Type=oneshot
-WorkingDirectory="/var/lib/timertab jobs"
+WorkingDirectory=/var/lib/timertab\x20jobs
 Environment="LANG=C.UTF-8"
 Environment="TZ=UTC"
 ExecStart=/bin/sh -lc "echo run && date"

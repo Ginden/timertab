@@ -419,6 +419,16 @@ func TestSystemdQuotedEscapesControlCharacters(t *testing.T) {
 	}
 }
 
+func TestSystemdPathEscapesWhitespaceWithoutQuotes(t *testing.T) {
+	t.Parallel()
+
+	got := systemdPath(`/var/lib/timertab jobs\current`)
+	want := `/var/lib/timertab\x20jobs\\current`
+	if got != want {
+		t.Fatalf("systemdPath() = %q, want %q", got, want)
+	}
+}
+
 func readRenderGolden(t *testing.T, name string) string {
 	t.Helper()
 
