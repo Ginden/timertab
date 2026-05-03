@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.4] - 2026-05-03
+
+### Features
+
+- Add Launchpad PPA build workflow and Debian packaging Introduce scripts for source package creation, GitHub Actions workflow to build and upload PPA packages, update documentation to mention PPA installation, add complete Debian packaging files (control, rules, changelog, etc.), and add a test helper for temporary working directory handling.
+- Escape WorkingDirectory paths without quotes
+
+### Miscellaneous Tasks
+
+- Update CHANGELOG.md for v1.1.3
+- Downgrade go version to 1.22
+
+### Refactor
+
+- Simplify output writes & env export
+
 ## [1.1.3] - 2026-04-07
 
 ### Features
