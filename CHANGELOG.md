@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-05-08
+
+### Features
+
+- Add verbosity, color, highlighting
+
+### Miscellaneous Tasks
+
+- Update CHANGELOG.md for v1.1.5
+
 ## [1.1.5] - 2026-05-03
 
 ### Bug Fixes
