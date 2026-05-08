@@ -68,13 +68,13 @@ func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, erro
 		return applyReport{}, err
 	}
 
-	progress.Printf(ctx, "timertab: rendering desired units")
+	progress.PrintfLevel(ctx, 2, "timertab: rendering desired units")
 	desiredState, err := buildDesiredState(targetUID, instanceID, cfg.Jobs)
 	if err != nil {
 		return applyReport{}, err
 	}
 
-	progress.Printf(ctx, "timertab: scanning existing systemd units in %s", unitDir)
+	progress.PrintfLevel(ctx, 2, "timertab: scanning existing systemd units in %s", unitDir)
 	existing, err := discoverExistingUnits(unitDir, targetUID, instanceID)
 	if err != nil {
 		return applyReport{}, err
@@ -103,7 +103,7 @@ func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, erro
 	}
 
 	systemctlPlan := buildSystemctlPlan(desiredState, plan, timerStates)
-	progress.Printf(ctx, "timertab: applying systemd manager operations")
+	progress.PrintfLevel(ctx, 2, "timertab: applying systemd manager operations")
 	if err := systemctl.RunPlan(ctx, executor, systemctlPlan); err != nil {
 		return applyReport{}, err
 	}

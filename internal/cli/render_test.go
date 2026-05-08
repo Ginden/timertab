@@ -7,6 +7,7 @@ import (
 
 	"github.com/ginden/timertab/internal/config"
 	"github.com/ginden/timertab/internal/systemd"
+	"github.com/spf13/cobra"
 )
 
 func TestBuildRenderReportUsesReadableJobSections(t *testing.T) {
@@ -96,7 +97,9 @@ func TestDisplayCLIPath(t *testing.T) {
 func TestColorizeRenderOutputPathWithoutTerminal(t *testing.T) {
 	t.Parallel()
 
-	if got := colorizeRenderOutputPath(&bytes.Buffer{}, "output"); got != "./output" {
+	cmd := &cobra.Command{}
+	cmd.SetOut(&bytes.Buffer{})
+	if got := colorizeRenderOutputPath(cmd, "output"); got != "./output" {
 		t.Fatalf("colorizeRenderOutputPath() = %q, want %q", got, "./output")
 	}
 }

@@ -105,7 +105,7 @@ func renderBundle(cmd *cobra.Command, cfg *config.File, importWarnings []string,
 	}
 
 	// Print summary to stderr
-	cmd.Printf("rendered %d job(s) to %s\n", len(rendered), colorizeRenderOutputPath(cmd.OutOrStdout(), outputDir))
+	cmd.Printf("rendered %d job(s) to %s\n", len(rendered), colorizeRenderOutputPath(cmd, outputDir))
 	for _, w := range importWarnings {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s %s\n", warningPrefix, w)
 	}
@@ -309,10 +309,9 @@ func truncateRunes(text string, max int) string {
 	return string(runes[:max-3]) + "..."
 }
 
-func colorizeRenderOutputPath(out any, path string) string {
+func colorizeRenderOutputPath(cmd *cobra.Command, path string) string {
 	display := displayCLIPath(path)
-	writer, ok := out.(interface{ Write([]byte) (int, error) })
-	if !ok || !statusWriterSupportsANSI(writer) {
+	if !commandAllowsColor(cmd, cmd.OutOrStdout()) {
 		return display
 	}
 	return "\x1b[1;36m" + display + "\x1b[0m"

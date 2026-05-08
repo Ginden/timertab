@@ -34,14 +34,16 @@ func listConfig(cmd *cobra.Command, cfgPath string) error {
 		return err
 	}
 
-	cmd.Printf("# %s\n", cfgPath)
-	_, err = cmd.OutOrStdout().Write(data)
-	if err != nil {
-		return err
+	var out bytes.Buffer
+	fmt.Fprintf(&out, "# %s\n", cfgPath)
+	out.Write(data)
+	if len(data) == 0 || data[len(data)-1] != '\n' {
+		out.WriteString("\n")
 	}
 
-	if len(data) == 0 || data[len(data)-1] != '\n' {
-		cmd.Println("")
+	_, err = io.WriteString(cmd.OutOrStdout(), highlightForCommand(cmd, "yaml", out.String()))
+	if err != nil {
+		return err
 	}
 
 	return nil

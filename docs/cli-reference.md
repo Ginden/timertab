@@ -11,7 +11,24 @@ Running `timertab` with no arguments prints help.
 Global flags:
 
 - `-h`, `--help`: show help
-- `-v`, `--version`: print the build version
+- `-V`, `--version`: print the build version
+- `-v`, `--verbose`: increase verbosity; repeat as `-vv` or `-vvv` for more detail
+- `--color auto|always|never`: control ANSI color and syntax highlighting; defaults to `auto`
+
+Verbosity:
+
+- Default output is quiet: primary command output, warnings, and errors.
+- `-v` prints high-level progress phases such as validation, save, reconcile, and auto-commit.
+- `-vv` also prints lower-level reconcile/apply phases such as rendering desired units, scanning existing unit files, and applying systemd manager operations.
+- `-vvv` is reserved for future debug-level diagnostics.
+
+Color:
+
+- `--color=auto` colorizes terminal output and disables color when stdout is redirected.
+- `--color=always` forces ANSI color even when output is captured.
+- `--color=never` disables ANSI color.
+- `NO_COLOR` disables color when `--color=auto` is used.
+- Machine-readable output such as `status --json` is not colorized.
 
 Legacy root shorthands are still accepted:
 
@@ -73,6 +90,7 @@ Behavior:
 
 - Prints a header line with the resolved config path.
 - Prints the raw YAML file contents as stored on disk.
+- Syntax-highlights the YAML when color is enabled.
 - If the file does not exist, prints `# no timertab file found`.
 
 ## `timertab print-path`
@@ -131,7 +149,7 @@ Apply behavior:
 - Without `--no-apply`, `edit` checks the `systemd >= 247` baseline first.
 - On successful validation it writes the config file, reconciles unit files, reloads the target systemd manager when unit files changed, and enables/starts or disables/stops timers only when runtime state needs reconciliation.
 - If validation fails, nothing is written or pruned.
-- During successful `edit` runs, progress lines such as validation, save, reconcile, reload, and auto-commit phases are printed to stderr.
+- During successful `edit` runs, `-v` prints progress lines such as validation, save, reconcile, reload, and auto-commit phases to stderr.
 
 Git behavior:
 
@@ -185,6 +203,7 @@ Detail mode:
 - `timertab status <id>` prints a detailed report for one job.
 - Includes overview fields, current unit names/paths/states, the job YAML, rendered service and timer unit bodies, recent log lines, and suggested diagnostic commands.
 - The detailed view does not support `--json`.
+- When color is enabled, the detailed view highlights statuses, job YAML, rendered unit snippets, and example diagnostic commands.
 
 Behavior notes:
 

@@ -44,18 +44,6 @@ var runCrontabList = func(ctx context.Context) (string, error) {
 	return string(output), nil
 }
 
-func isTTY(w io.Writer) bool {
-	file, ok := w.(*os.File)
-	if !ok {
-		return false
-	}
-	info, err := file.Stat()
-	if err != nil {
-		return false
-	}
-	return info.Mode()&os.ModeCharDevice != 0
-}
-
 func newImportCommand() *cobra.Command {
 	var (
 		fromStdin    bool
@@ -92,7 +80,7 @@ func newImportCommand() *cobra.Command {
 			}
 
 			// Stdout/pipe mode: no TTY on stdout, or forced via --stdout flag.
-			if forceStdout || (!dryRun && !isTTY(cmd.OutOrStdout())) {
+			if forceStdout || (!dryRun && !writerIsTTY(cmd.OutOrStdout())) {
 				out, err := imported.MarshalYAML()
 				if err != nil {
 					return err

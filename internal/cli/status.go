@@ -239,14 +239,15 @@ func collectStatusDetail(ctx context.Context, cfgPath, unitDir string, scope sys
 
 func printStatusTable(cmd *cobra.Command, rows []statusRow) {
 	out := cmd.OutOrStdout()
+	policy := commandOutputPolicy(cmd)
 	tableRows := make([][]string, 0, len(rows)+1)
 	tableRows = append(tableRows, []string{"id", "last_run", "next_trigger", "result"})
 	for _, row := range rows {
 		tableRows = append(tableRows, []string{
-			colorizeStatusJobID(out, row.ID),
+			colorizeStatusJobID(policy, out, row.ID),
 			row.LastRun,
 			row.NextTrigger,
-			colorizeStatusSummaryResult(out, row.Result),
+			colorizeStatusSummaryResult(policy, out, row.Result),
 		})
 	}
 	printStatusAlignedTable(out, tableRows, 2)
@@ -260,20 +261,21 @@ func printStatusJSON(cmd *cobra.Command, rows []statusRow) error {
 
 func printStatusDetail(cmd *cobra.Command, detail statusDetail) {
 	out := cmd.OutOrStdout()
+	policy := commandOutputPolicy(cmd)
 	jobYAML := mustMarshalStatusYAML(detail.Job)
 	result := statusResultValue(detail.ServiceProps["Result"], detail.ServiceMissing)
 
-	printStatusHeadline(out, detail.Job.ID, detail.Job.Name, result)
-	printStatusTableSection(out, "Overview", []string{"field", "value"}, [][]string{
+	printStatusHeadline(policy, out, detail.Job.ID, detail.Job.Name, result)
+	printStatusTableSection(policy, out, "Overview", []string{"field", "value"}, [][]string{
 		{"job", detail.Job.ID},
 		{"name", statusDisplayName(detail.Job.Name)},
-		{"result", colorizeStatusResult(out, result)},
+		{"result", colorizeStatusResult(policy, out, result)},
 		{"last run", statusTimeValue(detail.TimerProps["LastTriggerUSec"], detail.TimerMissing)},
 		{"next trigger", statusTimeValue(detail.TimerProps["NextElapseUSecRealtime"], detail.TimerMissing)},
 		{"config", detail.ConfigPath},
 		{"unit dir", detail.UnitDir},
 	})
-	printStatusTableSection(out, "Units", []string{"kind", "unit", "load", "active", "sub", "enabled", "path"}, [][]string{
+	printStatusTableSection(policy, out, "Units", []string{"kind", "unit", "load", "active", "sub", "enabled", "path"}, [][]string{
 		{
 			"service",
 			detail.ServiceName,
@@ -293,25 +295,25 @@ func printStatusDetail(cmd *cobra.Command, detail statusDetail) {
 			detail.TimerPath,
 		},
 	})
-	printStatusBlockSection(out, "Job YAML", jobYAML)
-	printStatusBlockSection(out, "Service Unit", detail.ServiceBody)
-	printStatusBlockSection(out, "Timer Unit", detail.TimerBody)
-	printStatusBlockSection(out, "Recent Logs", detail.LogPeek)
-	printStatusCommandsSection(out, statusDiagnosticSteps(detail))
+	printStatusBlockSection(policy, out, "Job YAML", "yaml", jobYAML)
+	printStatusBlockSection(policy, out, "Service Unit", "ini", detail.ServiceBody)
+	printStatusBlockSection(policy, out, "Timer Unit", "ini", detail.TimerBody)
+	printStatusBlockSection(policy, out, "Recent Logs", "text", detail.LogPeek)
+	printStatusCommandsSection(policy, out, statusDiagnosticSteps(detail))
 }
 
-func printStatusHeadline(out io.Writer, jobID, name, result string) {
+func printStatusHeadline(policy outputPolicy, out io.Writer, jobID, name, result string) {
 	label := "STATUS " + jobID
 	if trimmed := strings.TrimSpace(name); trimmed != "" {
 		label += " - " + trimmed
 	}
 	_, _ = fmt.Fprintln(out, label)
 	_, _ = fmt.Fprintln(out, strings.Repeat("=", len(label)))
-	_, _ = fmt.Fprintf(out, "Result: %s\n\n", colorizeStatusResult(out, result))
+	_, _ = fmt.Fprintf(out, "Result: %s\n\n", colorizeStatusResult(policy, out, result))
 }
 
-func printStatusTableSection(out io.Writer, title string, headers []string, rows [][]string) {
-	printStatusSectionTitle(out, title)
+func printStatusTableSection(policy outputPolicy, out io.Writer, title string, headers []string, rows [][]string) {
+	printStatusSectionTitle(policy, out, title)
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(tw, strings.Join(headers, "\t"))
 	for _, row := range rows {
@@ -321,8 +323,9 @@ func printStatusTableSection(out io.Writer, title string, headers []string, rows
 	_, _ = fmt.Fprintln(out)
 }
 
-func printStatusBlockSection(out io.Writer, title, content string) {
-	printStatusSectionTitle(out, title)
+func printStatusBlockSection(policy outputPolicy, out io.Writer, title, language, content string) {
+	printStatusSectionTitle(policy, out, title)
+	content = highlightForPolicy(policy, out, language, content)
 	_, _ = fmt.Fprint(out, indentBlock(content, "  "))
 	if !strings.HasSuffix(content, "\n") {
 		_, _ = fmt.Fprintln(out)
@@ -330,20 +333,20 @@ func printStatusBlockSection(out io.Writer, title, content string) {
 	_, _ = fmt.Fprintln(out)
 }
 
-func printStatusCommandsSection(out io.Writer, steps []statusDiagnosticStep) {
-	printStatusSectionTitle(out, "Diagnostics")
+func printStatusCommandsSection(policy outputPolicy, out io.Writer, steps []statusDiagnosticStep) {
+	printStatusSectionTitle(policy, out, "Diagnostics")
 	_, _ = fmt.Fprintln(out, "  Start with the first command, then continue only if you need more detail.")
 	_, _ = fmt.Fprintln(out)
 	for idx, step := range steps {
 		_, _ = fmt.Fprintf(out, "  %d. %s\n", idx+1, step.Title)
 		_, _ = fmt.Fprintf(out, "     %s\n", step.Why)
-		_, _ = fmt.Fprintf(out, "     %s\n", colorizeStatusCommand(out, step.Command))
+		_, _ = fmt.Fprintf(out, "     %s\n", colorizeStatusCommand(policy, out, step.Command))
 		_, _ = fmt.Fprintln(out)
 	}
 }
 
-func printStatusSectionTitle(out io.Writer, title string) {
-	_, _ = fmt.Fprintln(out, colorizeStatusSectionTitle(out, title))
+func printStatusSectionTitle(policy outputPolicy, out io.Writer, title string) {
+	_, _ = fmt.Fprintln(out, colorizeStatusSectionTitle(policy, out, title))
 	_, _ = fmt.Fprintln(out, strings.Repeat("-", len(title)))
 }
 
@@ -576,8 +579,8 @@ func statusDiagnosticSteps(detail statusDetail) []statusDiagnosticStep {
 	}
 }
 
-func colorizeStatusResult(out io.Writer, result string) string {
-	if !statusWriterSupportsANSI(out) {
+func colorizeStatusResult(policy outputPolicy, out io.Writer, result string) string {
+	if !outputAllowsColor(policy, out) {
 		return strings.ToUpper(result)
 	}
 	const ansiReset = "\x1b[0m"
@@ -591,36 +594,32 @@ func colorizeStatusResult(out io.Writer, result string) string {
 	}
 }
 
-func colorizeStatusSummaryResult(out io.Writer, result string) string {
-	if !statusWriterSupportsANSI(out) {
+func colorizeStatusSummaryResult(policy outputPolicy, out io.Writer, result string) string {
+	if !outputAllowsColor(policy, out) {
 		return result
 	}
-	return colorizeStatusResult(out, result)
+	return colorizeStatusResult(policy, out, result)
 }
 
-func colorizeStatusJobID(out io.Writer, jobID string) string {
-	if !statusWriterSupportsANSI(out) {
+func colorizeStatusJobID(policy outputPolicy, out io.Writer, jobID string) string {
+	if !outputAllowsColor(policy, out) {
 		return jobID
 	}
 	return "\x1b[1;34m" + jobID + "\x1b[0m"
 }
 
-func colorizeStatusSectionTitle(out io.Writer, title string) string {
-	if !statusWriterSupportsANSI(out) {
+func colorizeStatusSectionTitle(policy outputPolicy, out io.Writer, title string) string {
+	if !outputAllowsColor(policy, out) {
 		return title
 	}
 	return "\x1b[1m" + title + "\x1b[0m"
 }
 
-func colorizeStatusCommand(out io.Writer, command string) string {
-	if !statusWriterSupportsANSI(out) {
+func colorizeStatusCommand(policy outputPolicy, out io.Writer, command string) string {
+	if !outputAllowsColor(policy, out) {
 		return command
 	}
-	const (
-		ansiCommand = "\x1b[1;36m"
-		ansiReset   = "\x1b[0m"
-	)
-	return ansiCommand + command + ansiReset
+	return highlightForPolicy(policy, out, "bash", command)
 }
 
 func statusDisplayName(name string) string {
@@ -629,16 +628,4 @@ func statusDisplayName(name string) string {
 		return "-"
 	}
 	return trimmed
-}
-
-func statusWriterSupportsANSI(out io.Writer) bool {
-	file, ok := out.(*os.File)
-	if !ok {
-		return false
-	}
-	info, err := file.Stat()
-	if err != nil {
-		return false
-	}
-	return (info.Mode() & os.ModeCharDevice) != 0
 }

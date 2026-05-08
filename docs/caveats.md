@@ -62,10 +62,11 @@ This is deliberate. `OnSuccess=` and `OnFailure=` would be cleaner conceptually,
 
 ## Status Output
 
-Human-oriented `status` output uses color only when writing to a terminal.
+Human-oriented `status` output uses color according to the global `--color=auto|always|never` policy.
 
 - JSON output stays machine-readable and uncolored.
-- Piped or redirected text stays plain.
+- With the default `--color=auto`, piped or redirected text stays plain.
+- `NO_COLOR` disables color when `--color=auto` is used.
 - The summary view computes its own column widths because standard tab alignment breaks once ANSI color sequences are present.
 
 ## YAML Preservation

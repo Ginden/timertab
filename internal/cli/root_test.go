@@ -105,7 +105,7 @@ func TestRootCommandEditPrintsProgressOnHappyPath(t *testing.T) {
 
 	stderr := &bytes.Buffer{}
 	cmd := NewRootCommand()
-	cmd.SetArgs([]string{"edit", "--no-commit", "--config", filepath.Join(t.TempDir(), "timertab.yaml")})
+	cmd.SetArgs([]string{"-v", "edit", "--no-commit", "--config", filepath.Join(t.TempDir(), "timertab.yaml")})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(stderr)
 
@@ -123,6 +123,52 @@ func TestRootCommandEditPrintsProgressOnHappyPath(t *testing.T) {
 		if !strings.Contains(out, needle) {
 			t.Fatalf("stderr missing %q, got:\n%s", needle, out)
 		}
+	}
+}
+
+func TestRootCommandEditIsQuietByDefault(t *testing.T) {
+	originalCheck := ensureSystemdBaseline
+	originalApply := runSystemctlApply
+	t.Cleanup(func() {
+		ensureSystemdBaseline = originalCheck
+		runSystemctlApply = originalApply
+	})
+
+	ensureSystemdBaseline = func() error { return nil }
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
+		return applyReport{}, nil
+	}
+
+	t.Setenv("EDITOR", "true")
+
+	stderr := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"edit", "--no-commit", "--config", filepath.Join(t.TempDir(), "timertab.yaml")})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(stderr)
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if got := stderr.String(); got != "" {
+		t.Fatalf("stderr = %q, want quiet default", got)
+	}
+}
+
+func TestRootCommandVersionUsesCapitalV(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"-V"})
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if got := stdout.String(); !strings.Contains(got, "unknown") {
+		t.Fatalf("stdout = %q, want version output", got)
 	}
 }
 
@@ -158,6 +204,36 @@ func TestRootCommandPrintConfigAliasListsConfig(t *testing.T) {
 	}
 	if !strings.Contains(out, string(content)) {
 		t.Fatalf("stdout missing config body, got:\n%s", out)
+	}
+}
+
+func TestRootCommandListColorAlwaysHighlightsConfig(t *testing.T) {
+	originalResolveConfigPath := resolveConfigPath
+	t.Cleanup(func() {
+		resolveConfigPath = originalResolveConfigPath
+	})
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	if err := os.WriteFile(cfgPath, []byte("version: 1\njobs: []\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q) error = %v", cfgPath, err)
+	}
+
+	resolveConfigPath = func(string) (string, error) {
+		return cfgPath, nil
+	}
+
+	stdout := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"--color=always", "list"})
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if got := stdout.String(); !strings.Contains(got, "\x1b[") {
+		t.Fatalf("stdout missing ANSI highlighting, got:\n%s", got)
 	}
 }
 

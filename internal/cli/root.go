@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/ginden/timertab/internal/config"
+	"github.com/ginden/timertab/internal/progress"
 	"github.com/ginden/timertab/internal/systemd"
 	"github.com/ginden/timertab/internal/version"
 )
@@ -17,11 +18,29 @@ var ensureSystemdBaseline = systemd.EnsureBaseline
 var resolveConfigPath = config.ResolvePath
 
 func NewRootCommand() *cobra.Command {
+	var (
+		verbosity int
+		color     string
+	)
+
 	cmd := &cobra.Command{
 		Use:   "timertab",
 		Short: "Manage systemd timers using a crontab-like workflow",
 		Long:  "timertab is a crontab-like CLI that manages systemd timer/service units from a YAML config file.",
 		Args:  cobra.NoArgs,
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			colorMode, err := validateColorMode(color)
+			if err != nil {
+				return err
+			}
+			ctx := withOutputPolicy(cmd.Context(), outputPolicy{
+				verbosity: verbosity,
+				color:     colorMode,
+			})
+			ctx = progress.WithReporter(ctx, cmd.ErrOrStderr(), verbosity)
+			cmd.SetContext(ctx)
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
@@ -32,6 +51,9 @@ func NewRootCommand() *cobra.Command {
 
 	cmd.Version = fmt.Sprintf("%s (%s, %s)", version.Version, version.Commit, version.Date)
 	cmd.SetVersionTemplate("{{printf \"%s\\n\" .Version}}")
+	cmd.Flags().BoolP("version", "V", false, "Print the build version")
+	cmd.PersistentFlags().CountVarP(&verbosity, "verbose", "v", "Increase verbosity; repeat for more detail")
+	cmd.PersistentFlags().StringVar(&color, "color", string(colorAuto), "Colorize output: auto, always, or never")
 
 	cmd.AddCommand(newListCommand())
 	cmd.AddCommand(newEditCommand())

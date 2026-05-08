@@ -8,6 +8,8 @@
   - YAML parsing and marshalling for the timertab file.
 - `github.com/santhosh-tekuri/jsonschema/v6`
   - Runtime JSON Schema validation against `schema/v1.json`.
+- `github.com/alecthomas/chroma/v2`
+  - ANSI syntax highlighting for human-oriented CLI output.
 - `golang.org/x/text`
   - Localized formatting for schema validation errors.
 
