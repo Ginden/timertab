@@ -67,6 +67,8 @@ Generated unit files live under the target manager's unit directory:
 | `timertab status <id>` | Show a detailed report for one job |
 | `timertab logs <id>` | Show `journalctl` output for one job |
 | `timertab trigger <id>` | Start one job's generated service immediately |
+| `timertab add` | Add a configured job without opening an editor |
+| `timertab rm` | Remove a configured job and apply pruning |
 | `timertab enable <id>` | Mark a job enabled, save config, and apply |
 | `timertab disable <id>` | Mark a job disabled, save config, and apply |
 | `timertab eject <id>` | Stop managing a job but leave its unit files in place |
@@ -279,6 +281,34 @@ Behavior:
 - Runs `systemctl --user start <service unit>` for non-root users and `systemctl start <service unit>` for root.
 - Does not modify the config file.
 - Prints a success line with the job ID and resolved service unit name.
+
+## `timertab add`
+
+Usage:
+
+```bash
+timertab add [--config <path>] --when <schedule> [--name <name>] [--id <id>] [--env K=V]... [--no-apply] [--no-commit] -- <command...>
+```
+
+Behavior:
+
+- Appends a job to the active config, generating an ID when `--id` is omitted.
+- A single command argument is saved as shell shorthand; multiple command arguments are saved as explicit argv.
+- Reconciles systemd units unless `--no-apply` is set.
+
+## `timertab rm`
+
+Usage:
+
+```bash
+timertab rm <id> [--config <path>] [--no-apply] [--no-commit]
+```
+
+Behavior:
+
+- Removes the job from the config file.
+- Reconciles systemd units so the removed job's managed units are pruned unless `--no-apply` is set.
+- Unlike `eject`, ownership is not handed over; this is the destructive delete path.
 
 ## `timertab enable`
 

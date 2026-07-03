@@ -207,6 +207,8 @@ Raw `systemd:` directive values are not escaped.
 | `timertab status` / `timertab status --json` | Show last run, next trigger, and result for each job |
 | `timertab status <id>` | Show detailed runtime state, generated unit definitions, file locations, and diagnostic commands |
 | `timertab trigger <id>` | Run one job immediately by starting its generated service unit |
+| `timertab add --when <schedule> -- <command>` | Add a job without opening an editor |
+| `timertab rm <id>` | Remove a job, then apply pruning of its managed units |
 | `timertab eject <id>` | Stop managing a job — its units stay and keep running |
 | `timertab enable <id>` / `timertab disable <id>` | Toggle one job on/off without removing it |
 | `timertab logs <id>` | Tail/query journald logs for one job |
