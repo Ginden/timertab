@@ -190,24 +190,31 @@ func compileCronExpression(value string) ([]string, error) {
 	weekdaySpec := formatWeekdayField(weekdayValues)
 	timeSpec := fmt.Sprintf("%s:%s:00", hourSpec, minuteSpec)
 
-	dayOfMonthAll := len(dayOfMonthValues) == 31
-	weekdayAll := len(weekdayValues) == 7
+	dayOfMonthWildcard := cronDayFieldStartsWithStar(parts[2])
+	weekdayWildcard := cronDayFieldStartsWithStar(parts[4])
 
 	domCalendar := fmt.Sprintf("*-%s-%s %s", monthSpec, dayOfMonthSpec, timeSpec)
 	dowCalendar := fmt.Sprintf("%s *-%s-* %s", weekdaySpec, monthSpec, timeSpec)
+	combinedDayCalendar := fmt.Sprintf("%s *-%s-%s %s", weekdaySpec, monthSpec, dayOfMonthSpec, timeSpec)
 	anyDayCalendar := fmt.Sprintf("*-%s-* %s", monthSpec, timeSpec)
 
 	switch {
-	case dayOfMonthAll && weekdayAll:
+	case dayOfMonthWildcard && weekdayWildcard:
 		return []string{anyDayCalendar}, nil
-	case dayOfMonthAll:
+	case dayOfMonthWildcard && len(dayOfMonthValues) == 31:
 		return []string{dowCalendar}, nil
-	case weekdayAll:
+	case weekdayWildcard && len(weekdayValues) == 7:
 		return []string{domCalendar}, nil
+	case dayOfMonthWildcard || weekdayWildcard:
+		return []string{combinedDayCalendar}, nil
 	default:
 		// Cron semantics for day-of-month and weekday are OR, not AND.
 		return []string{domCalendar, dowCalendar}, nil
 	}
+}
+
+func cronDayFieldStartsWithStar(field string) bool {
+	return strings.HasPrefix(strings.TrimSpace(field), "*")
 }
 
 func parseCronField(value string, opts cronFieldOptions) ([]int, error) {

@@ -66,6 +66,50 @@ func TestCompileTimerDirectivesGolden(t *testing.T) {
 	}
 }
 
+func TestCompileTimerDirectivesCronStarStepDayFieldsUseVixieSemantics(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		when ScheduleList
+		want []string
+	}{
+		{
+			name: "day of month star step combines with weekday",
+			when: ScheduleList{"0 0 */2 * Mon"},
+			want: []string{"OnCalendar=Mon *-*-01,03,05,07,09,11,13,15,17,19,21,23,25,27,29,31 00:00:00"},
+		},
+		{
+			name: "weekday star step combines with day of month",
+			when: ScheduleList{"0 0 15 * */2"},
+			want: []string{"OnCalendar=Sun,Tue,Thu,Sat *-*-15 00:00:00"},
+		},
+		{
+			name: "both explicitly restricted still use cron or semantics",
+			when: ScheduleList{"0 0 15 * Mon"},
+			want: []string{
+				"OnCalendar=*-*-15 00:00:00",
+				"OnCalendar=Mon *-*-* 00:00:00",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := CompileTimerDirectives(tt.when)
+			if err != nil {
+				t.Fatalf("CompileTimerDirectives() error = %v", err)
+			}
+			if strings.Join(got, "\n") != strings.Join(tt.want, "\n") {
+				t.Fatalf("CompileTimerDirectives() mismatch\nwant:\n%s\n\ngot:\n%s", strings.Join(tt.want, "\n"), strings.Join(got, "\n"))
+			}
+		})
+	}
+}
+
 func TestCompileTimerDirectivesErrors(t *testing.T) {
 	t.Parallel()
 
