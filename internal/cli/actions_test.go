@@ -390,7 +390,7 @@ EOF
 	if got := stderr.String(); !strings.Contains(got, "🚨 timertab: config is invalid:") {
 		t.Fatalf("stderr missing validation error, got:\n%s", got)
 	}
-	if got := stderr.String(); !strings.Contains(got, "🚨 timertab: reopen editor to fix validation errors") {
+	if got := stderr.String(); !strings.Contains(got, "timertab: invalid config; (e)dit again or (q)uit and discard?") {
 		t.Fatalf("stderr missing re-edit prompt, got:\n%s", got)
 	}
 
@@ -461,7 +461,7 @@ exit 1
 `))
 
 	cmd := &cobra.Command{}
-	cmd.SetIn(bytes.NewBuffer(nil))
+	cmd.SetIn(strings.NewReader("q\n"))
 	cmd.SetOut(&bytes.Buffer{})
 	stderr := &bytes.Buffer{}
 	cmd.SetErr(stderr)
@@ -470,8 +470,8 @@ exit 1
 	if err == nil {
 		t.Fatalf("editConfig() error = nil, want non-nil")
 	}
-	if !strings.Contains(err.Error(), "editor failed:") {
-		t.Fatalf("editConfig() error = %v, want editor failure", err)
+	if !strings.Contains(err.Error(), "edit aborted; invalid config discarded") {
+		t.Fatalf("editConfig() error = %v, want abort message", err)
 	}
 	if applyCallCount != 0 {
 		t.Fatalf("runSystemctlApply call count = %d, want 0", applyCallCount)
@@ -481,8 +481,8 @@ exit 1
 	if readErr != nil {
 		t.Fatalf("ReadFile(%q) error = %v", countPath, readErr)
 	}
-	if got := strings.TrimSpace(string(editorRunsRaw)); got != "2" {
-		t.Fatalf("editor run count = %q, want %q", got, "2")
+	if got := strings.TrimSpace(string(editorRunsRaw)); got != "1" {
+		t.Fatalf("editor run count = %q, want %q", got, "1")
 	}
 
 	if got := stderr.String(); !strings.Contains(got, "🚨 timertab: config is invalid:") {

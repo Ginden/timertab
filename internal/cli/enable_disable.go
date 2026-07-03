@@ -63,16 +63,16 @@ func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command
 				return fmt.Errorf("job %q not found", jobID)
 			}
 
+			if err := ensureSystemdBaseline(); err != nil {
+				return err
+			}
+
 			loaded.Jobs[jobIndex].Enabled = boolPtr(enabled)
 
 			err = savePatchedConfig(cfgPath, raw, loaded, loaded.Jobs, func(jobsNode *yaml.Node) error {
 				return setJobEnabledNode(jobsNode.Content[jobIndex], enabled)
 			})
 			if err != nil {
-				return err
-			}
-
-			if err := ensureSystemdBaseline(); err != nil {
 				return err
 			}
 

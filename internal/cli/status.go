@@ -93,6 +93,7 @@ func newStatusCommand() *cobra.Command {
 			loaded, err := config.LoadFromFile(cfgPath)
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) {
+					cmd.Printf("# no timertab config found at %s\n", cfgPath)
 					return nil
 				}
 				return err
@@ -176,11 +177,12 @@ func collectStatusRows(ctx context.Context, scope systemctl.Scope, targetUID uin
 			return nil, err
 		}
 
+		lastRunRaw := timerProps["LastTriggerUSec"]
 		rows = append(rows, statusRow{
 			ID:          job.ID,
-			LastRun:     statusTimeValue(timerProps["LastTriggerUSec"], timerMissing),
+			LastRun:     statusTimeValue(lastRunRaw, timerMissing),
 			NextTrigger: statusTimeValue(timerProps["NextElapseUSecRealtime"], timerMissing),
-			Result:      statusResultValue(serviceProps["Result"], serviceMissing),
+			Result:      statusResultValue(serviceProps["Result"], serviceMissing, statusTimeUnknown(lastRunRaw, timerMissing)),
 		})
 	}
 
@@ -263,7 +265,7 @@ func printStatusDetail(cmd *cobra.Command, detail statusDetail) {
 	out := cmd.OutOrStdout()
 	policy := commandOutputPolicy(cmd)
 	jobYAML := mustMarshalStatusYAML(detail.Job)
-	result := statusResultValue(detail.ServiceProps["Result"], detail.ServiceMissing)
+	result := statusResultValue(detail.ServiceProps["Result"], detail.ServiceMissing, statusTimeUnknown(detail.TimerProps["LastTriggerUSec"], detail.TimerMissing))
 
 	printStatusHeadline(policy, out, detail.Job.ID, detail.Job.Name, result)
 	printStatusTableSection(policy, out, "Overview", []string{"field", "value"}, [][]string{
@@ -449,23 +451,31 @@ func isMissingUnitError(stderr string) bool {
 }
 
 func statusTimeValue(raw string, missing bool) string {
-	if missing {
+	if statusTimeUnknown(raw, missing) {
 		return "unknown"
 	}
 	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" || trimmed == "n/a" {
-		return "unknown"
-	}
 	return statusWholeMinuteTimestampPattern.ReplaceAllString(trimmed, `$1$2`)
 }
 
-func statusResultValue(raw string, missing bool) string {
+func statusTimeUnknown(raw string, missing bool) bool {
+	if missing {
+		return true
+	}
+	trimmed := strings.TrimSpace(raw)
+	return trimmed == "" || trimmed == "n/a"
+}
+
+func statusResultValue(raw string, missing bool, neverRan bool) string {
 	if missing {
 		return "unknown"
 	}
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" || trimmed == "n/a" {
 		return "unknown"
+	}
+	if neverRan && trimmed == "success" {
+		return "never ran"
 	}
 	if trimmed == "success" {
 		return "pass"
@@ -589,6 +599,8 @@ func colorizeStatusResult(policy outputPolicy, out io.Writer, result string) str
 		return "\x1b[1;32mPASS" + ansiReset
 	case "fail":
 		return "\x1b[1;31mFAIL" + ansiReset
+	case "never ran":
+		return "\x1b[1;33mNEVER RAN" + ansiReset
 	default:
 		return "\x1b[1;33mUNKNOWN" + ansiReset
 	}

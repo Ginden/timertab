@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	"github.com/ginden/timertab/internal/config"
@@ -16,11 +14,12 @@ func newValidateCommand() *cobra.Command {
 		Short: "Validate timertab YAML",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if path == "" {
-				return fmt.Errorf("--config is required")
+			cfgPath, err := resolveConfigPath(path)
+			if err != nil {
+				return err
 			}
 
-			cfg, err := config.LoadFromFile(path)
+			cfg, err := config.LoadFromFile(cfgPath)
 			if err != nil {
 				return err
 			}

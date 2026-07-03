@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -169,6 +170,54 @@ func TestEnableDisableCommandsFailForUnknownID(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `job "missing" not found`) {
 		t.Fatalf("error = %q, want not-found message", err.Error())
+	}
+}
+
+func TestEnableDisableChecksSystemdBaselineBeforeSaving(t *testing.T) {
+	originalApply := runSystemctlApply
+	originalEnsure := ensureSystemdBaseline
+	t.Cleanup(func() {
+		runSystemctlApply = originalApply
+		ensureSystemdBaseline = originalEnsure
+	})
+
+	baselineErr := errors.New("unsupported systemd")
+	ensureSystemdBaseline = func() error { return baselineErr }
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
+		return applyReport{}, errors.New("apply should not run")
+	}
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	if err := saveConfig(cfgPath, &config.File{
+		Version: 1,
+		Jobs: []config.Job{{
+			ID:   "target",
+			When: config.ScheduleList{"@daily"},
+			Run:  config.ShellCommand("echo target"),
+		}},
+	}); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+	before, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"disable", "target", "--config", cfgPath})
+
+	err = cmd.Execute()
+	if !errors.Is(err, baselineErr) {
+		t.Fatalf("Execute() error = %v, want %v", err, baselineErr)
+	}
+	after, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Fatalf("config changed despite baseline failure; got:\n%s\nwant:\n%s", after, before)
 	}
 }
 

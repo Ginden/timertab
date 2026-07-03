@@ -59,7 +59,7 @@ Generated unit files live under the target manager's unit directory:
 | --- | --- |
 | `timertab list` | Print the current config file |
 | `timertab print-path` | Print the resolved config path |
-| `timertab validate --config <path>` | Validate a config file and print `ok` on success |
+| `timertab validate` | Validate the active config file and print `ok` on success |
 | `timertab edit` | Open the config in an editor, validate it, save it, and usually apply it |
 | `timertab apply` | Reconcile systemd units to match the config without opening an editor |
 | `timertab diff` | Preview unit file creates/modifies/deletes without writing |
@@ -113,11 +113,12 @@ Usage:
 
 ```bash
 timertab validate --config <path>
+timertab validate
 ```
 
 Behavior:
 
-- `--config` is required.
+- Uses the normal config path resolution by default; `--config` overrides it.
 - Loads the YAML file, validates it against the embedded schema and semantic rules, and normalizes missing job IDs in memory.
 - Prints `ok` on success.
 - Does not write files, call `systemctl`, or modify the config.
@@ -223,7 +224,7 @@ Summary mode:
 
 - `timertab status` prints one row per configured job.
 - Columns are `id`, `last_run`, `next_trigger`, and `result`.
-- `result` is normalized to `pass`, `fail`, or `unknown`.
+- `result` is normalized to `pass`, `fail`, `never ran`, or `unknown`.
 - `--json` is only supported in summary mode.
 
 Detail mode:
@@ -237,6 +238,8 @@ Behavior notes:
 
 - Non-root mode inspects units with `systemctl --user show`; root mode uses `systemctl show`.
 - Missing units are reported as `unknown` or `missing` instead of hard-failing.
+- If no config file exists, `status` prints the resolved missing path instead of silently exiting.
+- Jobs whose timer has never triggered are reported as `never ran` instead of `pass`.
 - The detailed log preview uses `journalctl --user -u <service> -n 20 --no-pager` for non-root users and `journalctl -u <service> -n 20 --no-pager` for root.
 
 ## `timertab logs`

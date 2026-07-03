@@ -107,6 +107,37 @@ func TestStatusCommandPrintsRowsAndHandlesMissingUnits(t *testing.T) {
 	}
 }
 
+func TestStatusCommandReportsMissingConfig(t *testing.T) {
+	originalResolveConfigPath := resolveConfigPath
+	t.Cleanup(func() { resolveConfigPath = originalResolveConfigPath })
+
+	cfgPath := filepath.Join(t.TempDir(), "missing.yaml")
+	resolveConfigPath = func(string) (string, error) { return cfgPath, nil }
+
+	stdout := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"status"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if got := stdout.String(); !strings.Contains(got, "# no timertab config found at "+cfgPath) {
+		t.Fatalf("stdout = %q, want missing-config message", got)
+	}
+}
+
+func TestStatusResultValueShowsNeverRanForDefaultSuccess(t *testing.T) {
+	got := statusResultValue("success", false, true)
+	if got != "never ran" {
+		t.Fatalf("statusResultValue() = %q, want never ran", got)
+	}
+	if got := colorizeStatusResult(outputPolicy{}, &bytes.Buffer{}, "never ran"); got != "NEVER RAN" {
+		t.Fatalf("colorizeStatusResult() = %q, want NEVER RAN", got)
+	}
+}
+
 func TestStatusCommandForRootUsesSystemManager(t *testing.T) {
 	originalResolveConfigPath := resolveConfigPath
 	originalResolveCurrentUID := resolveCurrentUID

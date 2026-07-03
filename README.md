@@ -211,7 +211,7 @@ Raw `systemd:` directive values are not escaped.
 | `timertab diff` | Preview create/modify/delete reconcile operations |
 | `timertab import` | Convert crontab entries into timertab YAML |
 | `timertab render` | Convert crontab input into a review bundle with `timertab.yaml`, rendered units, and `REPORT.md` |
-| `timertab validate --config <path>` | Validate a config file without applying |
+| `timertab validate` / `timertab validate --config <path>` | Validate a config file without applying |
 | `timertab print-path` (or `timertab --print-path`) | Show where the config file lives |
 
 Config file location:

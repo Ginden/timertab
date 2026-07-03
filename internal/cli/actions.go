@@ -108,6 +108,13 @@ func editConfig(cmd *cobra.Command, cfgPath string, noApply, dryRun, noCommit bo
 		loaded, out, err := prepareEditedConfigForSave(editedRaw)
 		if err != nil {
 			printEditValidationError(cmd, err)
+			again, promptErr := promptEditAgain(cmd)
+			if promptErr != nil {
+				return promptErr
+			}
+			if !again {
+				return errors.New("edit aborted; invalid config discarded")
+			}
 			continue
 		}
 
@@ -293,7 +300,27 @@ func printApplyReport(cmd *cobra.Command, report applyReport) {
 
 func printEditValidationError(cmd *cobra.Command, err error) {
 	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s timertab: config is invalid: %v\n", errorPrefix, err)
-	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s timertab: reopen editor to fix validation errors\n", errorPrefix)
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s timertab: choose edit again or quit and discard\n", errorPrefix)
+}
+
+func promptEditAgain(cmd *cobra.Command) (bool, error) {
+	for {
+		_, _ = fmt.Fprint(cmd.ErrOrStderr(), "timertab: invalid config; (e)dit again or (q)uit and discard? [e/q] ")
+		var answer string
+		if _, err := fmt.Fscanln(cmd.InOrStdin(), &answer); err != nil {
+			if errors.Is(err, io.EOF) {
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr())
+				return true, nil
+			}
+			return false, err
+		}
+		switch strings.ToLower(strings.TrimSpace(answer)) {
+		case "e", "edit":
+			return true, nil
+		case "q", "quit":
+			return false, nil
+		}
+	}
 }
 
 func resolveEditor() (string, error) {
