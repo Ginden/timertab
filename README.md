@@ -74,7 +74,9 @@ systemd:
     AccuracySec: "1m"
 ```
 
-Raw `systemd:` directive values are passed through unchanged, including systemd `%` specifiers.
+Directive names must be plain systemd keys like `Restart` or `AccuracySec`, and values
+must be single-line strings. Raw `systemd:` directive values are passed through unchanged,
+including systemd `%` specifiers.
 
 ### 📝 Git auto-commit
 

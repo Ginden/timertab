@@ -116,12 +116,13 @@
       "properties": {
         "name": {
           "type": "string",
-          "minLength": 1,
+          "pattern": "^[A-Za-z][A-Za-z0-9]*$",
           "description": "Systemd directive name (e.g. 'Restart', 'AccuracySec')."
         },
         "value": {
           "type": "string",
-          "description": "Systemd directive value (e.g. 'on-failure', '1m')."
+          "pattern": "^[^\\n\\r]*$",
+          "description": "Systemd directive value (e.g. 'on-failure', '1m'). Must not contain newlines."
         }
       }
     },
@@ -132,10 +133,11 @@
           "type": "object",
           "description": "Object map form — directive names as keys, directive values as values.",
           "propertyNames": {
-            "minLength": 1
+            "pattern": "^[A-Za-z][A-Za-z0-9]*$"
           },
           "additionalProperties": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[^\\n\\r]*$"
           }
         },
         {

@@ -159,6 +159,9 @@ systemd:
 
 Raw directive values are emitted unchanged. If a raw value contains `%`, systemd interprets it using normal specifier expansion rules; use `%%` when the raw directive needs a literal percent sign.
 
+Directive names MUST match `^[A-Za-z][A-Za-z0-9]*$`. Directive values MUST be single-line
+strings without `\n` or `\r`.
+
 ## 6. Native systemd Integration Model
 
 Generated units are fully native and do not require `timertab` at runtime.

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -28,6 +29,109 @@ func TestScheduleValidationRejected(t *testing.T) {
 			}
 			t.Logf("Correctly rejected: %q -> %v", p.pattern, err)
 		})
+	}
+}
+
+func TestValidateSystemdOverridesRejectsBadDirectives(t *testing.T) {
+	base := func(systemd *Systemd) *File {
+		return &File{
+			Version: 1,
+			Jobs: []Job{{
+				ID:      "demo",
+				When:    ScheduleList{"@daily"},
+				Run:     ShellCommand("echo demo"),
+				Systemd: systemd,
+			}},
+		}
+	}
+
+	cases := []struct {
+		name    string
+		systemd *Systemd
+		wantErr string
+	}{
+		{
+			name: "newline injection in map value",
+			systemd: &Systemd{Service: &SystemdDirectiveSet{
+				Map: map[string]string{"Nice": "10\nExecStartPre=/bin/rm -rf x"},
+			}},
+			wantErr: "must not contain newlines",
+		},
+		{
+			name: "carriage return in list value",
+			systemd: &Systemd{Timer: &SystemdDirectiveSet{
+				Items: []SystemdDirective{{Name: "AccuracySec", Value: "1m\r"}},
+			}},
+			wantErr: "must not contain newlines",
+		},
+		{
+			name: "directive name with space",
+			systemd: &Systemd{Service: &SystemdDirectiveSet{
+				Map: map[string]string{"Bad Name": "1"},
+			}},
+			wantErr: "directive name",
+		},
+		{
+			name: "directive name with equals",
+			systemd: &Systemd{Service: &SystemdDirectiveSet{
+				Items: []SystemdDirective{{Name: "Nice=10", Value: "x"}},
+			}},
+			wantErr: "directive name",
+		},
+		{
+			name: "directive name starting with bracket",
+			systemd: &Systemd{Timer: &SystemdDirectiveSet{
+				Map: map[string]string{"[Service]": "x"},
+			}},
+			wantErr: "directive name",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := base(tc.systemd).Validate()
+			if err == nil {
+				t.Fatalf("Validate() error = nil, want %q", tc.wantErr)
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("Validate() error = %q, want substring %q", err.Error(), tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateSystemdOverridesAcceptsSpecifiersAndDuplicates(t *testing.T) {
+	cfg := &File{
+		Version: 1,
+		Jobs: []Job{{
+			ID:   "demo",
+			When: ScheduleList{"@daily"},
+			Run:  ShellCommand("echo demo"),
+			Systemd: &Systemd{Service: &SystemdDirectiveSet{
+				Items: []SystemdDirective{
+					{Name: "ExecStartPre", Value: "/bin/echo %h"},
+					{Name: "ExecStartPre", Value: "/bin/echo again"},
+				},
+			}},
+		}},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil", err)
+	}
+}
+
+func TestLoadFromBytesRejectsInvalidDirectiveNameViaSchema(t *testing.T) {
+	input := `version: 1
+jobs:
+  - id: demo
+    when: "@daily"
+    run: echo demo
+    systemd:
+      service:
+        "Bad Name": "1"
+`
+	if _, err := LoadFromBytes([]byte(input)); err == nil {
+		t.Fatalf("LoadFromBytes() error = nil, want schema violation")
 	}
 }
 

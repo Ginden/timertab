@@ -25,6 +25,7 @@ import (
 var (
 	validID           = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
 	validEnv          = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	validDirective    = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*$`)
 	validMemoryMax    = regexp.MustCompile(`^(?i:infinity|[0-9]+(?:[KMGTPE])?)$`)
 	validCPUQuota     = regexp.MustCompile(`^[0-9]+(?:\.[0-9]+)?%$`)
 	compiledSchema    *jsonschema.Schema
@@ -346,6 +347,9 @@ func validateJob(job Job) error {
 	if err := validateLimits(job.Limits); err != nil {
 		return fmt.Errorf("limits: %w", err)
 	}
+	if err := validateSystemdOverrides(job.Systemd); err != nil {
+		return fmt.Errorf("systemd: %w", err)
+	}
 	if job.OnSuccess != nil {
 		if err := validateHook(*job.OnSuccess); err != nil {
 			return fmt.Errorf("on_success: %w", err)
@@ -407,6 +411,34 @@ func validateLimits(limits *Limits) error {
 		}
 	}
 
+	return nil
+}
+
+func validateSystemdOverrides(overrides *Systemd) error {
+	if overrides == nil {
+		return nil
+	}
+	if err := validateSystemdDirectiveSet("service", overrides.Service); err != nil {
+		return err
+	}
+	if err := validateSystemdDirectiveSet("timer", overrides.Timer); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateSystemdDirectiveSet rejects directive names and values that would break
+// unit-file syntax: raw directives are written verbatim into the rendered unit, so
+// a bad name or an embedded newline silently produces a unit systemd cannot load.
+func validateSystemdDirectiveSet(section string, set *SystemdDirectiveSet) error {
+	for _, directive := range set.Directives() {
+		if !validDirective.MatchString(directive.Name) {
+			return fmt.Errorf("%s: directive name %q must match %s", section, directive.Name, validDirective.String())
+		}
+		if strings.ContainsAny(directive.Value, "\n\r") {
+			return fmt.Errorf("%s: directive %q value must not contain newlines", section, directive.Name)
+		}
+	}
 	return nil
 }
 
