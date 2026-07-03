@@ -54,6 +54,16 @@ That is why:
 - hooks are dispatched through shell inside the generated service itself
 - `timertab eject <id>` removes ownership markers but leaves the units in place
 
+## `@reboot` Timers
+
+`@reboot` compiles to `OnBootSec=0`.
+
+For user timers, this means the job is tied to the user systemd manager. It runs after the user session starts, not necessarily at machine boot unless lingering is enabled with `loginctl enable-linger <user>`.
+
+Starting a systemd timer with only `OnBootSec=0` after boot makes systemd consider the timer elapsed immediately. To preserve cron-like `@reboot` behavior, `timertab` enables `@reboot`-only timers during apply but does not start them immediately. They are armed for the next boot or user-manager start.
+
+Use `timertab trigger <id>` when you intentionally want to run an `@reboot` job right now.
+
 ## Hook Execution Model
 
 Success and failure hooks are dispatched from `ExecStopPost`.

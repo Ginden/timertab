@@ -237,7 +237,7 @@ func collectCaveats(cfg *config.File) []caveat {
 	if hasReboot {
 		out = append(out, caveat{
 			title:  "@reboot semantics",
-			detail: "`@reboot` in cron runs once per system boot. The systemd equivalent (`OnBootSec=0`) fires once after the user session starts, which requires `loginctl enable-linger` for headless operation.",
+			detail: "`@reboot` in cron runs once per system boot. The systemd equivalent (`OnBootSec=0`) fires once after the user session starts, which requires `loginctl enable-linger` for headless operation. timertab enables @reboot-only timers during apply but does not start them immediately; use `timertab trigger <id>` when you want an immediate run.",
 		})
 	}
 

@@ -119,6 +119,7 @@ func TestRunPlanStopsOnFailureAndReturnsActionableError(t *testing.T) {
 		Plan{
 			TimersToDisable: []string{"old.timer"},
 			TimersToEnable:  []string{"alpha.timer", "beta.timer", "gamma.timer"},
+			TimersToStart:   []string{"alpha.timer", "beta.timer", "gamma.timer"},
 			ReloadDaemon:    true,
 		},
 	)
@@ -172,6 +173,7 @@ func TestRunPlanSkipsReloadWhenOnlyTimerStateNeedsReconcile(t *testing.T) {
 		executor,
 		Plan{
 			TimersToEnable: []string{"alpha.timer", "beta.timer"},
+			TimersToStart:  []string{"alpha.timer", "beta.timer"},
 		},
 	)
 	if err != nil {
@@ -181,6 +183,31 @@ func TestRunPlanSkipsReloadWhenOnlyTimerStateNeedsReconcile(t *testing.T) {
 	wantCalls := []string{
 		"enable-batch alpha.timer beta.timer",
 		"start-batch alpha.timer beta.timer",
+	}
+	if !reflect.DeepEqual(executor.calls, wantCalls) {
+		t.Fatalf("calls = %v, want %v", executor.calls, wantCalls)
+	}
+}
+
+func TestRunPlanCanEnableTimersWithoutStartingThem(t *testing.T) {
+	executor := &fakeExecutor{}
+
+	err := RunPlan(
+		context.Background(),
+		executor,
+		Plan{
+			TimersToEnable: []string{"alpha.timer", "reboot.timer"},
+			TimersToStart:  []string{"alpha.timer"},
+		},
+	)
+	if err != nil {
+		t.Fatalf("RunPlan() error = %v, want nil", err)
+	}
+
+	wantCalls := []string{
+		"enable alpha.timer",
+		"enable reboot.timer",
+		"start alpha.timer",
 	}
 	if !reflect.DeepEqual(executor.calls, wantCalls) {
 		t.Fatalf("calls = %v, want %v", executor.calls, wantCalls)
@@ -240,6 +267,7 @@ func TestRunPlanEmitsProgressMessages(t *testing.T) {
 		Plan{
 			TimersToDisable: []string{"old.timer"},
 			TimersToEnable:  []string{"alpha.timer", "beta.timer"},
+			TimersToStart:   []string{"alpha.timer", "beta.timer"},
 			ReloadDaemon:    true,
 		},
 	)

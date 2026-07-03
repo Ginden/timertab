@@ -148,6 +148,7 @@ Apply behavior:
 
 - Without `--no-apply`, `edit` checks the `systemd >= 247` baseline first.
 - On successful validation it writes the config file, reconciles unit files, reloads the target systemd manager when unit files changed, and enables/starts or disables/stops timers only when runtime state needs reconciliation.
+- `@reboot`-only timers are enabled but not started during apply, so they do not fire immediately. Use `timertab trigger <id>` for an intentional immediate run.
 - If validation fails, nothing is written or pruned.
 - During successful `edit` runs, `-v` prints progress lines such as validation, save, reconcile, reload, and auto-commit phases to stderr.
 

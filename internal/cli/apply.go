@@ -28,9 +28,10 @@ var (
 )
 
 type applyDesiredState struct {
-	units          []reconcile.DesiredUnit
-	enabledTimers  []string
-	disabledTimers []string
+	units             []reconcile.DesiredUnit
+	enabledTimers     []string
+	disabledTimers    []string
+	timersToSkipStart map[string]struct{}
 }
 
 type applyReport struct {
@@ -170,9 +171,10 @@ func previewEditedConfig(_ context.Context, cfg *config.File) (applyReport, erro
 
 func buildDesiredState(targetUID uint32, instanceID string, jobs []config.Job) (applyDesiredState, error) {
 	state := applyDesiredState{
-		units:          make([]reconcile.DesiredUnit, 0, len(jobs)*2),
-		enabledTimers:  make([]string, 0, len(jobs)),
-		disabledTimers: make([]string, 0, len(jobs)),
+		units:             make([]reconcile.DesiredUnit, 0, len(jobs)*2),
+		enabledTimers:     make([]string, 0, len(jobs)),
+		disabledTimers:    make([]string, 0, len(jobs)),
+		timersToSkipStart: make(map[string]struct{}),
 	}
 
 	for idx, job := range jobs {
@@ -188,6 +190,9 @@ func buildDesiredState(targetUID uint32, instanceID string, jobs []config.Job) (
 
 		if job.IsEnabled() {
 			state.enabledTimers = append(state.enabledTimers, rendered.TimerName)
+			if isRebootOnlyTimer(job) {
+				state.timersToSkipStart[rendered.TimerName] = struct{}{}
+			}
 		} else {
 			state.disabledTimers = append(state.disabledTimers, rendered.TimerName)
 		}
@@ -292,12 +297,16 @@ func buildSystemctlPlan(state applyDesiredState, plan reconcile.Plan, timerState
 
 	toDisable := make([]string, 0, len(state.disabledTimers))
 	toEnable := make([]string, 0, len(state.enabledTimers))
+	toStart := make([]string, 0, len(state.enabledTimers))
 	for _, unit := range plan.Create {
 		if !strings.HasSuffix(unit.Name, ".timer") {
 			continue
 		}
 		if _, enabled := enabledTimers[unit.Name]; enabled {
 			toEnable = append(toEnable, unit.Name)
+			if timerShouldStartOnApply(state, unit.Name) {
+				toStart = append(toStart, unit.Name)
+			}
 		}
 	}
 	for _, unit := range plan.Update {
@@ -307,6 +316,9 @@ func buildSystemctlPlan(state applyDesiredState, plan reconcile.Plan, timerState
 
 		if _, enabled := enabledTimers[unit.Name]; enabled {
 			toEnable = append(toEnable, unit.Name)
+			if timerShouldStartOnApply(state, unit.Name) {
+				toStart = append(toStart, unit.Name)
+			}
 			continue
 		}
 
@@ -320,8 +332,11 @@ func buildSystemctlPlan(state applyDesiredState, plan reconcile.Plan, timerState
 		}
 
 		if _, enabled := enabledTimers[unitName]; enabled {
-			if timerNeedsEnableStart(timerStates[unitName]) {
+			if timerNeedsEnable(timerStates[unitName]) {
 				toEnable = append(toEnable, unitName)
+			}
+			if timerShouldStartOnApply(state, unitName) && timerNeedsStart(timerStates[unitName]) {
+				toStart = append(toStart, unitName)
 			}
 			continue
 		}
@@ -334,15 +349,23 @@ func buildSystemctlPlan(state applyDesiredState, plan reconcile.Plan, timerState
 	return systemctl.Plan{
 		TimersToDisable: sortedUniqueStrings(toDisable),
 		TimersToEnable:  sortedUniqueStrings(toEnable),
+		TimersToStart:   sortedUniqueStrings(toStart),
 		ReloadDaemon:    len(plan.Create) > 0 || len(plan.Update) > 0 || len(plan.Remove) > 0,
 	}
 }
 
-func timerNeedsEnableStart(state timerRuntimeState) bool {
+func timerNeedsEnable(state timerRuntimeState) bool {
 	if state.Missing {
 		return true
 	}
-	return !isEnabledTimerUnitFileState(state.UnitFileState) || !isStartedTimerActiveState(state.ActiveState)
+	return !isEnabledTimerUnitFileState(state.UnitFileState)
+}
+
+func timerNeedsStart(state timerRuntimeState) bool {
+	if state.Missing {
+		return true
+	}
+	return !isStartedTimerActiveState(state.ActiveState)
 }
 
 func timerNeedsDisableStop(state timerRuntimeState) bool {
@@ -350,6 +373,48 @@ func timerNeedsDisableStop(state timerRuntimeState) bool {
 		return false
 	}
 	return isEnabledTimerUnitFileState(state.UnitFileState) || isStartedTimerActiveState(state.ActiveState)
+}
+
+func timerShouldStartOnApply(state applyDesiredState, timerName string) bool {
+	_, skip := state.timersToSkipStart[timerName]
+	return !skip
+}
+
+func isRebootOnlyTimer(job config.Job) bool {
+	if !isRebootOnlySchedule(job.When) {
+		return false
+	}
+	if job.Systemd == nil || job.Systemd.Timer == nil {
+		return true
+	}
+	for _, directive := range job.Systemd.Timer.Directives() {
+		name := strings.TrimSpace(directive.Name)
+		if isTimerTriggerDirective(name) && !strings.EqualFold(name, "OnBootSec") {
+			return false
+		}
+	}
+	return true
+}
+
+func isRebootOnlySchedule(when config.ScheduleList) bool {
+	if len(when) == 0 {
+		return false
+	}
+	for _, schedule := range when {
+		if strings.TrimSpace(schedule) != "@reboot" {
+			return false
+		}
+	}
+	return true
+}
+
+func isTimerTriggerDirective(name string) bool {
+	switch strings.TrimSpace(name) {
+	case "OnActiveSec", "OnBootSec", "OnStartupSec", "OnUnitActiveSec", "OnUnitInactiveSec", "OnCalendar":
+		return true
+	default:
+		return false
+	}
 }
 
 func isEnabledTimerUnitFileState(state string) bool {
@@ -476,7 +541,7 @@ func buildApplyReport(targetUID uint32, unitDir string, plan reconcile.Plan, sys
 		DisabledTimers: append([]string(nil), systemctlPlan.TimersToDisable...),
 		StoppedTimers:  append([]string(nil), systemctlPlan.TimersToDisable...),
 		EnabledTimers:  append([]string(nil), systemctlPlan.TimersToEnable...),
-		StartedTimers:  append([]string(nil), systemctlPlan.TimersToEnable...),
+		StartedTimers:  append([]string(nil), systemctlPlan.TimersToStart...),
 		ReloadedDaemon: systemctlPlan.ReloadDaemon,
 		DaemonLabel:    systemctl.ScopeForUID(targetUID).DaemonLabel(),
 	}

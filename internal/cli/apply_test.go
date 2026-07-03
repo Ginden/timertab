@@ -96,6 +96,63 @@ func TestApplyEditedConfigReconcilesUnitsAndRunsSystemctl(t *testing.T) {
 	assertFileExists(t, filepath.Join(unitDir, foreignUnmanaged))
 }
 
+func TestApplyEditedConfigEnablesRebootTimerWithoutStartingOnCreate(t *testing.T) {
+	unitDir := t.TempDir()
+	targetUID := uint32(1000)
+
+	job := config.Job{
+		ID:   "job-reboot",
+		When: config.ScheduleList{"@reboot"},
+		Run:  config.ShellCommand("echo reboot"),
+	}
+	rendered, err := systemd.RenderJobUnits(targetUID, config.DefaultInstanceID, job)
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	fakeExecutor := &recordingExecutor{}
+	restore := stubApplyDeps(t, targetUID, unitDir, fakeExecutor)
+	defer restore()
+
+	cfg := &config.File{
+		Version: 1,
+		Jobs:    []config.Job{job},
+	}
+	report, err := applyEditedConfig(context.Background(), cfg)
+	if err != nil {
+		t.Fatalf("applyEditedConfig() error = %v", err)
+	}
+
+	wantReport := applyReport{
+		Created: []string{
+			filepath.Join(unitDir, rendered.ServiceName),
+			filepath.Join(unitDir, rendered.TimerName),
+		},
+		Modified:       []string{},
+		Deleted:        []string{},
+		ReloadedDaemon: true,
+		DisabledTimers: nil,
+		StoppedTimers:  nil,
+		EnabledTimers:  []string{rendered.TimerName},
+		StartedTimers:  nil,
+		DaemonLabel:    systemctl.UserScope.DaemonLabel(),
+	}
+	if !reflect.DeepEqual(report, wantReport) {
+		t.Fatalf("apply report = %#v, want %#v", report, wantReport)
+	}
+
+	wantCalls := []string{
+		"daemon-reload",
+		"enable " + rendered.TimerName,
+	}
+	if !reflect.DeepEqual(fakeExecutor.calls, wantCalls) {
+		t.Fatalf("systemctl calls = %v, want %v", fakeExecutor.calls, wantCalls)
+	}
+
+	assertFileExists(t, filepath.Join(unitDir, rendered.ServiceName))
+	assertFileExists(t, filepath.Join(unitDir, rendered.TimerName))
+}
+
 func TestApplyEditedConfigDisablesExistingTimersForDisabledJobs(t *testing.T) {
 	unitDir := t.TempDir()
 	targetUID := uint32(1000)

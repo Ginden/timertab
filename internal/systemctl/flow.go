@@ -21,6 +21,7 @@ type batchExecutor interface {
 type Plan struct {
 	TimersToDisable []string
 	TimersToEnable  []string
+	TimersToStart   []string
 	ReloadDaemon    bool
 }
 
@@ -36,7 +37,16 @@ func RunPlan(ctx context.Context, executor Executor, plan Plan) error {
 			return fmt.Errorf("failed to daemon-reload: %w", err)
 		}
 	}
-	if err := EnableAndStartTimers(ctx, executor, plan.TimersToEnable); err != nil {
+	if sameStringSlice(plan.TimersToEnable, plan.TimersToStart) {
+		if err := EnableAndStartTimers(ctx, executor, plan.TimersToEnable); err != nil {
+			return err
+		}
+		return nil
+	}
+	if err := EnableTimers(ctx, executor, plan.TimersToEnable); err != nil {
+		return err
+	}
+	if err := StartTimers(ctx, executor, plan.TimersToStart); err != nil {
 		return err
 	}
 	return nil
@@ -68,6 +78,60 @@ func EnableAndStartTimers(ctx context.Context, executor Executor, timerUnits []s
 		if err := executor.EnableTimer(ctx, timerUnit); err != nil {
 			return fmt.Errorf("failed to enable timer %q: %w", timerUnit, err)
 		}
+		if err := executor.StartTimer(ctx, timerUnit); err != nil {
+			return fmt.Errorf("failed to start timer %q: %w", timerUnit, err)
+		}
+	}
+
+	return nil
+}
+
+// EnableTimers enables timers without starting them.
+func EnableTimers(ctx context.Context, executor Executor, timerUnits []string) error {
+	if executor == nil {
+		return errMissingExecutor
+	}
+	if len(timerUnits) == 0 {
+		return nil
+	}
+
+	if batch, ok := executor.(batchExecutor); ok {
+		progress.Printf(ctx, "timertab: enabling %d timer(s)", len(timerUnits))
+		if err := batch.EnableTimers(ctx, timerUnits); err != nil {
+			return fmt.Errorf("failed to enable timers: %w", err)
+		}
+		return nil
+	}
+
+	progress.Printf(ctx, "timertab: enabling %d timer(s)", len(timerUnits))
+	for _, timerUnit := range timerUnits {
+		if err := executor.EnableTimer(ctx, timerUnit); err != nil {
+			return fmt.Errorf("failed to enable timer %q: %w", timerUnit, err)
+		}
+	}
+
+	return nil
+}
+
+// StartTimers starts timers without changing enablement.
+func StartTimers(ctx context.Context, executor Executor, timerUnits []string) error {
+	if executor == nil {
+		return errMissingExecutor
+	}
+	if len(timerUnits) == 0 {
+		return nil
+	}
+
+	if batch, ok := executor.(batchExecutor); ok {
+		progress.Printf(ctx, "timertab: starting %d timer(s)", len(timerUnits))
+		if err := batch.StartTimers(ctx, timerUnits); err != nil {
+			return fmt.Errorf("failed to start timers: %w", err)
+		}
+		return nil
+	}
+
+	progress.Printf(ctx, "timertab: starting %d timer(s)", len(timerUnits))
+	for _, timerUnit := range timerUnits {
 		if err := executor.StartTimer(ctx, timerUnit); err != nil {
 			return fmt.Errorf("failed to start timer %q: %w", timerUnit, err)
 		}
@@ -109,4 +173,16 @@ func DisableAndStopTimers(ctx context.Context, executor Executor, timerUnits []s
 	}
 
 	return nil
+}
+
+func sameStringSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for idx := range a {
+		if a[idx] != b[idx] {
+			return false
+		}
+	}
+	return true
 }
