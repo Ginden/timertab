@@ -233,7 +233,24 @@ Safety rule:
 
 ## 9. CLI Behavior
 
-- `timertab list` (or `timertab -l`): list current jobs from source-of-truth config
-- `timertab edit` (or `timertab -e`): open editor, validate, persist IDs, apply on success
-- successful `timertab edit` apply runs auto-commit config changes unless disabled with `--no-commit` or `git.auto_commit: false`
-- `sudo timertab edit` (or `sudo timertab -e`): root context by default
+- `timertab list` / `timertab print-config` (or `timertab -l`): print the source-of-truth config.
+- `timertab print-path` (or legacy `timertab --print-path`): print the resolved config path.
+- `timertab validate [--config <path>]`: validate the active config and print `ok` on success.
+- `timertab edit` (or `timertab -e`): open editor, validate, persist IDs, save, and apply on success unless `--no-apply` is set.
+- `timertab apply`: load the active config, persist generated IDs if needed, and reconcile without opening an editor.
+- `timertab diff`: preview reconcile create/modify/delete operations without writing units.
+- `timertab status [id] [--json]`: show summary status or detailed diagnostics for one job.
+- `timertab doctor`: scan timertab-named unit files for active-config, orphaned, other-instance, and ejected/foreign units.
+- `timertab logs <id>`: show journald logs for one generated service.
+- `timertab trigger <id>`: start one generated service immediately.
+- `timertab enable <id>` / `timertab disable <id>`: toggle `enabled`, save, and apply.
+- `timertab add --when <schedule> -- <command...>`: append a job non-interactively, then apply unless `--no-apply` is set.
+- `timertab rm <id>`: remove a job from config and apply pruning unless `--no-apply` is set.
+- `timertab eject <id>`: remove ownership markers and remove the job from config while leaving unit files installed.
+- `timertab adopt <id>`: restore ownership markers on previously ejected unit files and apply unless `--no-apply` is set.
+- `timertab import`: convert crontab entries into timertab YAML or merge them into the active config.
+- `timertab render`: convert crontab input into a review bundle without touching live systemd.
+- `timertab completion <shell>`: generate shell completion scripts.
+- Successful mutating config commands run auto-commit unless disabled with `--no-commit` or `git.auto_commit: false`.
+- Mutating commands take a non-blocking config lock; config writes use private `0600` permissions.
+- `sudo timertab ...`: root context by default, managing system-scope units for UID 0.

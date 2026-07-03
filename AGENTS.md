@@ -32,16 +32,19 @@ If the README/spec drift from the code, follow the code and update docs to match
 
 ## Current Implementation Status
 
-- CLI is implemented for `edit`, `list`/`print-config`, `print-path`, `validate`, `diff`, `status`, `logs`, `trigger`, `enable`, `disable`, `eject`, `import`, `render`, and shell completion.
+- CLI is implemented for `edit`, `apply`, `add`, `rm`/`remove`, `list`/`print-config`, `print-path`, `validate`, `diff`, `status`, `doctor`, `logs`, `trigger`, `enable`, `disable`, `eject`, `adopt`, `import`, `render`, and shell completion.
 - Legacy root shorthands `-e`, `-l`, and `--print-path` are still supported by argument rewriting.
 - Global verbosity uses `-v`/`-vv`/`-vvv`; version output uses `-V`/`--version`; color uses `--color=auto|always|never`.
 - Human-oriented output can use ANSI color and syntax highlighting; machine-readable output stays uncolored.
 - YAML load/schema validation/semantic validation/ID normalization are implemented and covered by tests.
-- Reconcile is implemented: render desired units, detect existing managed units, build deterministic create/update/keep/remove plans, prune stale managed units, write unit files, `daemon-reload`, and enable/start or disable/stop timers as needed.
+- Reconcile is implemented: render desired units, detect existing managed units, build deterministic create/update/keep/remove plans, prune stale managed units, write unit files, `daemon-reload`, and enable/start or disable/stop timers as needed. `@reboot`-only timers are enabled but not started during apply.
 - `edit` preserves user formatting when possible, injects generated IDs back into the original YAML node tree, and auto-commits config changes by default.
 - `status` supports both table/JSON summary output and per-job detailed diagnostics.
+- Mutating config commands take a non-blocking config lock and write the config with private `0600` permissions.
+- Per-job `tz` is supported for calendar schedules, and import maps `CRON_TZ` to `tz`.
 - `import` converts crontab input into timertab YAML; `render` produces a review bundle (`timertab.yaml`, rendered units, `REPORT.md`) without touching systemd.
-- `eject` removes timertab ownership markers from existing unit files and removes the job from config without deleting the units.
+- `eject` removes timertab ownership markers from existing unit files and removes the job from config without deleting the units; `adopt` restores markers for previously ejected units.
+- `doctor` reports active, orphaned, ejected/foreign, and other-instance timertab unit files for the current UID.
 
 ## Coding Rules
 
