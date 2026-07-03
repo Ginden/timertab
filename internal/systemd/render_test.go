@@ -61,6 +61,36 @@ func TestRenderJobUnitsGolden(t *testing.T) {
 			wantServiceGolden: "hooks-enabled.service.golden",
 			wantTimerGolden:   "hooks-enabled.timer.golden",
 		},
+		{
+			name: "percent specifiers",
+			uid:  1002,
+			job: config.Job{
+				ID:   "percent-specifiers",
+				When: config.ScheduleList{"@daily"},
+				Run:  config.ShellCommand("date +%F && echo pct=100%"),
+				Env: map[string]string{
+					"DATE_FORMAT": "%Y-%m-%d",
+					"LITERAL":     "100%",
+				},
+				Cwd: "/var/lib/timertab%jobs",
+				Systemd: &config.Systemd{
+					Service: &config.SystemdDirectiveSet{
+						Map: map[string]string{
+							"SyslogIdentifier": "raw-%n",
+						},
+					},
+				},
+				OnSuccess: &config.Hook{
+					Command: "printf '%s\\n' done",
+					Env: map[string]string{
+						"HOOK_FORMAT": "%s",
+					},
+				},
+			},
+			wantBaseName:      "timertab-u1002-percent-specifiers-653fd0a73b",
+			wantServiceGolden: "percent-specifiers.service.golden",
+			wantTimerGolden:   "percent-specifiers.timer.golden",
+		},
 	}
 
 	for _, tc := range tests {
@@ -375,7 +405,7 @@ func TestRenderJobUnitsExecutesExplicitArgvWithoutShellWrapper(t *testing.T) {
 	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
 		ID:   "argv-job",
 		When: config.ScheduleList{"@hourly"},
-		Run:  config.ExecCommand("/usr/bin/env", "bash", "-lc", "echo hello"),
+		Run:  config.ExecCommand("/usr/bin/env", "bash", "-lc", "date +%F"),
 	})
 	if err != nil {
 		t.Fatalf("RenderJobUnits() error = %v", err)
@@ -384,7 +414,7 @@ func TestRenderJobUnitsExecutesExplicitArgvWithoutShellWrapper(t *testing.T) {
 	if strings.Contains(units.ServiceContent, `ExecStart=/bin/sh -lc`) {
 		t.Fatalf("ServiceContent unexpectedly used shell shorthand:\n%s", units.ServiceContent)
 	}
-	if !strings.Contains(units.ServiceContent, `ExecStart="/usr/bin/env" "bash" "-lc" "echo hello"`) {
+	if !strings.Contains(units.ServiceContent, `ExecStart="/usr/bin/env" "bash" "-lc" "date +%%F"`) {
 		t.Fatalf("ServiceContent missing explicit argv ExecStart:\n%s", units.ServiceContent)
 	}
 }
@@ -412,8 +442,8 @@ func TestRenderJobUnitsPrefixesCustomInstanceID(t *testing.T) {
 func TestSystemdQuotedEscapesControlCharacters(t *testing.T) {
 	t.Parallel()
 
-	got := systemdQuoted("line1\nline2\ttab")
-	want := "\"line1\\nline2\\ttab\""
+	got := systemdQuoted("line1\nline2\ttab%")
+	want := "\"line1\\nline2\\ttab%%\""
 	if got != want {
 		t.Fatalf("systemdQuoted() = %q, want %q", got, want)
 	}
@@ -422,8 +452,8 @@ func TestSystemdQuotedEscapesControlCharacters(t *testing.T) {
 func TestSystemdPathEscapesWhitespaceWithoutQuotes(t *testing.T) {
 	t.Parallel()
 
-	got := systemdPath(`/var/lib/timertab jobs\current`)
-	want := `/var/lib/timertab\x20jobs\\current`
+	got := systemdPath(`/var/lib/timertab jobs\current%done`)
+	want := `/var/lib/timertab\x20jobs\\current%%done`
 	if got != want {
 		t.Fatalf("systemdPath() = %q, want %q", got, want)
 	}

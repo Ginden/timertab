@@ -74,6 +74,8 @@ systemd:
     AccuracySec: "1m"
 ```
 
+Raw `systemd:` directive values are passed through unchanged, including systemd `%` specifiers.
+
 ### 📝 Git auto-commit
 
 Every successful edit is automatically committed to a local git repo. Full audit trail of every change, with no extra effort. Disable with `--no-commit` or in config.
@@ -186,6 +188,8 @@ jobs:
 ```
 
 String `run` values are shorthand for `["/bin/sh", "-lc", "..."]`. Use the list form when you want exact argv execution without an extra shell.
+In generated timertab-owned directives, literal `%` characters in commands, environment values, and `cwd` are escaped for systemd so values such as `date +%F` run as written.
+Raw `systemd:` directive values are not escaped.
 
 ## Usage
 

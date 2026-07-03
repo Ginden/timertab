@@ -1,0 +1,13 @@
+# timertab-managed: true
+# timertab-uid: 1002
+# timertab-instance-id: timertab
+# timertab-job-id: percent-specifiers
+[Unit]
+Description="timertab timer percent-specifiers"
+
+[Timer]
+Unit=timertab-u1002-percent-specifiers-653fd0a73b.service
+OnCalendar=*-*-* 00:00:00
+
+[Install]
+WantedBy=timers.target

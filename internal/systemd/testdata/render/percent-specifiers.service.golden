@@ -1,0 +1,15 @@
+# timertab-managed: true
+# timertab-uid: 1002
+# timertab-instance-id: timertab
+# timertab-job-id: percent-specifiers
+[Unit]
+Description="timertab job percent-specifiers"
+
+[Service]
+Type=oneshot
+WorkingDirectory=/var/lib/timertab%%jobs
+Environment="DATE_FORMAT=%%Y-%%m-%%d"
+Environment="LITERAL=100%%"
+SyslogIdentifier=raw-%n
+ExecStart=/bin/sh -lc "date +%%F && echo pct=100%%"
+ExecStopPost=/bin/sh -lc "TIMERTAB_JOB_ID='percent-specifiers'; TIMERTAB_UNIT='timertab-u1002-percent-specifiers-653fd0a73b.service'; export TIMERTAB_JOB_ID TIMERTAB_UNIT SERVICE_RESULT EXIT_CODE EXIT_STATUS; if [ \"${SERVICE_RESULT:-}\" = \"success\" ]; then HOOK_FORMAT='%%s' /bin/sh -lc 'printf '\"'\"'%%s\\n'\"'\"' done'; fi; if [ \"${SERVICE_RESULT:-}\" != \"success\" ]; then :; fi"

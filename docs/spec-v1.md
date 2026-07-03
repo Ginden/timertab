@@ -157,6 +157,8 @@ systemd:
 - object map form (`Record<string, string>`)
 - ordered list form (`[{name, value}]`)
 
+Raw directive values are emitted unchanged. If a raw value contains `%`, systemd interprets it using normal specifier expansion rules; use `%%` when the raw directive needs a literal percent sign.
+
 ## 6. Native systemd Integration Model
 
 Generated units are fully native and do not require `timertab` at runtime.
@@ -175,6 +177,8 @@ Service shape:
 - string `run`: `ExecStart=/bin/sh -lc '<run>'`
 - argv `run`: `ExecStart=<argv[0]> <argv[1]> ...`
 - `ExecStopPost=/bin/sh -lc '<hook-dispatch>'`
+
+In timertab-rendered directives, literal `%` characters from config-controlled fields are escaped as `%%` before writing unit files. This applies to generated `Description=`, `WorkingDirectory=`, `Environment=`, `ExecStart=`, and `ExecStopPost=` values. Raw `systemd` overrides are intentionally excluded from this escaping policy.
 
 Hook dispatch uses `SERVICE_RESULT`/`EXIT_CODE`/`EXIT_STATUS` provided by `systemd`.
 

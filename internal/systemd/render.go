@@ -379,6 +379,7 @@ func systemdQuoted(value string) string {
 	replacer := strings.NewReplacer(
 		`\`, `\\`,
 		`"`, `\"`,
+		`%`, `%%`,
 		"\n", `\n`,
 		"\r", `\r`,
 		"\t", `\t`,
@@ -394,6 +395,8 @@ func systemdPath(value string) string {
 		switch r {
 		case '\\':
 			b.WriteString(`\\`)
+		case '%':
+			b.WriteString(`%%`)
 		case ' ':
 			b.WriteString(`\x20`)
 		case '\n':

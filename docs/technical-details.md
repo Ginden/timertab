@@ -33,6 +33,7 @@ This document collects implementation, release, and maintenance notes that are u
 - Each job renders to one `.service` and one `.timer`.
 - Generated units are meant to remain understandable and operable without `timertab` installed.
 - Success and failure hooks are dispatched from `ExecStopPost`, not `OnSuccess=` / `OnFailure=`, to preserve compatibility with the v1 `systemd >= 247` baseline.
+- Literal `%` characters in timertab-owned generated directives are escaped as `%%` to prevent unintended systemd specifier expansion. Raw `systemd:` overrides remain pass-through.
 
 ### ID generation
 
