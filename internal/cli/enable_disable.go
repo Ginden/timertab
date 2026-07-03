@@ -46,50 +46,9 @@ func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command
 				return err
 			}
 
-			raw, err := os.ReadFile(cfgPath)
-			if err != nil {
-				return err
-			}
-			loaded, err := config.LoadFromBytes(raw)
-			if err != nil {
-				return err
-			}
-			if err := loaded.NormalizeIDs(); err != nil {
-				return err
-			}
-
-			jobIndex := indexOfJobID(loaded.Jobs, jobID)
-			if jobIndex < 0 {
-				return fmt.Errorf("job %q not found", jobID)
-			}
-
-			if err := ensureSystemdBaseline(); err != nil {
-				return err
-			}
-
-			loaded.Jobs[jobIndex].Enabled = boolPtr(enabled)
-
-			err = savePatchedConfig(cfgPath, raw, loaded, loaded.Jobs, func(jobsNode *yaml.Node) error {
-				return setJobEnabledNode(jobsNode.Content[jobIndex], enabled)
+			return withConfigLock(cfgPath, func() error {
+				return runSetEnabledCommand(cmd, cfgPath, jobID, use, enabled, noCommit)
 			})
-			if err != nil {
-				return err
-			}
-
-			report, err := runSystemctlApply(cmd.Context(), loaded)
-			if err != nil {
-				return err
-			}
-
-			cmd.Printf("timertab: saved %s\n", cfgPath)
-			printApplyReport(cmd, report)
-
-			if !noCommit {
-				message := fmt.Sprintf("timertab: %s job %s", use, jobID)
-				maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, loaded, message)
-			}
-
-			return nil
 		},
 	}
 
@@ -97,6 +56,53 @@ func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command
 	cmd.Flags().BoolVar(&noCommit, "no-commit", false, "Skip git auto-commit of the config change")
 
 	return cmd
+}
+
+func runSetEnabledCommand(cmd *cobra.Command, cfgPath, jobID, use string, enabled bool, noCommit bool) error {
+	raw, err := os.ReadFile(cfgPath)
+	if err != nil {
+		return err
+	}
+	loaded, err := config.LoadFromBytes(raw)
+	if err != nil {
+		return err
+	}
+	if err := loaded.NormalizeIDs(); err != nil {
+		return err
+	}
+
+	jobIndex := indexOfJobID(loaded.Jobs, jobID)
+	if jobIndex < 0 {
+		return fmt.Errorf("job %q not found", jobID)
+	}
+
+	if err := ensureSystemdBaseline(); err != nil {
+		return err
+	}
+
+	loaded.Jobs[jobIndex].Enabled = boolPtr(enabled)
+
+	err = savePatchedConfig(cfgPath, raw, loaded, loaded.Jobs, func(jobsNode *yaml.Node) error {
+		return setJobEnabledNode(jobsNode.Content[jobIndex], enabled)
+	})
+	if err != nil {
+		return err
+	}
+
+	report, err := runSystemctlApply(cmd.Context(), loaded)
+	if err != nil {
+		return err
+	}
+
+	cmd.Printf("timertab: saved %s\n", cfgPath)
+	printApplyReport(cmd, report)
+
+	if !noCommit {
+		message := fmt.Sprintf("timertab: %s job %s", use, jobID)
+		maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, loaded, message)
+	}
+
+	return nil
 }
 
 func boolPtr(value bool) *bool {

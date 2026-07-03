@@ -36,58 +36,60 @@ func newAddCommand() *cobra.Command {
 				return err
 			}
 
-			jobEnv, err := parseEnvFlags(env)
-			if err != nil {
-				return err
-			}
-
-			job := config.Job{
-				ID:   strings.TrimSpace(id),
-				Name: strings.TrimSpace(name),
-				When: config.ScheduleList(when),
-				Env:  jobEnv,
-				Run:  runCommandFromArgs(args),
-			}
-
-			loaded, raw, err := loadConfigWithRaw(cfgPath)
-			if err != nil {
-				return err
-			}
-			preJobs := append([]config.Job(nil), loaded.Jobs...)
-			loaded.Jobs = append(loaded.Jobs, job)
-			if err := loaded.NormalizeIDs(); err != nil {
-				return err
-			}
-			addedJob := loaded.Jobs[len(loaded.Jobs)-1]
-
-			if !noApply {
-				if err := ensureSystemdBaseline(); err != nil {
-					return err
-				}
-			}
-
-			if err := savePatchedConfig(cfgPath, raw, loaded, loaded.Jobs[:len(preJobs)], func(jobsNode *yaml.Node) error {
-				return appendJobNodes(jobsNode, []config.Job{addedJob})
-			}); err != nil {
-				return err
-			}
-
-			if noApply {
-				cmd.Printf("timertab: saved %s (no apply)\n", cfgPath)
-			} else {
-				report, err := runSystemctlApply(cmd.Context(), loaded)
+			return withConfigLock(cfgPath, func() error {
+				jobEnv, err := parseEnvFlags(env)
 				if err != nil {
 					return err
 				}
-				cmd.Printf("timertab: saved %s\n", cfgPath)
-				printApplyReport(cmd, report)
-			}
 
-			if !noCommit {
-				maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, loaded, "timertab: add job "+addedJob.ID)
-			}
+				job := config.Job{
+					ID:   strings.TrimSpace(id),
+					Name: strings.TrimSpace(name),
+					When: config.ScheduleList(when),
+					Env:  jobEnv,
+					Run:  runCommandFromArgs(args),
+				}
 
-			return nil
+				loaded, raw, err := loadConfigWithRaw(cfgPath)
+				if err != nil {
+					return err
+				}
+				preJobs := append([]config.Job(nil), loaded.Jobs...)
+				loaded.Jobs = append(loaded.Jobs, job)
+				if err := loaded.NormalizeIDs(); err != nil {
+					return err
+				}
+				addedJob := loaded.Jobs[len(loaded.Jobs)-1]
+
+				if !noApply {
+					if err := ensureSystemdBaseline(); err != nil {
+						return err
+					}
+				}
+
+				if err := savePatchedConfig(cfgPath, raw, loaded, loaded.Jobs[:len(preJobs)], func(jobsNode *yaml.Node) error {
+					return appendJobNodes(jobsNode, []config.Job{addedJob})
+				}); err != nil {
+					return err
+				}
+
+				if noApply {
+					cmd.Printf("timertab: saved %s (no apply)\n", cfgPath)
+				} else {
+					report, err := runSystemctlApply(cmd.Context(), loaded)
+					if err != nil {
+						return err
+					}
+					cmd.Printf("timertab: saved %s\n", cfgPath)
+					printApplyReport(cmd, report)
+				}
+
+				if !noCommit {
+					maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, loaded, "timertab: add job "+addedJob.ID)
+				}
+
+				return nil
+			})
 		},
 	}
 
@@ -131,53 +133,55 @@ func newRemoveCommand() *cobra.Command {
 				return err
 			}
 
-			raw, err := os.ReadFile(cfgPath)
-			if err != nil {
-				return err
-			}
-			loaded, err := config.LoadFromBytes(raw)
-			if err != nil {
-				return err
-			}
-			if err := loaded.NormalizeIDs(); err != nil {
-				return err
-			}
-
-			jobIndex := indexOfJobID(loaded.Jobs, jobID)
-			if jobIndex < 0 {
-				return fmt.Errorf("job %q not found", jobID)
-			}
-			preJobs := append([]config.Job(nil), loaded.Jobs...)
-			loaded.Jobs = append(loaded.Jobs[:jobIndex], loaded.Jobs[jobIndex+1:]...)
-
-			if !noApply {
-				if err := ensureSystemdBaseline(); err != nil {
-					return err
-				}
-			}
-
-			if err := savePatchedConfig(cfgPath, raw, loaded, preJobs, func(jobsNode *yaml.Node) error {
-				return removeJobNode(jobsNode, jobIndex)
-			}); err != nil {
-				return err
-			}
-
-			if noApply {
-				cmd.Printf("timertab: saved %s (no apply)\n", cfgPath)
-			} else {
-				report, err := runSystemctlApply(cmd.Context(), loaded)
+			return withConfigLock(cfgPath, func() error {
+				raw, err := os.ReadFile(cfgPath)
 				if err != nil {
 					return err
 				}
-				cmd.Printf("timertab: saved %s\n", cfgPath)
-				printApplyReport(cmd, report)
-			}
+				loaded, err := config.LoadFromBytes(raw)
+				if err != nil {
+					return err
+				}
+				if err := loaded.NormalizeIDs(); err != nil {
+					return err
+				}
 
-			if !noCommit {
-				maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, loaded, "timertab: remove job "+jobID)
-			}
+				jobIndex := indexOfJobID(loaded.Jobs, jobID)
+				if jobIndex < 0 {
+					return fmt.Errorf("job %q not found", jobID)
+				}
+				preJobs := append([]config.Job(nil), loaded.Jobs...)
+				loaded.Jobs = append(loaded.Jobs[:jobIndex], loaded.Jobs[jobIndex+1:]...)
 
-			return nil
+				if !noApply {
+					if err := ensureSystemdBaseline(); err != nil {
+						return err
+					}
+				}
+
+				if err := savePatchedConfig(cfgPath, raw, loaded, preJobs, func(jobsNode *yaml.Node) error {
+					return removeJobNode(jobsNode, jobIndex)
+				}); err != nil {
+					return err
+				}
+
+				if noApply {
+					cmd.Printf("timertab: saved %s (no apply)\n", cfgPath)
+				} else {
+					report, err := runSystemctlApply(cmd.Context(), loaded)
+					if err != nil {
+						return err
+					}
+					cmd.Printf("timertab: saved %s\n", cfgPath)
+					printApplyReport(cmd, report)
+				}
+
+				if !noCommit {
+					maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, loaded, "timertab: remove job "+jobID)
+				}
+
+				return nil
+			})
 		},
 	}
 

@@ -131,7 +131,7 @@ func editConfig(cmd *cobra.Command, cfgPath string, noApply, dryRun, noCommit bo
 		}
 
 		progress.Printf(cmd.Context(), "timertab: saving config to %s", cfgPath)
-		if err := os.WriteFile(cfgPath, out, 0o644); err != nil {
+		if err := writeConfigFile(cfgPath, out); err != nil {
 			return err
 		}
 

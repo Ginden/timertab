@@ -43,82 +43,84 @@ func newEjectCommand() *cobra.Command {
 				return err
 			}
 
-			raw, err := os.ReadFile(cfgPath)
-			if err != nil {
-				return err
-			}
-			loaded, err := config.LoadFromBytes(raw)
-			if err != nil {
-				return err
-			}
-			if err := loaded.NormalizeIDs(); err != nil {
-				return err
-			}
+			return withConfigLock(cfgPath, func() error {
+				raw, err := os.ReadFile(cfgPath)
+				if err != nil {
+					return err
+				}
+				loaded, err := config.LoadFromBytes(raw)
+				if err != nil {
+					return err
+				}
+				if err := loaded.NormalizeIDs(); err != nil {
+					return err
+				}
 
-			jobIndex := indexOfJobID(loaded.Jobs, jobID)
-			if jobIndex < 0 {
-				return fmt.Errorf("job %q not found", jobID)
-			}
-			job := loaded.Jobs[jobIndex]
-			instanceID := loaded.EffectiveInstanceID()
+				jobIndex := indexOfJobID(loaded.Jobs, jobID)
+				if jobIndex < 0 {
+					return fmt.Errorf("job %q not found", jobID)
+				}
+				job := loaded.Jobs[jobIndex]
+				instanceID := loaded.EffectiveInstanceID()
 
-			targetUID, err := resolveCurrentUID()
-			if err != nil {
-				return err
-			}
-			unitDir, err := resolveSystemdUnitDir(targetUID)
-			if err != nil {
-				return err
-			}
+				targetUID, err := resolveCurrentUID()
+				if err != nil {
+					return err
+				}
+				unitDir, err := resolveSystemdUnitDir(targetUID)
+				if err != nil {
+					return err
+				}
 
-			rendered, err := renderJobUnits(targetUID, instanceID, job)
-			if err != nil {
-				return err
-			}
+				rendered, err := renderJobUnits(targetUID, instanceID, job)
+				if err != nil {
+					return err
+				}
 
-			servicePath := filepath.Join(unitDir, rendered.ServiceName)
-			timerPath := filepath.Join(unitDir, rendered.TimerName)
+				servicePath := filepath.Join(unitDir, rendered.ServiceName)
+				timerPath := filepath.Join(unitDir, rendered.TimerName)
 
-			serviceResult, err := stripManagedMarkersFromUnitFile(servicePath, targetUID, instanceID, job.ID)
-			if err != nil {
-				return err
-			}
-			timerResult, err := stripManagedMarkersFromUnitFile(timerPath, targetUID, instanceID, job.ID)
-			if err != nil {
-				return err
-			}
+				serviceResult, err := stripManagedMarkersFromUnitFile(servicePath, targetUID, instanceID, job.ID)
+				if err != nil {
+					return err
+				}
+				timerResult, err := stripManagedMarkersFromUnitFile(timerPath, targetUID, instanceID, job.ID)
+				if err != nil {
+					return err
+				}
 
-			preJobs := make([]config.Job, len(loaded.Jobs))
-			copy(preJobs, loaded.Jobs)
+				preJobs := make([]config.Job, len(loaded.Jobs))
+				copy(preJobs, loaded.Jobs)
 
-			loaded.Jobs = append(loaded.Jobs[:jobIndex], loaded.Jobs[jobIndex+1:]...)
-			err = savePatchedConfig(cfgPath, raw, loaded, preJobs, func(jobsNode *yaml.Node) error {
-				return removeJobNode(jobsNode, jobIndex)
+				loaded.Jobs = append(loaded.Jobs[:jobIndex], loaded.Jobs[jobIndex+1:]...)
+				err = savePatchedConfig(cfgPath, raw, loaded, preJobs, func(jobsNode *yaml.Node) error {
+					return removeJobNode(jobsNode, jobIndex)
+				})
+				if err != nil {
+					return err
+				}
+
+				cmd.Printf("timertab: saved %s\n", cfgPath)
+				if serviceResult.Changed {
+					cmd.Printf("ejected %s\n", servicePath)
+				}
+				if timerResult.Changed {
+					cmd.Printf("ejected %s\n", timerPath)
+				}
+				if serviceResult.Missing {
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s unit file missing: %s\n", warningPrefix, servicePath)
+				}
+				if timerResult.Missing {
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s unit file missing: %s\n", warningPrefix, timerPath)
+				}
+				cmd.Println("timertab: ejected units are still installed and may keep running; use `timertab rm` to delete a job and prune its units")
+
+				if !noCommit {
+					maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, loaded, "timertab: eject job "+jobID)
+				}
+
+				return nil
 			})
-			if err != nil {
-				return err
-			}
-
-			cmd.Printf("timertab: saved %s\n", cfgPath)
-			if serviceResult.Changed {
-				cmd.Printf("ejected %s\n", servicePath)
-			}
-			if timerResult.Changed {
-				cmd.Printf("ejected %s\n", timerPath)
-			}
-			if serviceResult.Missing {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s unit file missing: %s\n", warningPrefix, servicePath)
-			}
-			if timerResult.Missing {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s unit file missing: %s\n", warningPrefix, timerPath)
-			}
-			cmd.Println("timertab: ejected units are still installed and may keep running; use `timertab rm` to delete a job and prune its units")
-
-			if !noCommit {
-				maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, loaded, "timertab: eject job "+jobID)
-			}
-
-			return nil
 		},
 	}
 
@@ -154,70 +156,72 @@ func newAdoptCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			loaded, err := config.LoadFromFile(cfgPath)
-			if err != nil {
-				return err
-			}
-			if err := loaded.NormalizeIDs(); err != nil {
-				return err
-			}
+			return withConfigLock(cfgPath, func() error {
+				loaded, err := config.LoadFromFile(cfgPath)
+				if err != nil {
+					return err
+				}
+				if err := loaded.NormalizeIDs(); err != nil {
+					return err
+				}
 
-			jobIndex := indexOfJobID(loaded.Jobs, jobID)
-			if jobIndex < 0 {
-				return fmt.Errorf("job %q not found", jobID)
-			}
+				jobIndex := indexOfJobID(loaded.Jobs, jobID)
+				if jobIndex < 0 {
+					return fmt.Errorf("job %q not found", jobID)
+				}
 
-			targetUID, err := resolveCurrentUID()
-			if err != nil {
-				return err
-			}
-			unitDir, err := resolveSystemdUnitDir(targetUID)
-			if err != nil {
-				return err
-			}
-			instanceID := loaded.EffectiveInstanceID()
-			job := loaded.Jobs[jobIndex]
+				targetUID, err := resolveCurrentUID()
+				if err != nil {
+					return err
+				}
+				unitDir, err := resolveSystemdUnitDir(targetUID)
+				if err != nil {
+					return err
+				}
+				instanceID := loaded.EffectiveInstanceID()
+				job := loaded.Jobs[jobIndex]
 
-			rendered, err := renderJobUnits(targetUID, instanceID, job)
-			if err != nil {
-				return err
-			}
-			servicePath := filepath.Join(unitDir, rendered.ServiceName)
-			timerPath := filepath.Join(unitDir, rendered.TimerName)
+				rendered, err := renderJobUnits(targetUID, instanceID, job)
+				if err != nil {
+					return err
+				}
+				servicePath := filepath.Join(unitDir, rendered.ServiceName)
+				timerPath := filepath.Join(unitDir, rendered.TimerName)
 
-			serviceChanged, err := addManagedMarkersToUnitFile(servicePath, targetUID, instanceID, job.ID)
-			if err != nil {
-				return err
-			}
-			timerChanged, err := addManagedMarkersToUnitFile(timerPath, targetUID, instanceID, job.ID)
-			if err != nil {
-				return err
-			}
+				serviceChanged, err := addManagedMarkersToUnitFile(servicePath, targetUID, instanceID, job.ID)
+				if err != nil {
+					return err
+				}
+				timerChanged, err := addManagedMarkersToUnitFile(timerPath, targetUID, instanceID, job.ID)
+				if err != nil {
+					return err
+				}
 
-			if serviceChanged {
-				cmd.Printf("adopted %s\n", servicePath)
-			}
-			if timerChanged {
-				cmd.Printf("adopted %s\n", timerPath)
-			}
-			if !serviceChanged && !timerChanged {
-				cmd.Println("timertab: units already carry timertab management markers")
-			}
+				if serviceChanged {
+					cmd.Printf("adopted %s\n", servicePath)
+				}
+				if timerChanged {
+					cmd.Printf("adopted %s\n", timerPath)
+				}
+				if !serviceChanged && !timerChanged {
+					cmd.Println("timertab: units already carry timertab management markers")
+				}
 
-			if noApply {
-				cmd.Println("timertab: adopted markers (no apply)")
+				if noApply {
+					cmd.Println("timertab: adopted markers (no apply)")
+					return nil
+				}
+
+				if err := ensureSystemdBaseline(); err != nil {
+					return err
+				}
+				report, err := runSystemctlApply(cmd.Context(), loaded)
+				if err != nil {
+					return err
+				}
+				printApplyReport(cmd, report)
 				return nil
-			}
-
-			if err := ensureSystemdBaseline(); err != nil {
-				return err
-			}
-			report, err := runSystemctlApply(cmd.Context(), loaded)
-			if err != nil {
-				return err
-			}
-			printApplyReport(cmd, report)
-			return nil
+			})
 		},
 	}
 
@@ -261,7 +265,10 @@ func writeConfigFile(path string, data []byte) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0o644)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600)
 }
 
 func indexOfJobID(jobs []config.Job, id string) int {

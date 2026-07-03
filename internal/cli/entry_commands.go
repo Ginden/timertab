@@ -63,7 +63,9 @@ func newEditCommand() *cobra.Command {
 				}
 			}
 
-			return editConfig(cmd, cfgPath, noApply, dryRun, noCommit)
+			return withConfigLock(cfgPath, func() error {
+				return editConfig(cmd, cfgPath, noApply, dryRun, noCommit)
+			})
 		},
 	}
 

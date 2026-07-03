@@ -103,7 +103,9 @@ func newImportCommand() *cobra.Command {
 				return importDryRun(cmd, cfgPath, imported)
 			}
 
-			return importInteractive(cmd, cfgPath, imported, noApply, noCommit)
+			return withConfigLock(cfgPath, func() error {
+				return importInteractive(cmd, cfgPath, imported, noApply, noCommit)
+			})
 		},
 	}
 

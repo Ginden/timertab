@@ -44,6 +44,15 @@ Only the config file itself is staged and committed by `timertab`, but the repos
 
 If `git` is missing or Git operations fail, edit/apply still succeeds and the failure degrades to a warning.
 
+## Locking and File Permissions
+
+Mutating commands take a non-blocking `<config>.lock` next to the resolved config file.
+If another timertab edit/apply/import/add/remove-style operation is already active for
+that config, the second command fails instead of waiting and risking a lost update.
+
+Config writes use mode `0600` because job `env:` values may contain secrets. Existing
+files are rewritten with private permissions the next time timertab saves them.
+
 ## Generated Units Are Native
 
 Generated units are meant to work without `timertab` installed.
