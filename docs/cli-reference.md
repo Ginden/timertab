@@ -65,6 +65,7 @@ Generated unit files live under the target manager's unit directory:
 | `timertab diff` | Preview unit file creates/modifies/deletes without writing |
 | `timertab status` | Show summary status for configured jobs |
 | `timertab status <id>` | Show a detailed report for one job |
+| `timertab doctor` | Show active, orphaned, ejected, and other-instance timertab unit files |
 | `timertab logs <id>` | Show `journalctl` output for one job |
 | `timertab trigger <id>` | Start one job's generated service immediately |
 | `timertab add` | Add a configured job without opening an editor |
@@ -244,6 +245,20 @@ Behavior notes:
 - If no config file exists, `status` prints the resolved missing path instead of silently exiting.
 - Jobs whose timer has never triggered are reported as `never ran` instead of `pass`.
 - The detailed log preview uses `journalctl --user -u <service> -n 20 --no-pager` for non-root users and `journalctl -u <service> -n 20 --no-pager` for root.
+
+## `timertab doctor`
+
+Usage:
+
+```bash
+timertab doctor [--config <path>]
+```
+
+Behavior:
+
+- Scans the current UID's systemd unit directory for `timertab-*` service and timer files.
+- Classifies units as `active-config`, `orphan-managed`, `managed-other-instance`, or `ejected-or-foreign`.
+- Does not call `systemctl` or mutate files.
 
 ## `timertab logs`
 

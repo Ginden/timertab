@@ -213,6 +213,7 @@ Raw `systemd:` directive values are not escaped.
 | `timertab adopt <id>` | Resume managing previously ejected unit files |
 | `timertab enable <id>` / `timertab disable <id>` | Toggle one job on/off without removing it |
 | `timertab logs <id>` | Tail/query journald logs for one job |
+| `timertab doctor` | Show active, orphaned, ejected, and other-instance timertab unit files |
 | `timertab diff` | Preview create/modify/delete reconcile operations |
 | `timertab import` | Convert crontab entries into timertab YAML |
 | `timertab render` | Convert crontab input into a review bundle with `timertab.yaml`, rendered units, and `REPORT.md` |
