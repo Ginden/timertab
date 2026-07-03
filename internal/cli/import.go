@@ -176,9 +176,10 @@ func importCrontab(raw string) (*config.File, []string, error) {
 		}
 
 		// Strip cron % separator (text after % becomes stdin in cron; not supported in systemd).
-		if stripped, hadPercent := stripCronPercent(command); hadPercent {
+		stripped, hadPercent := stripCronPercent(command)
+		command = stripped
+		if hadPercent {
 			warnings = append(warnings, fmt.Sprintf("line %d: %% character stripped from command (cron stdin syntax has no systemd equivalent)", lineNo))
-			command = stripped
 		}
 
 		// Strip inline bash comments from the command.
@@ -241,11 +242,15 @@ func stripCronPercent(command string) (string, bool) {
 			continue
 		}
 		if command[i] == '%' {
-			return strings.TrimRight(command[:i], " \t"), true
+			return unescapeCronLiteralPercent(strings.TrimRight(command[:i], " \t")), true
 		}
 		i++
 	}
-	return command, false
+	return unescapeCronLiteralPercent(command), false
+}
+
+func unescapeCronLiteralPercent(command string) string {
+	return strings.ReplaceAll(command, `\%`, `%`)
 }
 
 // stripInlineComment removes a trailing bash inline comment (space followed by #)
@@ -421,7 +426,22 @@ func parseCrontabEnv(line string) (string, string, bool) {
 	}
 
 	value := strings.TrimSpace(line[index+1:])
+	value = stripMatchingCrontabEnvQuotes(value)
 	return key, value, true
+}
+
+func stripMatchingCrontabEnvQuotes(value string) string {
+	if len(value) < 2 {
+		return value
+	}
+
+	first := value[0]
+	last := value[len(value)-1]
+	if (first == '"' || first == '\'') && first == last {
+		return value[1 : len(value)-1]
+	}
+
+	return value
 }
 
 func parseCrontabEntry(line string) (string, string, bool) {

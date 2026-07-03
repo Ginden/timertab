@@ -155,9 +155,10 @@ func TestStripCronPercent(t *testing.T) {
 	}{
 		{"mail user@host%Body here", "mail user@host", true},
 		{"/bin/backup.sh", "/bin/backup.sh", false},
-		{`echo "percentage: 50\%"`, `echo "percentage: 50\%"`, false},
+		{`echo "percentage: 50\%"`, `echo "percentage: 50%"`, false},
 		{"cmd arg%stdin text%more", "cmd arg", true},
 		{"cmd arg %-", "cmd arg", true},
+		{`echo 100\% done % stdin`, `echo 100% done`, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -169,6 +170,70 @@ func TestStripCronPercent(t *testing.T) {
 				t.Errorf("had = %v, want %v", gotHad, tt.had)
 			}
 		})
+	}
+}
+
+func TestImportCrontabEnvStripsMatchingQuotes(t *testing.T) {
+	input := strings.Join([]string{
+		`FOO="a b"`,
+		`BAR='c d'`,
+		`BAZ=unquoted`,
+		`QUX="  spaced  "`,
+		`0 9 * * * echo env`,
+	}, "\n")
+
+	cfg, warnings, err := importCrontab(input)
+	if err != nil {
+		t.Fatalf("importCrontab error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
+	if len(cfg.Jobs) != 1 {
+		t.Fatalf("jobs count = %d, want 1", len(cfg.Jobs))
+	}
+
+	wantEnv := map[string]string{
+		"FOO": "a b",
+		"BAR": "c d",
+		"BAZ": "unquoted",
+		"QUX": "  spaced  ",
+	}
+	for key, want := range wantEnv {
+		if got := cfg.Jobs[0].Env[key]; got != want {
+			t.Errorf("env[%s] = %q, want %q", key, got, want)
+		}
+	}
+}
+
+func TestImportCrontabPercentSyntax(t *testing.T) {
+	input := strings.Join([]string{
+		`0 9 * * * echo 100\% done`,
+		`0 10 * * * echo ok % this becomes stdin`,
+	}, "\n")
+
+	cfg, warnings, err := importCrontab(input)
+	if err != nil {
+		t.Fatalf("importCrontab error = %v", err)
+	}
+	if len(cfg.Jobs) != 2 {
+		t.Fatalf("jobs count = %d, want 2", len(cfg.Jobs))
+	}
+	if got := cfg.Jobs[0].Run.Display(); got != `echo 100% done` {
+		t.Errorf("jobs[0].run = %q, want literal percent unescaped", got)
+	}
+	if got := cfg.Jobs[1].Run.Display(); got != `echo ok` {
+		t.Errorf("jobs[1].run = %q, want command before stdin separator", got)
+	}
+
+	percentWarnings := 0
+	for _, w := range warnings {
+		if strings.Contains(w, "%") {
+			percentWarnings++
+		}
+	}
+	if percentWarnings != 1 {
+		t.Errorf("percent warnings = %d, want 1; warnings: %v", percentWarnings, warnings)
 	}
 }
 
