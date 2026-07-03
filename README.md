@@ -210,6 +210,7 @@ Raw `systemd:` directive values are not escaped.
 | `timertab add --when <schedule> -- <command>` | Add a job without opening an editor |
 | `timertab rm <id>` | Remove a job, then apply pruning of its managed units |
 | `timertab eject <id>` | Stop managing a job — its units stay and keep running |
+| `timertab adopt <id>` | Resume managing previously ejected unit files |
 | `timertab enable <id>` / `timertab disable <id>` | Toggle one job on/off without removing it |
 | `timertab logs <id>` | Tail/query journald logs for one job |
 | `timertab diff` | Preview create/modify/delete reconcile operations |

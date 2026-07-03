@@ -72,6 +72,7 @@ Generated unit files live under the target manager's unit directory:
 | `timertab enable <id>` | Mark a job enabled, save config, and apply |
 | `timertab disable <id>` | Mark a job disabled, save config, and apply |
 | `timertab eject <id>` | Stop managing a job but leave its unit files in place |
+| `timertab adopt <id>` | Resume managing previously ejected unit files |
 | `timertab import` | Convert crontab entries into timertab jobs |
 | `timertab render` | Render a crontab review bundle without touching `systemd` |
 | `timertab completion <shell>` | Generate shell completion scripts |
@@ -364,6 +365,7 @@ Behavior:
   user comments and formatting.
 - Does not delete the unit files.
 - Does not call `systemctl`.
+- Prints a reminder that ejected units may keep running.
 - Auto-commits the config change (`timertab: eject job <id>`) unless `--no-commit`
   is set or `git.auto_commit` is disabled.
 
@@ -372,6 +374,20 @@ Warnings:
 - If the expected service or timer file is missing, `eject` warns but still removes the job from the config.
 
 Use `eject` when you want the units to remain as normal standalone `systemd` units that `timertab` no longer manages.
+
+## `timertab adopt`
+
+Usage:
+
+```bash
+timertab adopt <id> [--config <path>] [--no-apply]
+```
+
+Behavior:
+
+- Restores timertab ownership markers to the rendered service and timer filenames for the configured job.
+- Fails if either unit file is missing.
+- Applies afterward by default so timertab can reconcile the adopted units; use `--no-apply` to only restore markers.
 
 ## `timertab import`
 

@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/ginden/timertab/internal/config"
+	"github.com/ginden/timertab/internal/systemd"
 )
 
 const defaultSchemaURL = "https://raw.githubusercontent.com/ginden/timertab/v1.1.0/schema/v1.json"
@@ -111,6 +112,7 @@ func newEjectCommand() *cobra.Command {
 			if timerResult.Missing {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s unit file missing: %s\n", warningPrefix, timerPath)
 			}
+			cmd.Println("timertab: ejected units are still installed and may keep running; use `timertab rm` to delete a job and prune its units")
 
 			if !noCommit {
 				maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, loaded, "timertab: eject job "+jobID)
@@ -122,6 +124,105 @@ func newEjectCommand() *cobra.Command {
 
 	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
 	cmd.Flags().BoolVar(&noCommit, "no-commit", false, "Skip git auto-commit of the config change")
+
+	return cmd
+}
+
+func newAdoptCommand() *cobra.Command {
+	var (
+		overridePath string
+		noApply      bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "adopt <id>",
+		Short: "Resume timertab management of previously ejected unit files",
+		Args:  cobra.ExactArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) > 0 {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			return completeJobIDs(overridePath, toComplete)
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			jobID := strings.TrimSpace(args[0])
+			if jobID == "" {
+				return fmt.Errorf("job id cannot be empty")
+			}
+
+			cfgPath, err := resolveConfigPath(overridePath)
+			if err != nil {
+				return err
+			}
+			loaded, err := config.LoadFromFile(cfgPath)
+			if err != nil {
+				return err
+			}
+			if err := loaded.NormalizeIDs(); err != nil {
+				return err
+			}
+
+			jobIndex := indexOfJobID(loaded.Jobs, jobID)
+			if jobIndex < 0 {
+				return fmt.Errorf("job %q not found", jobID)
+			}
+
+			targetUID, err := resolveCurrentUID()
+			if err != nil {
+				return err
+			}
+			unitDir, err := resolveSystemdUnitDir(targetUID)
+			if err != nil {
+				return err
+			}
+			instanceID := loaded.EffectiveInstanceID()
+			job := loaded.Jobs[jobIndex]
+
+			rendered, err := renderJobUnits(targetUID, instanceID, job)
+			if err != nil {
+				return err
+			}
+			servicePath := filepath.Join(unitDir, rendered.ServiceName)
+			timerPath := filepath.Join(unitDir, rendered.TimerName)
+
+			serviceChanged, err := addManagedMarkersToUnitFile(servicePath, targetUID, instanceID, job.ID)
+			if err != nil {
+				return err
+			}
+			timerChanged, err := addManagedMarkersToUnitFile(timerPath, targetUID, instanceID, job.ID)
+			if err != nil {
+				return err
+			}
+
+			if serviceChanged {
+				cmd.Printf("adopted %s\n", servicePath)
+			}
+			if timerChanged {
+				cmd.Printf("adopted %s\n", timerPath)
+			}
+			if !serviceChanged && !timerChanged {
+				cmd.Println("timertab: units already carry timertab management markers")
+			}
+
+			if noApply {
+				cmd.Println("timertab: adopted markers (no apply)")
+				return nil
+			}
+
+			if err := ensureSystemdBaseline(); err != nil {
+				return err
+			}
+			report, err := runSystemctlApply(cmd.Context(), loaded)
+			if err != nil {
+				return err
+			}
+			printApplyReport(cmd, report)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
+	cmd.Flags().BoolVar(&noApply, "no-apply", false, "Restore markers but skip systemd reconcile")
 
 	return cmd
 }
@@ -240,4 +341,61 @@ func stripManagedMarkers(content string, targetUID uint32, instanceID, jobID str
 	}
 
 	return out, true
+}
+
+func addManagedMarkersToUnitFile(path string, targetUID uint32, instanceID, jobID string) (bool, error) {
+	contentBytes, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, fmt.Errorf("unit file %q does not exist; cannot adopt", path)
+		}
+		return false, fmt.Errorf("read unit file %q: %w", path, err)
+	}
+
+	content := string(contentBytes)
+	if systemd.IsManagedUnitContentForUID(content, targetUID, instanceID) {
+		if !contentHasManagedJobID(content, jobID) {
+			return false, fmt.Errorf("unit file %q is already managed for another job", path)
+		}
+		return false, nil
+	}
+
+	markers := managedMarkerBlock(targetUID, instanceID, jobID)
+	if strings.HasPrefix(content, markers) {
+		return false, nil
+	}
+
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return false, fmt.Errorf("stat unit file %q: %w", path, err)
+	}
+	if err := os.WriteFile(path, []byte(markers+content), fileInfo.Mode().Perm()); err != nil {
+		return false, fmt.Errorf("write unit file %q: %w", path, err)
+	}
+
+	return true, nil
+}
+
+func contentHasManagedJobID(content, jobID string) bool {
+	want := "# timertab-job-id: " + jobID
+	for _, line := range strings.Split(content, "\n") {
+		if strings.TrimSpace(line) == want {
+			return true
+		}
+	}
+	return false
+}
+
+func managedMarkerBlock(targetUID uint32, instanceID, jobID string) string {
+	effectiveInstanceID := config.DefaultInstanceID
+	if strings.TrimSpace(instanceID) != "" {
+		effectiveInstanceID = strings.TrimSpace(instanceID)
+	}
+	return strings.Join([]string{
+		"# timertab-managed: true",
+		fmt.Sprintf("# timertab-uid: %d", targetUID),
+		"# timertab-instance-id: " + effectiveInstanceID,
+		"# timertab-job-id: " + jobID,
+		"",
+	}, "\n")
 }

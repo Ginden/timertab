@@ -43,7 +43,7 @@ func BuildPlan(targetUID uint32, instanceID string, desired []DesiredUnit, exist
 		if existingUnit.Managed {
 			continue
 		}
-		return Plan{}, fmt.Errorf("refusing to mutate foreign unit %q without timertab managed marker", name)
+		return Plan{}, fmt.Errorf("refusing to mutate foreign unit %q without timertab managed marker; it may have been ejected or created outside timertab: run `timertab adopt <id>`, delete the unit file, or choose another job id", name)
 	}
 
 	plan := Plan{

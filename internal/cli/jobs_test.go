@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,6 +94,103 @@ func TestEjectCommandRemovesJobAndManagedMarkers(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "ejected "+timerPath+"\n") {
 		t.Fatalf("stdout missing timer ejected line, got:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "may keep running") {
+		t.Fatalf("stdout missing still-running warning, got:\n%s", stdout.String())
+	}
+}
+
+func TestAdoptCommandRestoresManagedMarkersAndApplies(t *testing.T) {
+	originalResolveCurrentUID := resolveCurrentUID
+	originalResolveSystemdUnitDir := resolveSystemdUnitDir
+	originalEnsure := ensureSystemdBaseline
+	originalApply := runSystemctlApply
+	t.Cleanup(func() {
+		resolveCurrentUID = originalResolveCurrentUID
+		resolveSystemdUnitDir = originalResolveSystemdUnitDir
+		ensureSystemdBaseline = originalEnsure
+		runSystemctlApply = originalApply
+	})
+
+	targetUID := uint32(1000)
+	unitDir := t.TempDir()
+	resolveCurrentUID = func() (uint32, error) { return targetUID, nil }
+	resolveSystemdUnitDir = func(gotUID uint32) (string, error) {
+		if gotUID != targetUID {
+			t.Fatalf("resolveSystemdUnitDir() uid = %d, want %d", gotUID, targetUID)
+		}
+		return unitDir, nil
+	}
+	ensureSystemdBaseline = func() error { return nil }
+	var applyCalls int
+	runSystemctlApply = func(_ context.Context, loaded *config.File) (applyReport, error) {
+		applyCalls++
+		if len(loaded.Jobs) != 1 || loaded.Jobs[0].ID != "demo" {
+			t.Fatalf("applied config = %#v", loaded.Jobs)
+		}
+		return applyReport{Modified: []string{"/tmp/demo.service"}}, nil
+	}
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	cfg := &config.File{
+		Version: 1,
+		Jobs: []config.Job{{
+			ID:   "demo",
+			When: config.ScheduleList{"@daily"},
+			Run:  config.ShellCommand("echo demo"),
+		}},
+	}
+	if err := saveConfig(cfgPath, cfg); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	rendered, err := systemd.RenderJobUnits(targetUID, config.DefaultInstanceID, cfg.Jobs[0])
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+	serviceContent, changed := stripManagedMarkers(rendered.ServiceContent, targetUID, config.DefaultInstanceID, "demo")
+	if !changed {
+		t.Fatalf("stripManagedMarkers(service) changed = false")
+	}
+	timerContent, changed := stripManagedMarkers(rendered.TimerContent, targetUID, config.DefaultInstanceID, "demo")
+	if !changed {
+		t.Fatalf("stripManagedMarkers(timer) changed = false")
+	}
+	servicePath := filepath.Join(unitDir, rendered.ServiceName)
+	timerPath := filepath.Join(unitDir, rendered.TimerName)
+	if err := os.WriteFile(servicePath, []byte(serviceContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(service) error = %v", err)
+	}
+	if err := os.WriteFile(timerPath, []byte(timerContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(timer) error = %v", err)
+	}
+
+	stdout := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"adopt", "demo", "--config", cfgPath})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if applyCalls != 1 {
+		t.Fatalf("apply calls = %d, want 1", applyCalls)
+	}
+	for _, path := range []string{servicePath, timerPath} {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile(%s) error = %v", path, err)
+		}
+		if !strings.Contains(string(content), "# timertab-managed: true") {
+			t.Fatalf("%s missing managed marker:\n%s", path, content)
+		}
+		if !strings.Contains(stdout.String(), "adopted "+path) {
+			t.Fatalf("stdout missing adopted line for %s:\n%s", path, stdout.String())
+		}
+	}
+	if !strings.Contains(stdout.String(), "modified /tmp/demo.service") {
+		t.Fatalf("stdout missing apply report:\n%s", stdout.String())
 	}
 }
 

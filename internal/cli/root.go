@@ -61,6 +61,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.AddCommand(newPrintPathCommand())
 	cmd.AddCommand(newValidateCommand())
 	cmd.AddCommand(newEjectCommand())
+	cmd.AddCommand(newAdoptCommand())
 	cmd.AddCommand(newStatusCommand())
 	cmd.AddCommand(newLogsCommand())
 	cmd.AddCommand(newTriggerCommand())
