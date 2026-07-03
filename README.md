@@ -198,6 +198,7 @@ Raw `systemd:` directive values are not escaped.
 | `timertab edit` (or `timertab -e`) | Edit config, validate, and apply (generate and start timers) |
 | `timertab edit --no-apply` (or `timertab -e --no-apply`) | Edit and validate only, don't touch systemd |
 | `timertab edit --no-commit` | Apply without creating/updating the git history entry for that edit run |
+| `timertab apply` | Reconcile systemd units to match the config without opening an editor |
 | `timertab list` / `timertab print-config` (or `timertab -l`) | Print current config |
 | `timertab status` / `timertab status --json` | Show last run, next trigger, and result for each job |
 | `timertab status <id>` | Show detailed runtime state, generated unit definitions, file locations, and diagnostic commands |

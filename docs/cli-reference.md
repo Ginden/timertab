@@ -61,6 +61,7 @@ Generated unit files live under the target manager's unit directory:
 | `timertab print-path` | Print the resolved config path |
 | `timertab validate --config <path>` | Validate a config file and print `ok` on success |
 | `timertab edit` | Open the config in an editor, validate it, save it, and usually apply it |
+| `timertab apply` | Reconcile systemd units to match the config without opening an editor |
 | `timertab diff` | Preview unit file creates/modifies/deletes without writing |
 | `timertab status` | Show summary status for configured jobs |
 | `timertab status <id>` | Show a detailed report for one job |
@@ -168,6 +169,32 @@ Flags:
 Notes:
 
 - A deprecated hidden `--dry-run` flag still exists in code. `timertab diff` is the preferred preview flow.
+
+## `timertab apply`
+
+Usage:
+
+```bash
+timertab apply [--config <path>] [--no-commit]
+```
+
+Behavior:
+
+- Loads and validates the config file; fails fast without touching `systemd` when
+  the config is invalid (no writes, no prune).
+- Persists auto-generated job IDs back into the YAML the same way `edit` does,
+  preserving comments and formatting.
+- Checks the `systemd >= 247` baseline.
+- Runs the same reconcile pipeline as `edit`: writes unit files, reloads the manager
+  when unit files changed, prunes stale managed units, and enables/starts or
+  disables/stops timers as needed.
+- Auto-commits the config when ID injection changed the file, unless `--no-commit`
+  is set or `git.auto_commit` is disabled.
+
+Use `apply` after restoring the config from git or a backup, after `edit --no-apply`,
+or from scripts and provisioning tools. Applying a config with an empty `jobs: []`
+list is the sanctioned way to remove every timertab-managed unit (the `crontab -r`
+equivalent).
 
 ## `timertab diff`
 
