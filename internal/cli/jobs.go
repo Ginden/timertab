@@ -16,7 +16,10 @@ import (
 const defaultSchemaURL = "https://raw.githubusercontent.com/ginden/timertab/v1.1.0/schema/v1.json"
 
 func newEjectCommand() *cobra.Command {
-	var overridePath string
+	var (
+		overridePath string
+		noCommit     bool
+	)
 
 	cmd := &cobra.Command{
 		Use:   "eject <id>",
@@ -109,11 +112,16 @@ func newEjectCommand() *cobra.Command {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s unit file missing: %s\n", warningPrefix, timerPath)
 			}
 
+			if !noCommit {
+				maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, loaded, "timertab: eject job "+jobID)
+			}
+
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
+	cmd.Flags().BoolVar(&noCommit, "no-commit", false, "Skip git auto-commit of the config change")
 
 	return cmd
 }

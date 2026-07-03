@@ -78,7 +78,7 @@ Raw `systemd:` directive values are passed through unchanged, including systemd 
 
 ### 📝 Git auto-commit
 
-Every successful edit is automatically committed to a local git repo. Full audit trail of every change, with no extra effort. Disable with `--no-commit` or in config.
+Every successful config change (`edit`, `enable`, `disable`, `eject`, `import`) is automatically committed to a local git repo. Full audit trail of every change, with no extra effort. Disable with `--no-commit` or in config.
 
 ## All features
 
@@ -295,7 +295,7 @@ When you run `timertab edit` (or `timertab -e`), here's what happens:
 
 If validation fails at step 2, nothing else happens — no partial writes, no orphaned units.
 
-Successful `timertab edit` apply runs also auto-commit the config file by default. If the config directory is not already inside a git work tree, `timertab` initializes one first, then stages and commits the config change. Disable that once with `timertab edit --no-commit`, or persistently in config:
+Successful config-changing runs (`edit`, `enable`, `disable`, `eject`, `import`) also auto-commit the config file by default. If the config directory is not already inside a git work tree, `timertab` initializes one first, then stages and commits the config change. Disable that once with `--no-commit`, or persistently in config:
 
 ```yaml
 git:

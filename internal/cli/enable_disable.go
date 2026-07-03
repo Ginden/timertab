@@ -20,7 +20,10 @@ func newDisableCommand() *cobra.Command {
 }
 
 func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command {
-	var overridePath string
+	var (
+		overridePath string
+		noCommit     bool
+	)
 
 	cmd := &cobra.Command{
 		Use:   use + " <id>",
@@ -80,11 +83,18 @@ func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command
 
 			cmd.Printf("timertab: saved %s\n", cfgPath)
 			printApplyReport(cmd, report)
+
+			if !noCommit {
+				message := fmt.Sprintf("timertab: %s job %s", use, jobID)
+				maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, loaded, message)
+			}
+
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
+	cmd.Flags().BoolVar(&noCommit, "no-commit", false, "Skip git auto-commit of the config change")
 
 	return cmd
 }

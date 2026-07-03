@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -232,6 +233,187 @@ func TestEditConfigWarnsWhenGitIsUnavailable(t *testing.T) {
 
 	if !strings.Contains(stderr.String(), "git binary is unavailable") {
 		t.Fatalf("stderr missing git warning, got:\n%s", stderr.String())
+	}
+}
+
+// stubGitForCommitCapture routes git calls into a recorder and returns pointers to
+// the captured commit message and a call counter.
+func stubGitForCommitCapture(t *testing.T) (*string, *int) {
+	t.Helper()
+
+	originalFindGitBinary := findGitBinary
+	originalRunGitCommand := runGitCommand
+	t.Cleanup(func() {
+		findGitBinary = originalFindGitBinary
+		runGitCommand = originalRunGitCommand
+	})
+
+	message := new(string)
+	calls := new(int)
+	findGitBinary = func(string) (string, error) { return "/usr/bin/git", nil }
+	runGitCommand = func(_ context.Context, _ string, args ...string) (string, error) {
+		*calls++
+		switch args[0] {
+		case "rev-parse", "init", "add":
+			return "", nil
+		case "commit":
+			for idx := range args {
+				if args[idx] == "-m" && idx+1 < len(args) {
+					*message = args[idx+1]
+				}
+			}
+			return "", nil
+		default:
+			return "", fmt.Errorf("unexpected git args: %v", args)
+		}
+	}
+
+	return message, calls
+}
+
+func TestDisableCommandAutoCommitsWithJobMessage(t *testing.T) {
+	originalApply := runSystemctlApply
+	originalEnsure := ensureSystemdBaseline
+	t.Cleanup(func() {
+		runSystemctlApply = originalApply
+		ensureSystemdBaseline = originalEnsure
+	})
+	ensureSystemdBaseline = func() error { return nil }
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
+		return applyReport{}, nil
+	}
+	message, _ := stubGitForCommitCapture(t)
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	if err := saveConfig(cfgPath, &config.File{
+		Version: 1,
+		Jobs: []config.Job{{
+			ID:   "target",
+			When: config.ScheduleList{"@daily"},
+			Run:  config.ShellCommand("echo target"),
+		}},
+	}); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"disable", "target", "--config", cfgPath})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if *message != "timertab: disable job target" {
+		t.Fatalf("commit message = %q, want disable job message", *message)
+	}
+}
+
+func TestDisableCommandNoCommitSkipsAutoCommit(t *testing.T) {
+	originalApply := runSystemctlApply
+	originalEnsure := ensureSystemdBaseline
+	t.Cleanup(func() {
+		runSystemctlApply = originalApply
+		ensureSystemdBaseline = originalEnsure
+	})
+	ensureSystemdBaseline = func() error { return nil }
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
+		return applyReport{}, nil
+	}
+	_, calls := stubGitForCommitCapture(t)
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	if err := saveConfig(cfgPath, &config.File{
+		Version: 1,
+		Jobs: []config.Job{{
+			ID:   "target",
+			When: config.ScheduleList{"@daily"},
+			Run:  config.ShellCommand("echo target"),
+		}},
+	}); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"disable", "target", "--config", cfgPath, "--no-commit"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if *calls != 0 {
+		t.Fatalf("git calls = %d, want 0 with --no-commit", *calls)
+	}
+}
+
+func TestEjectCommandAutoCommitsWithJobMessage(t *testing.T) {
+	originalResolveCurrentUID := resolveCurrentUID
+	originalResolveSystemdUnitDir := resolveSystemdUnitDir
+	t.Cleanup(func() {
+		resolveCurrentUID = originalResolveCurrentUID
+		resolveSystemdUnitDir = originalResolveSystemdUnitDir
+	})
+	resolveCurrentUID = func() (uint32, error) { return 1000, nil }
+	unitDir := t.TempDir()
+	resolveSystemdUnitDir = func(uint32) (string, error) { return unitDir, nil }
+	message, _ := stubGitForCommitCapture(t)
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+	if err := saveConfig(cfgPath, &config.File{
+		Version: 1,
+		Jobs: []config.Job{{
+			ID:   "demo",
+			When: config.ScheduleList{"@daily"},
+			Run:  config.ShellCommand("echo demo"),
+		}},
+	}); err != nil {
+		t.Fatalf("saveConfig() error = %v", err)
+	}
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"eject", "demo", "--config", cfgPath})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if *message != "timertab: eject job demo" {
+		t.Fatalf("commit message = %q, want eject job message", *message)
+	}
+}
+
+func TestImportCommandAutoCommitsWithCountMessage(t *testing.T) {
+	originalApply := runSystemctlApply
+	originalEnsure := ensureSystemdBaseline
+	originalIsTTY := importOutputIsTTY
+	t.Cleanup(func() {
+		runSystemctlApply = originalApply
+		ensureSystemdBaseline = originalEnsure
+		importOutputIsTTY = originalIsTTY
+	})
+	ensureSystemdBaseline = func() error { return nil }
+	runSystemctlApply = func(_ context.Context, _ *config.File) (applyReport, error) {
+		return applyReport{}, nil
+	}
+	importOutputIsTTY = func(io.Writer) bool { return true }
+	message, _ := stubGitForCommitCapture(t)
+	t.Setenv("EDITOR", "true")
+
+	cfgPath := filepath.Join(t.TempDir(), "timertab.yaml")
+
+	cmd := NewRootCommand()
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetIn(strings.NewReader("30 6 * * * /usr/local/bin/backup.sh\n"))
+	cmd.SetArgs([]string{"import", "--stdin", "--config", cfgPath})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if *message != "timertab: import 1 job(s)" {
+		t.Fatalf("commit message = %q, want import count message", *message)
 	}
 }
 

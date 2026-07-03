@@ -53,6 +53,7 @@ func newImportCommand() *cobra.Command {
 		forceStdout  bool
 		noApply      bool
 		dryRun       bool
+		noCommit     bool
 		overridePath string
 	)
 
@@ -101,7 +102,7 @@ func newImportCommand() *cobra.Command {
 				return importDryRun(cmd, cfgPath, imported)
 			}
 
-			return importInteractive(cmd, cfgPath, imported, noApply)
+			return importInteractive(cmd, cfgPath, imported, noApply, noCommit)
 		},
 	}
 
@@ -109,6 +110,7 @@ func newImportCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&forceStdout, "stdout", false, "Force YAML-to-stdout mode even on a TTY")
 	cmd.Flags().BoolVar(&noApply, "no-apply", false, "Merge into config but skip systemd reconcile")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview what would be merged without writing anything")
+	cmd.Flags().BoolVar(&noCommit, "no-commit", false, "Skip git auto-commit of the config change")
 	cmd.Flags().StringVar(&overridePath, "config", "", "Override config path")
 	_ = cmd.Flags().MarkDeprecated("dry-run", "use `--stdout` for YAML export today; review-bundle rendering will replace import-time dry runs")
 
@@ -312,7 +314,7 @@ func importDryRun(cmd *cobra.Command, cfgPath string, imported *config.File) err
 
 // importInteractive opens an editor pre-filled with the imported jobs, then merges
 // the result into the main config and optionally reconciles systemd units.
-func importInteractive(cmd *cobra.Command, cfgPath string, imported *config.File, noApply bool) error {
+func importInteractive(cmd *cobra.Command, cfgPath string, imported *config.File, noApply, noCommit bool) error {
 	// Present jobs without pre-assigned IDs so they're regenerated conflict-free after merge.
 	importedForEdit := &config.File{
 		Schema:  imported.Schema,
@@ -421,6 +423,12 @@ func importInteractive(cmd *cobra.Command, cfgPath string, imported *config.File
 
 	cmd.Printf("timertab: saved %s\n", cfgPath)
 	printApplyReport(cmd, report)
+
+	if !noCommit {
+		message := fmt.Sprintf("timertab: import %d job(s)", merged.Added)
+		maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, existing, message)
+	}
+
 	return nil
 }
 

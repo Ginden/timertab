@@ -255,15 +255,17 @@ Behavior:
 Usage:
 
 ```bash
-timertab enable <id> [--config <path>]
+timertab enable <id> [--config <path>] [--no-commit]
 ```
 
 Behavior:
 
 - Loads the config and sets `jobs[].enabled` to `true` for the selected job.
-- Saves the config file.
+- Saves the config file, preserving user comments and formatting.
 - Checks the `systemd >= 247` baseline.
 - Applies the resulting reconcile plan.
+- Auto-commits the config change (`timertab: enable job <id>`) unless `--no-commit`
+  is set or `git.auto_commit` is disabled.
 
 Output includes the saved config path and the same apply report used by `edit`.
 
@@ -272,15 +274,17 @@ Output includes the saved config path and the same apply report used by `edit`.
 Usage:
 
 ```bash
-timertab disable <id> [--config <path>]
+timertab disable <id> [--config <path>] [--no-commit]
 ```
 
 Behavior:
 
 - Loads the config and sets `jobs[].enabled` to `false` for the selected job.
-- Saves the config file.
+- Saves the config file, preserving user comments and formatting.
 - Checks the `systemd >= 247` baseline.
 - Applies the resulting reconcile plan.
+- Auto-commits the config change (`timertab: disable job <id>`) unless `--no-commit`
+  is set or `git.auto_commit` is disabled.
 
 Output includes the saved config path and the same apply report used by `edit`.
 
@@ -289,16 +293,19 @@ Output includes the saved config path and the same apply report used by `edit`.
 Usage:
 
 ```bash
-timertab eject <id> [--config <path>]
+timertab eject <id> [--config <path>] [--no-commit]
 ```
 
 Behavior:
 
 - Resolves the current generated service and timer names for the job.
 - Removes timertab ownership markers from those unit files if they exist.
-- Removes the job from the config file and saves the updated config.
+- Removes the job from the config file and saves the updated config, preserving
+  user comments and formatting.
 - Does not delete the unit files.
 - Does not call `systemctl`.
+- Auto-commits the config change (`timertab: eject job <id>`) unless `--no-commit`
+  is set or `git.auto_commit` is disabled.
 
 Warnings:
 
@@ -311,7 +318,7 @@ Use `eject` when you want the units to remain as normal standalone `systemd` uni
 Usage:
 
 ```bash
-timertab import [--stdin] [--stdout] [--config <path>] [--no-apply]
+timertab import [--stdin] [--stdout] [--config <path>] [--no-apply] [--no-commit]
 ```
 
 Input behavior:
@@ -345,7 +352,9 @@ Merge behavior:
 Apply behavior:
 
 - In interactive mode, `--no-apply` saves the merged config without reconciling `systemd`.
-- Without `--no-apply`, import saves the config and applies it.
+- Without `--no-apply`, import saves the config and applies it, then auto-commits the
+  config change (`timertab: import N job(s)`) unless `--no-commit` is set or
+  `git.auto_commit` is disabled.
 - In stdout mode, import does not touch the config file or `systemd`.
 
 Notes:

@@ -36,10 +36,24 @@ func maybeAutoCommitEditedConfig(
 	before, after *config.File,
 	changed bool,
 ) {
-	// Auto-commit is a convenience feature layered on top of a successful save/apply.
-	// Any git failure must degrade to a warning rather than turning config edits into
-	// a partial or failed user operation.
-	if !changed || after == nil || !after.AutoCommitEnabled() {
+	if !changed || after == nil {
+		return
+	}
+	maybeAutoCommitConfig(ctx, stderr, cfgPath, after, buildAutoCommitMessage(before, after))
+}
+
+// maybeAutoCommitConfig commits the config file with the given message.
+// Auto-commit is a convenience feature layered on top of a successful save/apply.
+// Any git failure must degrade to a warning rather than turning config edits into
+// a partial or failed user operation.
+func maybeAutoCommitConfig(
+	ctx context.Context,
+	stderr io.Writer,
+	cfgPath string,
+	cfg *config.File,
+	message string,
+) {
+	if cfg == nil || !cfg.AutoCommitEnabled() {
 		return
 	}
 
@@ -63,7 +77,6 @@ func maybeAutoCommitEditedConfig(
 		return
 	}
 
-	message := buildAutoCommitMessage(before, after)
 	if _, err := runGitCommand(ctx, dir, "commit", "-m", message, "--", fileName); err != nil {
 		if isNothingToCommitError(err) {
 			return
