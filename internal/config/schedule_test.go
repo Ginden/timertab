@@ -110,6 +110,26 @@ func TestCompileTimerDirectivesCronStarStepDayFieldsUseVixieSemantics(t *testing
 	}
 }
 
+func TestCompileTimerDirectivesInLocationAppendsZoneToCalendarOnly(t *testing.T) {
+	t.Parallel()
+
+	got, err := CompileTimerDirectivesInLocation(ScheduleList{
+		"0 9 * * Mon",
+		"@reboot",
+	}, "America/New_York")
+	if err != nil {
+		t.Fatalf("CompileTimerDirectivesInLocation() error = %v", err)
+	}
+
+	want := []string{
+		"OnCalendar=Mon *-*-* 09:00:00 America/New_York",
+		"OnBootSec=0",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("CompileTimerDirectivesInLocation() mismatch\nwant:\n%s\n\ngot:\n%s", strings.Join(want, "\n"), strings.Join(got, "\n"))
+	}
+}
+
 func TestCompileTimerDirectivesErrors(t *testing.T) {
 	t.Parallel()
 

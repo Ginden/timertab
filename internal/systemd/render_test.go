@@ -223,6 +223,30 @@ func TestRenderJobUnitsIncludesRandomizedDelaySecWhenJitterIsSet(t *testing.T) {
 	}
 }
 
+func TestRenderJobUnitsAppendsTimezoneToCalendarSchedules(t *testing.T) {
+	t.Parallel()
+
+	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
+		ID:   "zoned-job",
+		When: config.ScheduleList{"0 9 * * Mon", "@reboot"},
+		TZ:   "America/New_York",
+		Run:  config.ShellCommand("echo hi"),
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	if !strings.Contains(units.TimerContent, "OnCalendar=Mon *-*-* 09:00:00 America/New_York\n") {
+		t.Fatalf("TimerContent missing timezone calendar:\n%s", units.TimerContent)
+	}
+	if !strings.Contains(units.TimerContent, "OnBootSec=0\n") {
+		t.Fatalf("TimerContent missing reboot schedule:\n%s", units.TimerContent)
+	}
+	if strings.Contains(units.TimerContent, "OnBootSec=0 America/New_York") {
+		t.Fatalf("TimerContent should not append timezone to OnBootSec:\n%s", units.TimerContent)
+	}
+}
+
 func TestRenderJobUnitsIncludesServiceLimits(t *testing.T) {
 	t.Parallel()
 

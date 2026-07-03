@@ -109,6 +109,10 @@ func (s ScheduleList) MarshalYAML() (any, error) {
 }
 
 func CompileTimerDirectives(when ScheduleList) ([]string, error) {
+	return CompileTimerDirectivesInLocation(when, "")
+}
+
+func CompileTimerDirectivesInLocation(when ScheduleList, tz string) ([]string, error) {
 	if len(when) == 0 {
 		return nil, fmt.Errorf("when is required")
 	}
@@ -119,10 +123,27 @@ func CompileTimerDirectives(when ScheduleList) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("when[%d] %q: %w", idx, schedule, err)
 		}
-		out = append(out, directives...)
+		out = append(out, appendCalendarTimezone(directives, tz)...)
 	}
 
 	return out, nil
+}
+
+func appendCalendarTimezone(directives []string, tz string) []string {
+	trimmedTZ := strings.TrimSpace(tz)
+	if trimmedTZ == "" {
+		return directives
+	}
+
+	out := make([]string, len(directives))
+	for idx, directive := range directives {
+		if strings.HasPrefix(directive, "OnCalendar=") {
+			out[idx] = directive + " " + trimmedTZ
+			continue
+		}
+		out[idx] = directive
+	}
+	return out
 }
 
 func compileScheduleToTimerDirectives(value string) ([]string, error) {

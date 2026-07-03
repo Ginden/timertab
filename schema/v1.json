@@ -200,6 +200,11 @@
             }
           ]
         },
+        "tz": {
+          "type": "string",
+          "minLength": 1,
+          "description": "IANA time zone name for this job's calendar schedules, e.g. 'UTC' or 'America/New_York'. @reboot schedules are unaffected."
+        },
         "run": {
           "description": "Command to execute. A string is shell shorthand and runs as '/bin/sh -lc \"<command>\"'. A list of strings is an explicit argv executed directly without a shell layer.",
           "oneOf": [

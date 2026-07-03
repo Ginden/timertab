@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/spf13/cobra"
@@ -148,6 +149,7 @@ func importCrontab(raw string) (*config.File, []string, error) {
 	globalEnv := make(map[string]string)
 	warnings := make([]string, 0)
 	var prevComment string
+	var currentTZ string
 
 	scanner := bufio.NewScanner(strings.NewReader(raw))
 	for lineNo := 1; scanner.Scan(); lineNo++ {
@@ -165,6 +167,15 @@ func importCrontab(raw string) (*config.File, []string, error) {
 
 		if key, value, ok := parseCrontabEnv(line); ok {
 			prevComment = ""
+			if key == "CRON_TZ" {
+				if _, err := time.LoadLocation(value); err != nil {
+					warnings = append(warnings, fmt.Sprintf("line %d: ignoring CRON_TZ=%q — invalid time zone", lineNo, value))
+					currentTZ = ""
+					continue
+				}
+				currentTZ = value
+				continue
+			}
 			if reason, ignored := ignoredCrontabEnv[key]; ignored {
 				warnings = append(warnings, fmt.Sprintf("line %d: ignoring %s=%q — %s", lineNo, key, value, reason))
 				continue
@@ -203,6 +214,7 @@ func importCrontab(raw string) (*config.File, []string, error) {
 		job := config.Job{
 			Name: prevComment,
 			When: config.ScheduleList{schedule},
+			TZ:   currentTZ,
 			Run:  config.ShellCommand(command),
 		}
 		if len(globalEnv) > 0 {

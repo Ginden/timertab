@@ -206,6 +206,58 @@ func TestImportCrontabEnvStripsMatchingQuotes(t *testing.T) {
 	}
 }
 
+func TestImportCrontabMapsCRONTZToJobTimezone(t *testing.T) {
+	input := strings.Join([]string{
+		`CRON_TZ="America/New_York"`,
+		`0 9 * * * echo east`,
+		`CRON_TZ=UTC`,
+		`0 10 * * * echo utc`,
+	}, "\n")
+
+	cfg, warnings, err := importCrontab(input)
+	if err != nil {
+		t.Fatalf("importCrontab error = %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", warnings)
+	}
+	if len(cfg.Jobs) != 2 {
+		t.Fatalf("jobs count = %d, want 2", len(cfg.Jobs))
+	}
+	if got := cfg.Jobs[0].TZ; got != "America/New_York" {
+		t.Fatalf("jobs[0].tz = %q, want America/New_York", got)
+	}
+	if got := cfg.Jobs[1].TZ; got != "UTC" {
+		t.Fatalf("jobs[1].tz = %q, want UTC", got)
+	}
+	for idx, job := range cfg.Jobs {
+		if _, ok := job.Env["CRON_TZ"]; ok {
+			t.Fatalf("jobs[%d].env should not contain CRON_TZ", idx)
+		}
+	}
+}
+
+func TestImportCrontabWarnsForInvalidCRONTZ(t *testing.T) {
+	input := strings.Join([]string{
+		`CRON_TZ=No/Such_Zone`,
+		`0 9 * * * echo local`,
+	}, "\n")
+
+	cfg, warnings, err := importCrontab(input)
+	if err != nil {
+		t.Fatalf("importCrontab error = %v", err)
+	}
+	if len(cfg.Jobs) != 1 {
+		t.Fatalf("jobs count = %d, want 1", len(cfg.Jobs))
+	}
+	if cfg.Jobs[0].TZ != "" {
+		t.Fatalf("jobs[0].tz = %q, want empty", cfg.Jobs[0].TZ)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "CRON_TZ") {
+		t.Fatalf("warnings = %v, want CRON_TZ warning", warnings)
+	}
+}
+
 func TestImportCrontabPercentSyntax(t *testing.T) {
 	input := strings.Join([]string{
 		`0 9 * * * echo 100\% done`,

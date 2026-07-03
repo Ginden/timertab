@@ -74,7 +74,7 @@ func RenderJobUnits(targetUID uint32, instanceID string, job config.Job) (Render
 	serviceName := baseName + ".service"
 	timerName := baseName + ".timer"
 
-	timerDirectives, err := config.CompileTimerDirectives(job.When)
+	timerDirectives, err := config.CompileTimerDirectivesInLocation(job.When, job.TZ)
 	if err != nil {
 		return RenderedUnits{}, err
 	}

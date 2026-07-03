@@ -338,6 +338,11 @@ func validateJob(job Job) error {
 			return err
 		}
 	}
+	if strings.TrimSpace(job.TZ) != "" {
+		if _, err := time.LoadLocation(strings.TrimSpace(job.TZ)); err != nil {
+			return fmt.Errorf("tz %q is not a valid IANA time zone", job.TZ)
+		}
+	}
 	if err := validateEnv(job.Env); err != nil {
 		return fmt.Errorf("env: %w", err)
 	}

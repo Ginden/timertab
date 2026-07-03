@@ -173,6 +173,7 @@ jobs:
     when:
       - "0 9 * * *"
       - "0 18 * * *"
+    tz: "America/New_York"
     run:
       - /usr/bin/rsync
       - -a
@@ -190,6 +191,7 @@ jobs:
 ```
 
 String `run` values are shorthand for `["/bin/sh", "-lc", "..."]`. Use the list form when you want exact argv execution without an extra shell.
+Set `tz: "Area/Location"` when a job should follow a specific IANA time zone instead of the machine's local time.
 In generated timertab-owned directives, literal `%` characters in commands, environment values, and `cwd` are escaped for systemd so values such as `date +%F` run as written.
 Raw `systemd:` directive values are not escaped.
 

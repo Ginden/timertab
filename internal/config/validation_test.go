@@ -120,6 +120,30 @@ func TestValidateSystemdOverridesAcceptsSpecifiersAndDuplicates(t *testing.T) {
 	}
 }
 
+func TestValidateJobTimezone(t *testing.T) {
+	cfg := &File{
+		Version: 1,
+		Jobs: []Job{{
+			ID:   "demo",
+			When: ScheduleList{"@daily"},
+			TZ:   "America/New_York",
+			Run:  ShellCommand("echo demo"),
+		}},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil", err)
+	}
+
+	cfg.Jobs[0].TZ = "No/Such_Zone"
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatalf("Validate() error = nil, want invalid timezone")
+	}
+	if !strings.Contains(err.Error(), "tz") {
+		t.Fatalf("Validate() error = %q, want tz mention", err.Error())
+	}
+}
+
 func TestLoadFromBytesRejectsInvalidDirectiveNameViaSchema(t *testing.T) {
 	input := `version: 1
 jobs:

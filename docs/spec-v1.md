@@ -37,6 +37,7 @@ jobs:
   - id: "npm-cache-verify"
     name: "NPM cache verify"
     when: "@hourly"
+    tz: "UTC"
     run: "npm --global cache verify"
     env:
       NPM_CONFIG_PREFIX: "/home/user/.npm-global"
@@ -58,7 +59,7 @@ Top-level optional fields:
 Job fields:
 
 - required: `when`, `run`
-- optional: `id`, `name`, `env`, `cwd`, `enabled`, `persistent`, `jitter`, `limits`, `systemd`, `on_success`, `on_failure`
+- optional: `id`, `name`, `tz`, `env`, `cwd`, `enabled`, `persistent`, `jitter`, `limits`, `systemd`, `on_success`, `on_failure`
 
 ### 4.1 `id`
 
@@ -88,6 +89,17 @@ Supported values:
 Unsupported in v1:
 
 - cron seconds/year extensions
+
+### 4.2.1 `tz`
+
+`tz` is an optional IANA time zone name for calendar schedules:
+
+```yaml
+tz: "America/New_York"
+```
+
+When set, generated `OnCalendar=` values include the zone suffix. `@reboot` schedules are
+not calendar schedules and are unaffected.
 
 ### 4.3 `run`
 
@@ -120,7 +132,6 @@ run:
   - -lc
   - echo ok
 ```
-- `CRON_TZ`
 
 ## 5. Hook Semantics
 
