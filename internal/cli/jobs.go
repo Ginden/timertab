@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/ginden/timertab/internal/config"
 )
@@ -38,7 +39,11 @@ func newEjectCommand() *cobra.Command {
 				return err
 			}
 
-			loaded, err := config.LoadFromFile(cfgPath)
+			raw, err := os.ReadFile(cfgPath)
+			if err != nil {
+				return err
+			}
+			loaded, err := config.LoadFromBytes(raw)
 			if err != nil {
 				return err
 			}
@@ -79,8 +84,14 @@ func newEjectCommand() *cobra.Command {
 				return err
 			}
 
+			preJobs := make([]config.Job, len(loaded.Jobs))
+			copy(preJobs, loaded.Jobs)
+
 			loaded.Jobs = append(loaded.Jobs[:jobIndex], loaded.Jobs[jobIndex+1:]...)
-			if err := saveConfig(cfgPath, loaded); err != nil {
+			err = savePatchedConfig(cfgPath, raw, loaded, preJobs, func(jobsNode *yaml.Node) error {
+				return removeJobNode(jobsNode, jobIndex)
+			})
+			if err != nil {
 				return err
 			}
 
@@ -133,15 +144,15 @@ func saveConfig(path string, loaded *config.File) error {
 		return err
 	}
 
+	return writeConfigFile(path, out)
+}
+
+func writeConfigFile(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
 
-	if err := os.WriteFile(path, out, 0o644); err != nil {
-		return err
-	}
-
-	return nil
+	return os.WriteFile(path, data, 0o644)
 }
 
 func indexOfJobID(jobs []config.Job, id string) int {

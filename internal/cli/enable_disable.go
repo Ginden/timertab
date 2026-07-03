@@ -2,9 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/ginden/timertab/internal/config"
 )
@@ -41,7 +43,11 @@ func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command
 				return err
 			}
 
-			loaded, err := config.LoadFromFile(cfgPath)
+			raw, err := os.ReadFile(cfgPath)
+			if err != nil {
+				return err
+			}
+			loaded, err := config.LoadFromBytes(raw)
 			if err != nil {
 				return err
 			}
@@ -56,7 +62,10 @@ func newSetEnabledCommand(use string, enabled bool, short string) *cobra.Command
 
 			loaded.Jobs[jobIndex].Enabled = boolPtr(enabled)
 
-			if err := saveConfig(cfgPath, loaded); err != nil {
+			err = savePatchedConfig(cfgPath, raw, loaded, loaded.Jobs, func(jobsNode *yaml.Node) error {
+				return setJobEnabledNode(jobsNode.Content[jobIndex], enabled)
+			})
+			if err != nil {
 				return err
 			}
 

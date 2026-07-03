@@ -203,58 +203,15 @@ func jobIDsChanged(before []string, after []config.Job) bool {
 }
 
 func injectGeneratedIDsIntoYAML(raw []byte, normalized *config.File) ([]byte, error) {
-	var root yaml.Node
-	if err := yaml.Unmarshal(raw, &root); err != nil {
-		return nil, fmt.Errorf("parse yaml: %w", err)
-	}
-	if root.Kind != yaml.DocumentNode || len(root.Content) != 1 {
-		return nil, fmt.Errorf("invalid yaml document structure")
-	}
-
-	doc := root.Content[0]
-	if doc.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("yaml root must be a mapping")
-	}
-
-	jobsNode := mappingNodeValue(doc, "jobs")
-	if jobsNode == nil {
-		return nil, fmt.Errorf("jobs key not found")
-	}
-	if jobsNode.Kind != yaml.SequenceNode {
-		return nil, fmt.Errorf("jobs must be a sequence")
-	}
-	if len(jobsNode.Content) != len(normalized.Jobs) {
-		return nil, fmt.Errorf("jobs length mismatch")
-	}
-
 	// Patch only the missing ids back into the original node tree so comments and
 	// field ordering survive automatic ID generation.
-	for idx, jobNode := range jobsNode.Content {
-		if jobNode.Kind != yaml.MappingNode {
-			return nil, fmt.Errorf("jobs[%d] must be a mapping", idx)
+	return patchConfigYAML(raw, func(doc *yaml.Node) error {
+		jobsNode, err := jobsSequenceNode(doc)
+		if err != nil {
+			return err
 		}
-		if mappingNodeValue(jobNode, "id") != nil {
-			continue
-		}
-
-		jobNode.Content = append(jobNode.Content,
-			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "id"},
-			&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: normalized.Jobs[idx].ID},
-		)
-	}
-
-	var out bytes.Buffer
-	encoder := yaml.NewEncoder(&out)
-	encoder.SetIndent(2)
-	if err := encoder.Encode(&root); err != nil {
-		_ = encoder.Close()
-		return nil, fmt.Errorf("encode yaml: %w", err)
-	}
-	if err := encoder.Close(); err != nil {
-		return nil, err
-	}
-
-	return out.Bytes(), nil
+		return patchMissingJobIDs(jobsNode, normalized.Jobs)
+	})
 }
 
 func mappingNodeValue(node *yaml.Node, key string) *yaml.Node {

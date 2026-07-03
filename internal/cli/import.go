@@ -13,11 +13,14 @@ import (
 	"unicode"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/ginden/timertab/internal/config"
 )
 
 var validImportedEnv = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+var importOutputIsTTY = writerIsTTY
 
 // ignoredCrontabEnv lists global crontab variables that have no useful systemd equivalent.
 // They are filtered out with a per-line warning instead of being propagated to job env.
@@ -80,7 +83,7 @@ func newImportCommand() *cobra.Command {
 			}
 
 			// Stdout/pipe mode: no TTY on stdout, or forced via --stdout flag.
-			if forceStdout || (!dryRun && !writerIsTTY(cmd.OutOrStdout())) {
+			if forceStdout || (!dryRun && !importOutputIsTTY(cmd.OutOrStdout())) {
 				out, err := imported.MarshalYAML()
 				if err != nil {
 					return err
@@ -376,6 +379,10 @@ func importInteractive(cmd *cobra.Command, cfgPath string, imported *config.File
 	if err != nil {
 		return err
 	}
+	// Raw bytes drive the comment-preserving node patch; a missing file simply
+	// falls back to canonical marshaling inside savePatchedConfig.
+	existingRaw, _ := os.ReadFile(cfgPath)
+	existingCount := len(existing.Jobs)
 
 	merged := mergeImportedJobs(existing.Jobs, editedConfig.Jobs)
 	if merged.Skipped > 0 {
@@ -391,7 +398,10 @@ func importInteractive(cmd *cobra.Command, cfgPath string, imported *config.File
 		return fmt.Errorf("merge failed: %w", err)
 	}
 
-	if err := saveConfig(cfgPath, existing); err != nil {
+	err = savePatchedConfig(cfgPath, existingRaw, existing, existing.Jobs[:existingCount], func(jobsNode *yaml.Node) error {
+		return appendJobNodes(jobsNode, existing.Jobs[existingCount:])
+	})
+	if err != nil {
 		return err
 	}
 

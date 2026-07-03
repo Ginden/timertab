@@ -81,12 +81,15 @@ Human-oriented `status` output uses color according to the global `--color=auto|
 
 ## YAML Preservation
 
-`timertab edit` tries to preserve the user's formatting and comments.
+Commands that write the config file (`edit`, `enable`, `disable`, `eject`, `import`) try
+to preserve the user's formatting and comments.
 
 That preservation is best-effort:
 
-- if validation succeeds and no IDs need to be inserted, the original YAML bytes are preserved
+- if validation succeeds and no IDs need to be inserted, `edit` preserves the original YAML bytes
 - if IDs must be generated, `timertab` patches them into the parsed YAML tree
-- if that patching fails, it falls back to canonical re-marshalling
+- `enable`/`disable` patch only the job's `enabled:` scalar, `eject` removes only the
+  job's sequence entry, and `import` appends new job entries to the `jobs:` sequence
+- if node patching fails, all of them fall back to canonical re-marshalling
 
 So comment/layout preservation is intentional, but not a hard guarantee under every mutation path.
