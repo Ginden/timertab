@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-07-09
+
+### Bug Fixes
+
+- Preserve config comments in enable/disable/eject/import
+- Preserve edit abort prompt input
+
+### Documentation
+
+- Consolidate agent notes into AGENTS.md
+
+### Features
+
+- Escape % characters in unit rendering Add proper escaping of % to %% in systemdQuoted and systemdPath, update documentation to explain raw directive handling and escaping, and extend tests and golden files for percent specifiers.
+- @reboot timers enabled but not started Separate enable and start steps for @reboot‑only timers; add skip‑start logic and docs.
+- Auto-commit config changes from enable/disable/eject/import
+- Add apply command for non-interactive reconcile
+
+### Miscellaneous Tasks
+
+- Update CHANGELOG.md for v1.2.0
+
+### Other
+
+- 2026-07-03 23:50:49+02:00 WIP: main
+- Validate raw systemd overrides
+- Fix CLI validation and status papercuts
+- Match cron star-step day semantics
+- Add per-job timezone support
+- Add noninteractive job add and rm
+- Add systemd-analyze render verification test
+- Add adopt command for ejected units
+- Add config locking and private file mode
+- Add doctor command for timertab unit visibility
+- Refresh agent and v1 spec docs
+
 ## [1.2.0] - 2026-05-08
 
 ### Features
