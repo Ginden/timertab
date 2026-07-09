@@ -92,7 +92,12 @@ func editConfig(cmd *cobra.Command, cfgPath string, noApply, dryRun, noCommit bo
 		// Run via shell so values like EDITOR=\"code --wait\" work.
 		editCmd := exec.Command("sh", "-lc", `$EDITOR_CMD "$1"`, "timertab-editor", tmpName)
 		editCmd.Env = append(os.Environ(), "EDITOR_CMD="+editor)
-		editCmd.Stdin = cmd.InOrStdin()
+		// Passing a buffered reader to exec.Cmd causes os/exec to copy (and consume)
+		// it before the editor exits. Keep such input for the invalid-config prompt;
+		// an actual terminal remains available to interactive editors.
+		if input, ok := cmd.InOrStdin().(*os.File); ok {
+			editCmd.Stdin = input
+		}
 		editCmd.Stdout = cmd.OutOrStdout()
 		editCmd.Stderr = cmd.ErrOrStderr()
 		if err := editCmd.Run(); err != nil {

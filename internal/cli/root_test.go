@@ -237,10 +237,14 @@ func TestRootCommandListColorAlwaysHighlightsConfig(t *testing.T) {
 	}
 }
 
-func TestRootCommandDoesNotRegisterAddCommand(t *testing.T) {
+func TestRootCommandRegistersAddCommand(t *testing.T) {
 	cmd := NewRootCommand()
-	if found, _, err := cmd.Find([]string{"add"}); err == nil && found != nil && found.Name() == "add" {
-		t.Fatalf("add command should not be registered")
+	found, _, err := cmd.Find([]string{"add"})
+	if err != nil {
+		t.Fatalf("Find(add) error = %v", err)
+	}
+	if found == nil || found.Name() != "add" {
+		t.Fatalf("Find(add) command = %#v, want add command", found)
 	}
 }
 
