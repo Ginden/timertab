@@ -224,5 +224,5 @@ func runCommandFromArgs(args []string) config.RunCommand {
 	if len(args) == 1 {
 		return config.ShellCommand(args[0])
 	}
-	return config.ExecCommand(args[0], args[1:]...)
+	return config.ExecCommand(args...)
 }

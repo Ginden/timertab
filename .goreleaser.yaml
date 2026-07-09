@@ -51,6 +51,7 @@ nfpms:
     description: Manage native systemd timers from a crontab-like YAML config.
     license: MIT
     formats:
+      - archlinux
       - deb
       - rpm
     bindir: /usr/bin

@@ -117,7 +117,8 @@ Or from a local clone:
 make install
 ```
 
-Tagged GitHub releases publish Linux `tar.gz`, `.deb`, and `.rpm` assets for both `amd64` and `arm64`.
+Tagged GitHub releases publish Linux `tar.gz`, `.pkg.tar.zst`, `.deb`, and `.rpm`
+assets for both `amd64` and `arm64`.
 
 If you want a native package instead of `go install`, download one from the latest release:
 
@@ -131,6 +132,9 @@ sudo dpkg -i timertab_*_arm64.deb
 sudo rpm -i timertab-*.x86_64.rpm
 # or
 sudo rpm -i timertab-*.aarch64.rpm
+
+# Arch Linux and derivatives
+sudo pacman -U timertab-*.pkg.tar.zst
 ```
 
 ### Create your first job

@@ -84,6 +84,33 @@ jobs:
           version: "~> v2"
           args: check
 
+  archlinux-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build Arch Linux package
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean --skip=publish
+
+      - name: Upload Arch Linux package
+        uses: actions/upload-artifact@v4
+        with:
+          name: timertab-archlinux-packages
+          path: dist/*.pkg.tar.zst
+          if-no-files-found: error
+
   workflow-lint:
     runs-on: ubuntu-latest
     steps:
