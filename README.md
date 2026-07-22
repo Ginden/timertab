@@ -117,8 +117,8 @@ Or from a local clone:
 make install
 ```
 
-Tagged GitHub releases publish Linux `tar.gz`, `.pkg.tar.zst`, `.deb`, and `.rpm`
-assets for both `amd64` and `arm64`.
+Tagged GitHub releases publish standalone static Linux binaries, `tar.gz`,
+`.pkg.tar.zst`, `.deb`, and `.rpm` assets for both `amd64` and `arm64`.
 
 If you want a native package instead of `go install`, download one from the latest release:
 

@@ -116,7 +116,8 @@ Tagging `v*` triggers GitHub Actions release automation.
 
 Current release flow:
 
-- Linux binaries via GoReleaser (`amd64`, `arm64`)
+- Standalone static Linux binaries via GoReleaser (`amd64`, `arm64`)
+- Linux `tar.gz` archives via GoReleaser (`amd64`, `arm64`)
 - Linux `.pkg.tar.zst`, `.deb`, and `.rpm` packages via GoReleaser (`amd64`, `arm64`)
 - Multi-arch import/render container image published to `ghcr.io/ginden/timertab-import`
 - GitHub-generated release notes/changelog
