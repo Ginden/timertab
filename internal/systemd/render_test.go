@@ -149,6 +149,30 @@ func TestRenderJobUnitsErrors(t *testing.T) {
 	}
 }
 
+func TestRenderJobUnitsWarnsAgainstDirectEdits(t *testing.T) {
+	t.Parallel()
+
+	units, err := RenderJobUnits(1000, config.DefaultInstanceID, config.Job{
+		ID:   "managed-job",
+		When: config.ScheduleList{"@hourly"},
+		Run:  config.ShellCommand("echo hi"),
+	})
+	if err != nil {
+		t.Fatalf("RenderJobUnits() error = %v", err)
+	}
+
+	for name, content := range map[string]string{
+		units.ServiceName: units.ServiceContent,
+		units.TimerName:   units.TimerContent,
+	} {
+		for _, line := range []string{generatedWarningLine, automationWarningLine, editInstructionLine} {
+			if !strings.Contains(content, line+"\n") {
+				t.Errorf("%s missing warning %q:\n%s", name, line, content)
+			}
+		}
+	}
+}
+
 func TestRenderJobUnitsUsesOnBootSecForRebootSchedule(t *testing.T) {
 	t.Parallel()
 
