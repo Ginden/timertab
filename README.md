@@ -96,17 +96,6 @@ Every successful config change (`edit`, `enable`, `disable`, `eject`, `import`) 
 
 ### Install
 
-Ubuntu users can install from the `ppa:ginden/timertab` PPA:
-
-```bash
-sudo add-apt-repository ppa:ginden/timertab
-sudo apt update
-sudo apt install timertab
-```
-
-PPA builds are currently published for Ubuntu 24.04 `noble` and Ubuntu 25.04
-`plucky`.
-
 ```bash
 go install github.com/ginden/timertab/cmd/timertab@latest
 ```

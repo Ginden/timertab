@@ -72,7 +72,7 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
-- Add Launchpad PPA build workflow and Debian packaging Introduce scripts for source package creation, GitHub Actions workflow to build and upload PPA packages, update documentation to mention PPA installation, add complete Debian packaging files (control, rules, changelog, etc.), and add a test helper for temporary working directory handling.
+- Add a test helper for temporary working directory handling.
 - Escape WorkingDirectory paths without quotes
 
 ### Miscellaneous Tasks
@@ -240,5 +240,4 @@ All notable changes to this project will be documented in this file.
 - Some docs changes
 - Render
 - Remove cross-user mode and add command
-
 
