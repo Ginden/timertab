@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-08-14
+
+### Documentation
+
+- Expand timertab skill with recipes and FAQ
+- Align timertab skill with common workflows
+
+### Features
+
+- Add warning comments to generated unit files
+- Add bundled timertab AI skill
+
+### Miscellaneous Tasks
+
+- Update CHANGELOG.md for v1.3.2
+- Drop PPA build infrastructure Removed build-ppa-source script, GitHub Actions workflow, Debian packaging files, and updated documentation to reflect removal of Launchpad PPA support.
+
 ## [1.3.2] - 2026-07-22
 
 ### Features
@@ -72,7 +89,7 @@ All notable changes to this project will be documented in this file.
 
 ### Features
 
-- Add a test helper for temporary working directory handling.
+- Add Launchpad PPA build workflow and Debian packaging Introduce scripts for source package creation, GitHub Actions workflow to build and upload PPA packages, update documentation to mention PPA installation, add complete Debian packaging files (control, rules, changelog, etc.), and add a test helper for temporary working directory handling.
 - Escape WorkingDirectory paths without quotes
 
 ### Miscellaneous Tasks
@@ -240,4 +257,5 @@ All notable changes to this project will be documented in this file.
 - Some docs changes
 - Render
 - Remove cross-user mode and add command
+
 
