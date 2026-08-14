@@ -16,6 +16,17 @@ Treat the YAML file as the source of truth. Each job becomes one native `.servic
 
 Expect Linux with systemd 247 or newer. Non-root invocation manages the current user's systemd manager; root invocation manages the system manager.
 
+### Choose user or root scope first
+
+The invoking UID selects both the config and systemd manager. Treat `timertab` and `sudo timertab` as two separate installations:
+
+| Intent | Timertab command | Native systemd command | Typical config |
+| --- | --- | --- | --- |
+| Run for the current user | `timertab ...` | `systemctl --user ...` | `$HOME/.config/timertab/timertab.yaml` |
+| Run as a machine service | `sudo timertab ...` | `sudo systemctl ...` | `/root/.config/timertab/timertab.yaml` |
+
+Use the same scope for edit, list, status, trigger, logs, and native diagnostics. A job shown by `sudo timertab -l` will normally not appear in `timertab status`, and vice versa. Do not add `sudo` merely because systemd is involved; use it only when the job is intentionally root-owned.
+
 Use this default path unless overridden:
 
 1. `--config PATH`
@@ -26,6 +37,26 @@ Use this default path unless overridden:
 Never hand-edit a timertab-managed unit. Change YAML and apply, or eject the job first when the goal is to own the units manually.
 
 ## Quick start
+
+Most day-to-day use is this small loop:
+
+```bash
+timertab -l                 # read the source-of-truth YAML
+timertab status             # scan every job
+timertab status JOB_ID      # investigate one job
+timertab -e                 # edit, validate, and apply
+```
+
+For root-owned machine jobs, keep the whole loop in root scope:
+
+```bash
+sudo timertab -l
+sudo timertab status
+sudo timertab status JOB_ID
+sudo EDITOR=nano timertab -e
+```
+
+Running bare `timertab` prints command help. `-l` is shorthand for `list`; `-e` is shorthand for `edit`.
 
 Create the first job interactively:
 
@@ -224,6 +255,15 @@ timertab doctor
 
 `status JOB_ID` includes config, unit names and paths, rendered units, recent logs, and diagnostic commands. `doctor` classifies unit files as active, orphaned, other-instance, or ejected/foreign without changing them.
 
+When the combined view is not enough, copy the exact service unit name from `timertab status JOB_ID` and ask systemd directly:
+
+```bash
+systemctl --user status UNIT.service   # user-owned job
+sudo systemctl status UNIT.service    # root-owned job
+```
+
+Use the `.service` unit to inspect the command's latest run. Use the corresponding `.timer` unit to inspect scheduling and activation. Prefer copying names from detailed status over reconstructing generated names by hand.
+
 Run the service immediately without changing its schedule:
 
 ```bash
@@ -295,10 +335,11 @@ Translate the user's goal into a recipe above. Ask only for missing facts that m
 
 Before changing anything:
 
-1. Run `timertab print-path` and `timertab list` for the target config.
-2. Run `timertab status` when runtime state matters and `timertab doctor` when ownership or orphaning matters.
-3. Use `--config PATH` consistently when the user names a non-default config.
-4. Explain whether the proposed action changes YAML, unit files, runtime state, or Git history.
+1. Determine scope from the user's established commands and job ownership. Preserve `sudo` when the user is operating root-owned jobs; preserve non-root scope otherwise. If unclear, inspect both scopes read-only before asking.
+2. Run `timertab print-path` and `timertab list` in the selected scope for the target config.
+3. Run `timertab status` when runtime state matters and `timertab doctor` when ownership or orphaning matters.
+4. Use `--config PATH` consistently when the user names a non-default config.
+5. Explain whether the proposed action changes YAML, unit files, runtime state, or Git history.
 
 Choose the least surprising interface:
 
@@ -330,6 +371,28 @@ No. Timertab writes native systemd units and exits. The systemd manager schedule
 ### Where are my files?
 
 Run `timertab print-path` for YAML. User units normally live in `${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user`; root-managed units live in `/etc/systemd/system`. Run `timertab status JOB_ID` for exact paths.
+
+### Should I use `sudo timertab`?
+
+Use it for jobs that genuinely need root privileges or machine-level service semantics. Root and non-root invocations use different configs, unit directories, managers, journals, and job sets. Once a job is created in one scope, use that same scope for every operation:
+
+```bash
+sudo timertab status JOB_ID
+sudo timertab trigger JOB_ID
+sudo timertab logs JOB_ID
+```
+
+For a user-owned job, omit `sudo` from all three. If unsure where a job lives, compare `timertab -l` with `sudo timertab -l` or compare both status summaries before changing anything.
+
+### How do I choose an editor with sudo?
+
+Pass the variable through sudo's command environment:
+
+```bash
+sudo EDITOR=nano timertab -e
+```
+
+Timertab checks `VISUAL`, then `EDITOR`, then falls back to `editor` and `vi`.
 
 ### Why did timertab create a Git repository or commit?
 
