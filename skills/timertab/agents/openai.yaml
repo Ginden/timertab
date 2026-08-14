@@ -1,0 +1,4 @@
+interface:
+  display_name: "Timertab"
+  short_description: "Manage systemd timers safely with timertab"
+  default_prompt: "Use $timertab to help me create and manage a scheduled job safely."

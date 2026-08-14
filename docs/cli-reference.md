@@ -12,6 +12,7 @@ Global flags:
 
 - `-h`, `--help`: show help
 - `-V`, `--version`: print the build version
+- `--show-ai-skill`: print the bundled timertab skill to stdout
 - `-v`, `--verbose`: increase verbosity; repeat as `-vv` or `-vvv` for more detail
 - `--color auto|always|never`: control ANSI color and syntax highlighting; defaults to `auto`
 
@@ -29,6 +30,8 @@ Color:
 - `--color=never` disables ANSI color.
 - `NO_COLOR` disables color when `--color=auto` is used.
 - Machine-readable output such as `status --json` is not colorized.
+
+`--show-ai-skill` prints the repository skill from `skills/timertab/SKILL.md` exactly as bundled in the binary. It does not read configuration or contact systemd, so it can be redirected into a file for either a user or an AI agent.
 
 Legacy root shorthands are still accepted:
 

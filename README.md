@@ -212,11 +212,16 @@ Raw `systemd:` directive values are not escaped.
 | `timertab render` | Convert crontab input into a review bundle with `timertab.yaml`, rendered units, and `REPORT.md` |
 | `timertab validate` / `timertab validate --config <path>` | Validate a config file without applying |
 | `timertab print-path` (or `timertab --print-path`) | Show where the config file lives |
+| `timertab --show-ai-skill` | Print the bundled timertab skill for users and AI agents |
 
 Config file location:
 - `--config <path>` if provided
 - `${TIMERTAB_CONFIG_DIR}/timertab.yaml` if `TIMERTAB_CONFIG_DIR` is set
 - otherwise `${XDG_CONFIG_HOME:-$HOME/.config}/timertab/timertab.yaml`
+
+The reusable timertab skill is checked into the repository at
+[`skills/timertab/SKILL.md`](skills/timertab/SKILL.md). Print the same skill from
+an installed binary with `timertab --show-ai-skill`.
 
 ### Import or Review an Existing Crontab
 

@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/ginden/timertab/internal/progress"
 	"github.com/ginden/timertab/internal/systemd"
 	"github.com/ginden/timertab/internal/version"
+	timertabskill "github.com/ginden/timertab/skills/timertab"
 )
 
 var ensureSystemdBaseline = systemd.EnsureBaseline
@@ -21,6 +23,7 @@ func NewRootCommand() *cobra.Command {
 	var (
 		verbosity int
 		color     string
+		showSkill bool
 	)
 
 	cmd := &cobra.Command{
@@ -42,6 +45,10 @@ func NewRootCommand() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if showSkill {
+				_, err := io.WriteString(cmd.OutOrStdout(), timertabskill.Content)
+				return err
+			}
 			return cmd.Help()
 		},
 	}
@@ -52,6 +59,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.Version = fmt.Sprintf("%s (%s, %s)", version.Version, version.Commit, version.Date)
 	cmd.SetVersionTemplate("{{printf \"%s\\n\" .Version}}")
 	cmd.Flags().BoolP("version", "V", false, "Print the build version")
+	cmd.Flags().BoolVar(&showSkill, "show-ai-skill", false, "Print the bundled AI skill")
 	cmd.PersistentFlags().CountVarP(&verbosity, "verbose", "v", "Increase verbosity; repeat for more detail")
 	cmd.PersistentFlags().StringVar(&color, "color", string(colorAuto), "Colorize output: auto, always, or never")
 

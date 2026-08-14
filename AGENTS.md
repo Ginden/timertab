@@ -35,6 +35,7 @@ If the README/spec drift from the code, follow the code and update docs to match
 - CLI is implemented for `edit`, `apply`, `add`, `rm`/`remove`, `list`/`print-config`, `print-path`, `validate`, `diff`, `status`, `doctor`, `logs`, `trigger`, `enable`, `disable`, `eject`, `adopt`, `import`, `render`, and shell completion.
 - Legacy root shorthands `-e`, `-l`, and `--print-path` are still supported by argument rewriting.
 - Global verbosity uses `-v`/`-vv`/`-vvv`; version output uses `-V`/`--version`; color uses `--color=auto|always|never`.
+- The repository skill lives at `skills/timertab/SKILL.md`; `timertab --show-ai-skill` prints the bundled copy to stdout.
 - Human-oriented output can use ANSI color and syntax highlighting; machine-readable output stays uncolored.
 - YAML load/schema validation/semantic validation/ID normalization are implemented and covered by tests.
 - Reconcile is implemented: render desired units, detect existing managed units, build deterministic create/update/keep/remove plans, prune stale managed units, write unit files, `daemon-reload`, and enable/start or disable/stop timers as needed. `@reboot`-only timers are enabled but not started during apply.

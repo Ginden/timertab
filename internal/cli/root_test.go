@@ -172,6 +172,30 @@ func TestRootCommandVersionUsesCapitalV(t *testing.T) {
 	}
 }
 
+func TestRootCommandShowAISkill(t *testing.T) {
+	stdout := &bytes.Buffer{}
+	cmd := NewRootCommand()
+	cmd.SetArgs([]string{"--show-ai-skill"})
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	out := stdout.String()
+	for _, want := range []string{
+		"name: timertab\n",
+		"# Use timertab\n",
+		"## Guide the user\n",
+		"## Operate as an AI agent\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("stdout missing %q, got:\n%s", want, out)
+		}
+	}
+}
+
 func TestRootCommandPrintConfigAliasListsConfig(t *testing.T) {
 	originalResolveConfigPath := resolveConfigPath
 	t.Cleanup(func() {
