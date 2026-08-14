@@ -187,8 +187,9 @@ func TestRootCommandShowAISkill(t *testing.T) {
 	for _, want := range []string{
 		"name: timertab\n",
 		"# Use timertab\n",
-		"## Guide the user\n",
-		"## Operate as an AI agent\n",
+		"## Use cases\n",
+		"## AI operating procedure\n",
+		"## FAQ and troubleshooting\n",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("stdout missing %q, got:\n%s", want, out)
