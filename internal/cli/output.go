@@ -109,7 +109,7 @@ func highlight(language, text string) string {
 	if err != nil {
 		return text
 	}
-	style := styles.Get("github")
+	style := styles.Get("github-dark")
 	if style == nil {
 		style = styles.Fallback
 	}
