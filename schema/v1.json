@@ -177,7 +177,7 @@
         "id": {
           "type": "string",
           "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$",
-          "description": "Stable identifier for this job. Optional in user input — auto-generated from the job name or content hash and persisted back to the config file. Must be unique across all jobs."
+          "description": "Stable identifier for this job. Optional in user input — auto-generated from the job name, else from the command it runs, else from a content hash, and persisted back to the config file. Must be unique across all jobs."
         },
         "name": {
           "type": "string",

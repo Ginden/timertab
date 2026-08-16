@@ -434,7 +434,7 @@ Import behavior:
 - Ignores unsupported global variables such as `MAILTO` and `SHELL` with warnings.
 - Strips cron `%` stdin syntax and inline shell comments with warnings.
 - Skips unsupported or invalid entries with warnings instead of aborting the whole import.
-- Generates a v1 config with normalized job IDs.
+- Generates a v1 config with normalized job IDs. Crontab lines rarely carry a comment to use as a name, so IDs are usually derived from the command itself (`docker builder prune` becomes `docker-builder-prune`); see [ID generation](spec-v1.md#41-id).
 
 Merge behavior:
 

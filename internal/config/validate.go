@@ -309,11 +309,21 @@ func (f *File) NormalizeIDs() error {
 	// ID generation happens only after full validation so we never persist synthetic
 	// identifiers for configs that would still be rejected.
 	seen := make(map[string]struct{}, len(f.Jobs))
+	for _, job := range f.Jobs {
+		// Reserve user-chosen IDs up front so generation never claims one that a
+		// later job already spells out.
+		if job.ID != "" {
+			seen[job.ID] = struct{}{}
+		}
+	}
+
+	ambiguous := ambiguousPreferredIDs(f.Jobs)
 	for idx := range f.Jobs {
 		job := &f.Jobs[idx]
-		if job.ID == "" {
-			job.ID = nextGeneratedID(*job, seen)
+		if job.ID != "" {
+			continue
 		}
+		job.ID = nextGeneratedID(*job, seen, ambiguous)
 		if _, exists := seen[job.ID]; exists {
 			return fmt.Errorf("jobs[%d]: duplicate generated id %q", idx, job.ID)
 		}
@@ -321,6 +331,39 @@ func (f *File) NormalizeIDs() error {
 	}
 
 	return nil
+}
+
+// ambiguousPreferredIDs finds the readable IDs that more than one job would want.
+// Those jobs all get a digest suffix instead, so that which job keeps the short
+// name does not depend on the order they happen to appear in the file.
+func ambiguousPreferredIDs(jobs []Job) map[string]struct{} {
+	counts := make(map[string]int, len(jobs))
+	for _, job := range jobs {
+		if job.ID != "" {
+			continue
+		}
+		if preferred := preferredGeneratedID(job); preferred != "" {
+			counts[preferred]++
+		}
+	}
+
+	ambiguous := make(map[string]struct{})
+	for candidate, count := range counts {
+		if count > 1 {
+			ambiguous[candidate] = struct{}{}
+		}
+	}
+	return ambiguous
+}
+
+func preferredGeneratedID(job Job) string {
+	if slug := slugify(job.Name); slug != "" {
+		return slug
+	}
+	if slug, weak := runSlug(job.Run); slug != "" && !weak {
+		return slug
+	}
+	return ""
 }
 
 func validateJob(job Job) error {
@@ -478,34 +521,61 @@ func validateSchedule(v string) error {
 	return nil
 }
 
-func nextGeneratedID(job Job, seen map[string]struct{}) string {
-	// Prefer readable IDs derived from the job name, then fall back to a content
-	// digest so unnamed jobs still get stable identifiers across reloads.
-	if slug := slugify(job.Name); slug != "" {
-		if _, exists := seen[slug]; !exists {
-			return slug
+func nextGeneratedID(job Job, seen, ambiguous map[string]struct{}) string {
+	// Candidates run from most to least descriptive: an explicit name, then the
+	// program the command actually runs, then a content digest so even opaque jobs
+	// get an identifier that is stable across reloads.
+	digest := jobDigest(job)
+	candidates := make([]string, 0, 4)
+
+	// A readable slug that several jobs want is no longer readable shorthand for any
+	// of them, so it is dropped in favour of its disambiguated form.
+	claimable := func(candidate string) bool {
+		_, contested := ambiguous[candidate]
+		return !contested
+	}
+
+	nameSlug := slugify(job.Name)
+	if nameSlug != "" && claimable(nameSlug) {
+		candidates = append(candidates, nameSlug)
+	}
+
+	commandSlug, weak := runSlug(job.Run)
+	switch {
+	case commandSlug == "":
+	case weak:
+		// A bare `ssh` or `docker` names the tool, not the job, so keep it only in
+		// the disambiguated form.
+		candidates = append(candidates, withDigestSuffix(commandSlug, digest))
+	default:
+		if claimable(commandSlug) {
+			candidates = append(candidates, commandSlug)
 		}
-		for n := 2; n < 10000; n++ {
-			candidate := fmt.Sprintf("%s-%d", slug, n)
-			if _, exists := seen[candidate]; !exists {
-				return candidate
-			}
+		candidates = append(candidates, withDigestSuffix(commandSlug, digest))
+	}
+
+	if nameSlug != "" {
+		// Two jobs sharing a name still differ in content; prefer a digest suffix
+		// over a positional counter so the ID does not depend on job order.
+		candidates = append(candidates, withDigestSuffix(nameSlug, digest))
+	}
+	candidates = append(candidates, "job-"+digest)
+
+	for _, candidate := range candidates {
+		if _, exists := seen[candidate]; !exists {
+			return candidate
 		}
 	}
 
-	candidate := "job-" + jobDigest(job)
-	if _, exists := seen[candidate]; !exists {
-		return candidate
-	}
-
+	fallback := candidates[len(candidates)-1]
 	for n := 2; n < 10000; n++ {
-		withSuffix := fmt.Sprintf("%s-%d", candidate, n)
+		withSuffix := fmt.Sprintf("%s-%d", fallback, n)
 		if _, exists := seen[withSuffix]; !exists {
 			return withSuffix
 		}
 	}
 
-	return candidate
+	return fallback
 }
 
 func slugify(input string) string {

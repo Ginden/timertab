@@ -295,7 +295,7 @@ When you run `timertab edit` (or `timertab -e`), here's what happens:
 
 1. Your editor opens the YAML config.
 2. On save, `timertab` validates the config against the schema and semantic rules.
-3. Missing job `id` fields are auto-generated and persisted back to the file.
+3. Missing job `id` fields are auto-generated from the job `name`, or from the command itself (`/opt/publish-metrics.py` -> `publish-metrics`, `docker builder prune` -> `docker-builder-prune`), and persisted back to the file. See [ID generation](docs/spec-v1.md#41-id) for the full rules.
 4. For each job, a `.service` and `.timer` unit is rendered.
 5. Stale units (from removed jobs) are stopped, disabled, and deleted.
 6. New/changed units are written, `daemon-reload` is called when unit files changed, and timers are enabled/started or disabled/stopped only when needed to match the config. `@reboot`-only timers are enabled but not started during apply, so they do not fire immediately.

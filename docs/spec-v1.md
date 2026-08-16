@@ -68,11 +68,36 @@ Job fields:
 - Pattern: `^[a-z0-9][a-z0-9._-]{0,63}$`
 - Must be unique in `jobs[]`
 
-ID generation:
+ID generation, first match wins:
 
-1. `slug(name)` when available and unique
-2. `job-<shortsha256(canonical-job-without-id)>`
-3. numeric suffix on collision
+1. `slug(name)` when `name` is set
+2. `slug(command)` derived from `run` (see below)
+3. `<slug>-<shortsha256>` when the slug above is taken, contested by another
+   job in the same file, or too generic to identify the job on its own
+4. `job-<shortsha256(canonical-job-without-id)>`
+5. numeric suffix on collision
+
+The command slug reduces `run` to the program that matters:
+
+- the executable's basename, with a script extension (`.sh`, `.py`, `.js`, …)
+  removed: `/opt/publish-metrics.py` -> `publish-metrics`
+- up to two following subcommand-like words, skipping flags and anything
+  path-like: `docker builder prune --force` -> `docker-builder-prune`
+- wrappers (`env`, `nice`, `timeout`, `flock`, `sudo`, `nohup`, …) and their
+  arguments are peeled off to reach the wrapped command
+- interpreters name their script or module, minus a trailing entrypoint
+  component: `python3 -m llm_usage_reporter.cli` -> `llm-usage-reporter`
+- `sh -c "<command>"` is unwrapped and the inner command is used
+- `ssh [opts] <host> <command>` is named after the remote command
+  (`ssh-docker-system-prune`), or after the host when the remote command
+  cannot be named
+- a bare generic tool (`ssh`, `rsync`, `curl`, `docker`, `git`, …) with no
+  distinguishing subcommand is treated as too generic and gets a digest suffix
+- commands containing shell syntax (pipelines, redirections, `$` expansion,
+  globs, `&&`) are not slugged at all and fall through to the digest form
+
+Generated IDs are persisted, so an existing job's ID never changes when this
+derivation is refined.
 
 ### 4.2 `when`
 
