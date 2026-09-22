@@ -98,8 +98,19 @@ func rewriteLegacyRootArgs(args []string) ([]string, error) {
 		hasPrintPath bool
 	)
 
-	for _, arg := range args {
+	for idx := 0; idx < len(args); idx++ {
+		arg := args[idx]
+		if arg == "--" || !strings.HasPrefix(arg, "-") {
+			out = append(out, args[idx:]...)
+			break
+		}
 		switch arg {
+		case "--config", "--color":
+			out = append(out, arg)
+			if idx+1 < len(args) {
+				idx++
+				out = append(out, args[idx])
+			}
 		case "-e", "--edit":
 			hasEdit = true
 		case "-l", "--list", "--print-config":

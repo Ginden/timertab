@@ -184,7 +184,7 @@ func TestApplyEditedConfigDisablesExistingTimersForDisabledJobs(t *testing.T) {
 		runSystemctlShow = originalRunSystemctlShow
 	})
 	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
-		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState"}
+		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState", "--property=LoadState"}
 		if !reflect.DeepEqual(args, want) {
 			t.Fatalf("runSystemctlShow args = %v, want %v", args, want)
 		}
@@ -252,7 +252,7 @@ func TestApplyEditedConfigSkipsUnchangedEnabledTimersAlreadyRunning(t *testing.T
 		runSystemctlShow = originalRunSystemctlShow
 	})
 	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
-		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState"}
+		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState", "--property=LoadState"}
 		if !reflect.DeepEqual(args, want) {
 			t.Fatalf("runSystemctlShow args = %v, want %v", args, want)
 		}
@@ -318,7 +318,7 @@ func TestApplyEditedConfigSkipsDisabledTimersAlreadyStopped(t *testing.T) {
 		runSystemctlShow = originalRunSystemctlShow
 	})
 	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
-		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState"}
+		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState", "--property=LoadState"}
 		if !reflect.DeepEqual(args, want) {
 			t.Fatalf("runSystemctlShow args = %v, want %v", args, want)
 		}
@@ -382,7 +382,7 @@ func TestApplyEditedConfigStartsExistingTimerWhenRuntimeStateDrifted(t *testing.
 		runSystemctlShow = originalRunSystemctlShow
 	})
 	runSystemctlShow = func(_ context.Context, args ...string) (string, string, error) {
-		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState"}
+		want := []string{"--user", "show", rendered.TimerName, "--property=UnitFileState", "--property=ActiveState", "--property=LoadState"}
 		if !reflect.DeepEqual(args, want) {
 			t.Fatalf("runSystemctlShow args = %v, want %v", args, want)
 		}

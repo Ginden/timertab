@@ -369,7 +369,9 @@ func importInteractive(cmd *cobra.Command, cfgPath string, imported *config.File
 	for {
 		editCmd := exec.CommandContext(cmd.Context(), "sh", "-lc", `$EDITOR_CMD "$1"`, "timertab-editor", tmpName)
 		editCmd.Env = append(os.Environ(), "EDITOR_CMD="+editor)
-		editCmd.Stdin = cmd.InOrStdin()
+		if input, ok := cmd.InOrStdin().(*os.File); ok {
+			editCmd.Stdin = input
+		}
 		editCmd.Stdout = cmd.OutOrStdout()
 		editCmd.Stderr = cmd.ErrOrStderr()
 		if err := editCmd.Run(); err != nil {
@@ -379,6 +381,13 @@ func importInteractive(cmd *cobra.Command, cfgPath string, imported *config.File
 		loaded, err := config.LoadFromFile(tmpName)
 		if err != nil {
 			printEditValidationError(cmd, err)
+			again, promptErr := promptEditAgain(cmd)
+			if promptErr != nil {
+				return promptErr
+			}
+			if !again {
+				return fmt.Errorf("import aborted; invalid config discarded")
+			}
 			continue
 		}
 
@@ -423,6 +432,10 @@ func importInteractive(cmd *cobra.Command, cfgPath string, imported *config.File
 
 	if noApply {
 		cmd.Printf("timertab: saved %s (no apply)\n", cfgPath)
+		if !noCommit {
+			message := fmt.Sprintf("timertab: import %d job(s)", merged.Added)
+			maybeAutoCommitConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, existing, message)
+		}
 		return nil
 	}
 
@@ -616,6 +629,9 @@ func importJobIdentity(job config.Job) string {
 	b.WriteByte('\x1f')
 	b.WriteString("cwd:")
 	b.WriteString(strings.TrimSpace(job.Cwd))
+	b.WriteByte('\x1f')
+	b.WriteString("tz:")
+	b.WriteString(strings.TrimSpace(job.TZ))
 	b.WriteByte('\x1f')
 	b.WriteString("when:")
 	for _, schedule := range schedules {

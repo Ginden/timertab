@@ -19,7 +19,7 @@ test:
 
 .PHONY: fmt
 fmt:
-	gofmt -w cmd/timertab/main.go internal/cli/*.go internal/config/*.go internal/version/*.go
+	gofmt -w cmd internal schema skills
 
 .PHONY: install-hooks
 install-hooks:

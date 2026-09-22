@@ -39,7 +39,8 @@ Legacy root shorthands are still accepted:
 - `timertab -l`, `timertab --list`, or `timertab --print-config` -> `timertab list`
 - `timertab --print-path` -> `timertab print-path`
 
-These legacy shorthands are mutually exclusive.
+These legacy shorthands are mutually exclusive and are recognized only before a
+subcommand or `--`. Flag values and arguments passed to jobs are preserved.
 
 ## Config Path Resolution
 
@@ -149,7 +150,7 @@ Behavior:
 - Uses the existing config file when present.
 - Uses the built-in default template when the file does not yet exist.
 - Resolves the editor in this order: `VISUAL`, `EDITOR`, `editor`, `vi`.
-- Reopens the editor when validation fails, instead of saving an invalid config.
+- When validation fails, offers to edit again or quit and discard. EOF quits without saving.
 - Persists auto-generated job IDs back into the YAML when needed.
 - Preserves the original YAML formatting/comments when normalization does not require rewriting.
 
@@ -163,7 +164,7 @@ Apply behavior:
 
 Git behavior:
 
-- Successful `edit` runs auto-commit the config by default.
+- Successful `edit` runs auto-commit changed config by default, including `--no-apply` saves.
 - If the config directory is not already inside a git work tree, `timertab` initializes one first.
 - `--no-commit` disables auto-commit for that run only.
 - The config can also disable auto-commit persistently with `git.auto_commit: false`.
@@ -204,6 +205,12 @@ or from scripts and provisioning tools. Applying a config with an empty `jobs: [
 list is the sanctioned way to remove every timertab-managed unit (the `crontab -r`
 equivalent).
 
+Config loading accepts exactly one YAML document. Additional documents, malformed
+trailing YAML, and NUL bytes in executable unit values are rejected before apply.
+Config saves use atomic replacement with `0600` permissions, preserving symlinks.
+When a YAML anchor edit would invalidate aliases or alter other jobs, the config is
+saved in canonical YAML instead of retaining the original formatting.
+
 ## `timertab diff`
 
 Usage:
@@ -233,6 +240,7 @@ Summary mode:
 - Columns are `id`, `last_run`, `next_trigger`, and `result`.
 - `result` is normalized to `pass`, `fail`, `never ran`, or `unknown`.
 - `--json` is only supported in summary mode.
+- Units with `LoadState=not-found` are treated as missing, including when `systemctl show` exits successfully.
 
 Detail mode:
 
@@ -378,7 +386,8 @@ timertab eject <id> [--config <path>] [--no-commit]
 Behavior:
 
 - Resolves the current generated service and timer names for the job.
-- Removes timertab ownership markers from those unit files if they exist.
+- Removes timertab ownership markers and generated-file edit warnings from those unit files if they exist.
+- Checks both files before changing either; conflicting ownership markers and symlinked unit files are rejected.
 - Removes the job from the config file and saves the updated config, preserving
   user comments and formatting.
 - Does not delete the unit files.
@@ -404,7 +413,7 @@ timertab adopt <id> [--config <path>] [--no-apply]
 Behavior:
 
 - Restores timertab ownership markers to the rendered service and timer filenames for the configured job.
-- Fails if either unit file is missing.
+- Checks both files before changing either. Fails if either is missing, is a symlink, or has conflicting UID, instance, or job ownership markers.
 - Applies afterward by default so timertab can reconcile the adopted units; use `--no-apply` to only restore markers.
 
 ## `timertab import`
@@ -440,15 +449,15 @@ Merge behavior:
 
 - Interactive import merges imported jobs into the destination config.
 - Duplicate detection is based on execution semantics, not on human-facing fields.
-- Duplicates are detected from `run`, `cwd`, normalized schedules, and `env`.
+- Duplicates are detected from `run`, `cwd`, `tz`, normalized schedules, and `env`.
 - Duplicate `name` or `id` values alone do not make entries distinct.
 
 Apply behavior:
 
 - In interactive mode, `--no-apply` saves the merged config without reconciling `systemd`.
-- Without `--no-apply`, import saves the config and applies it, then auto-commits the
-  config change (`timertab: import N job(s)`) unless `--no-commit` is set or
-  `git.auto_commit` is disabled.
+- Successful saves auto-commit the config change (`timertab: import N job(s)`),
+  including `--no-apply` saves, unless `--no-commit` is set or `git.auto_commit` is disabled.
+- Invalid editor output offers to edit again or quit and discard. EOF quits without saving.
 - In stdout mode, import does not touch the config file or `systemd`.
 
 Notes:

@@ -80,12 +80,15 @@ func newEjectCommand() *cobra.Command {
 				servicePath := filepath.Join(unitDir, rendered.ServiceName)
 				timerPath := filepath.Join(unitDir, rendered.TimerName)
 
-				serviceResult, err := stripManagedMarkersFromUnitFile(servicePath, targetUID, instanceID, job.ID)
+				serviceResult, err := prepareUnitMarkerChange(servicePath, targetUID, instanceID, job.ID, false)
 				if err != nil {
 					return err
 				}
-				timerResult, err := stripManagedMarkersFromUnitFile(timerPath, targetUID, instanceID, job.ID)
+				timerResult, err := prepareUnitMarkerChange(timerPath, targetUID, instanceID, job.ID, false)
 				if err != nil {
+					return err
+				}
+				if err := writeUnitMarkerChanges(serviceResult, timerResult); err != nil {
 					return err
 				}
 
@@ -188,22 +191,31 @@ func newAdoptCommand() *cobra.Command {
 				servicePath := filepath.Join(unitDir, rendered.ServiceName)
 				timerPath := filepath.Join(unitDir, rendered.TimerName)
 
-				serviceChanged, err := addManagedMarkersToUnitFile(servicePath, targetUID, instanceID, job.ID)
+				if !noApply {
+					if err := ensureSystemdBaseline(); err != nil {
+						return err
+					}
+				}
+
+				serviceChange, err := prepareUnitMarkerChange(servicePath, targetUID, instanceID, job.ID, true)
 				if err != nil {
 					return err
 				}
-				timerChanged, err := addManagedMarkersToUnitFile(timerPath, targetUID, instanceID, job.ID)
+				timerChange, err := prepareUnitMarkerChange(timerPath, targetUID, instanceID, job.ID, true)
 				if err != nil {
 					return err
 				}
 
-				if serviceChanged {
+				if err := writeUnitMarkerChanges(serviceChange, timerChange); err != nil {
+					return err
+				}
+				if serviceChange.Changed {
 					cmd.Printf("adopted %s\n", servicePath)
 				}
-				if timerChanged {
+				if timerChange.Changed {
 					cmd.Printf("adopted %s\n", timerPath)
 				}
-				if !serviceChanged && !timerChanged {
+				if !serviceChange.Changed && !timerChange.Changed {
 					cmd.Println("timertab: units already carry timertab management markers")
 				}
 
@@ -212,9 +224,6 @@ func newAdoptCommand() *cobra.Command {
 					return nil
 				}
 
-				if err := ensureSystemdBaseline(); err != nil {
-					return err
-				}
 				report, err := runSystemctlApply(cmd.Context(), loaded)
 				if err != nil {
 					return err
@@ -256,19 +265,48 @@ func saveConfig(path string, loaded *config.File) error {
 	if err != nil {
 		return err
 	}
+	if _, err := config.LoadFromBytes(out); err != nil {
+		return err
+	}
 
 	return writeConfigFile(path, out)
 }
 
 func writeConfigFile(path string, data []byte) error {
+	// Preserve explicit config symlinks while replacing the target atomically.
+	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return err
+		}
+		path = resolved
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
+	return writeFileAtomically(path, data, 0o600)
+}
 
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+func writeFileAtomically(path string, data []byte, mode os.FileMode) error {
+	file, err := os.CreateTemp(filepath.Dir(path), ".timertab-*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Chmod(path, 0o600)
+	defer os.Remove(file.Name())
+	if err := file.Chmod(mode); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if _, err := file.Write(data); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	return os.Rename(file.Name(), path)
 }
 
 func indexOfJobID(jobs []config.Job, id string) int {
@@ -280,36 +318,56 @@ func indexOfJobID(jobs []config.Job, id string) int {
 	return -1
 }
 
-type markerStripResult struct {
+type unitMarkerChange struct {
 	Changed bool
 	Missing bool
+	path    string
+	content string
+	mode    os.FileMode
 }
 
-func stripManagedMarkersFromUnitFile(path string, targetUID uint32, instanceID, jobID string) (markerStripResult, error) {
+// Preflight both units before changing either: a missing file during adopt or
+// conflicting ownership must not leave a pair with half its markers changed.
+func prepareUnitMarkerChange(path string, targetUID uint32, instanceID, jobID string, adopt bool) (unitMarkerChange, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) && !adopt {
+			return unitMarkerChange{Missing: true}, nil
+		}
+		return unitMarkerChange{}, fmt.Errorf("read unit file %q: %w", path, err)
+	}
+	if !info.Mode().IsRegular() {
+		return unitMarkerChange{}, fmt.Errorf("refusing to change markers on non-regular unit file %q", path)
+	}
 	contentBytes, err := os.ReadFile(path)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return markerStripResult{Missing: true}, nil
-		}
-		return markerStripResult{}, fmt.Errorf("read unit file %q: %w", path, err)
+		return unitMarkerChange{}, fmt.Errorf("read unit file %q: %w", path, err)
 	}
-
 	content := string(contentBytes)
-	updatedContent, changed := stripManagedMarkers(content, targetUID, instanceID, jobID)
-	if !changed {
-		return markerStripResult{}, nil
+	owned := systemd.IsManagedUnitContentForUID(content, targetUID, instanceID) && contentHasManagedJobID(content, jobID)
+	markers := parseUnitMarkers(content)
+	if !owned && (markers.managed || markers.uid != "" || markers.sawInstance || markers.jobID != "") {
+		return unitMarkerChange{}, fmt.Errorf("refusing to change conflicting ownership markers on unit file %q", path)
 	}
-
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return markerStripResult{}, fmt.Errorf("stat unit file %q: %w", path, err)
+	change := unitMarkerChange{path: path, mode: info.Mode().Perm()}
+	if adopt {
+		change.Changed = !owned
+		change.content = managedMarkerBlock(targetUID, instanceID, jobID) + content
+	} else if owned {
+		change.content, change.Changed = stripManagedMarkers(content, targetUID, instanceID, jobID)
 	}
+	return change, nil
+}
 
-	if err := os.WriteFile(path, []byte(updatedContent), fileInfo.Mode().Perm()); err != nil {
-		return markerStripResult{}, fmt.Errorf("write unit file %q: %w", path, err)
+func writeUnitMarkerChanges(changes ...unitMarkerChange) error {
+	for _, change := range changes {
+		if change.Changed {
+			if err := writeFileAtomically(change.path, []byte(change.content), change.mode); err != nil {
+				return fmt.Errorf("write unit file %q: %w", change.path, err)
+			}
+		}
 	}
-
-	return markerStripResult{Changed: true}, nil
+	return nil
 }
 
 func stripManagedMarkers(content string, targetUID uint32, instanceID, jobID string) (string, bool) {
@@ -328,7 +386,10 @@ func stripManagedMarkers(content string, targetUID uint32, instanceID, jobID str
 	changed := false
 	for _, line := range lines {
 		switch strings.TrimSpace(line) {
-		case managedMarker, uidMarker, instanceMarker, jobIDMarker:
+		case managedMarker, uidMarker, instanceMarker, jobIDMarker,
+			"# Generated by timertab; DO NOT EDIT this file directly.",
+			"# Humans and automated tools: do not modify this file or recommend direct edits.",
+			"# Use `timertab edit` to change the job; timertab will regenerate this unit.":
 			changed = true
 			continue
 		}
@@ -348,39 +409,6 @@ func stripManagedMarkers(content string, targetUID uint32, instanceID, jobID str
 	}
 
 	return out, true
-}
-
-func addManagedMarkersToUnitFile(path string, targetUID uint32, instanceID, jobID string) (bool, error) {
-	contentBytes, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return false, fmt.Errorf("unit file %q does not exist; cannot adopt", path)
-		}
-		return false, fmt.Errorf("read unit file %q: %w", path, err)
-	}
-
-	content := string(contentBytes)
-	if systemd.IsManagedUnitContentForUID(content, targetUID, instanceID) {
-		if !contentHasManagedJobID(content, jobID) {
-			return false, fmt.Errorf("unit file %q is already managed for another job", path)
-		}
-		return false, nil
-	}
-
-	markers := managedMarkerBlock(targetUID, instanceID, jobID)
-	if strings.HasPrefix(content, markers) {
-		return false, nil
-	}
-
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return false, fmt.Errorf("stat unit file %q: %w", path, err)
-	}
-	if err := os.WriteFile(path, []byte(markers+content), fileInfo.Mode().Perm()); err != nil {
-		return false, fmt.Errorf("write unit file %q: %w", path, err)
-	}
-
-	return true, nil
 }
 
 func contentHasManagedJobID(content, jobID string) bool {

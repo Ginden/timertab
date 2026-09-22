@@ -244,7 +244,7 @@ func collectCaveats(cfg *config.File) []caveat {
 	if hasDOWAndDOM {
 		out = append(out, caveat{
 			title:  "Day-of-month AND day-of-week",
-			detail: "Cron ORs day-of-month and day-of-week when both are specified. timertab emits two separate `OnCalendar=` lines to preserve this OR semantic, but the resulting behavior may differ in edge cases.",
+			detail: "When neither day field begins with `*`, cron uses OR and timertab emits two `OnCalendar=` lines. When either field begins with `*` (including stepped wildcards), both restrictions must match and timertab emits one combined calendar.",
 		})
 	}
 

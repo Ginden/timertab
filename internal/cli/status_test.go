@@ -197,8 +197,8 @@ func TestStatusCommandForRootUsesSystemManager(t *testing.T) {
 	}
 
 	want := [][]string{
-		{"show", rendered.TimerName, "--property=LastTriggerUSec", "--property=NextElapseUSecRealtime"},
-		{"show", rendered.ServiceName, "--property=Result"},
+		{"show", rendered.TimerName, "--property=LastTriggerUSec", "--property=NextElapseUSecRealtime", "--property=LoadState"},
+		{"show", rendered.ServiceName, "--property=Result", "--property=LoadState"},
 	}
 	if len(calls) != len(want) {
 		t.Fatalf("runSystemctlShow call count = %d, want %d (%v)", len(calls), len(want), calls)

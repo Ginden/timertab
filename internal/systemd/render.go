@@ -128,7 +128,7 @@ func renderServiceContent(targetUID uint32, instanceID string, job config.Job, s
 	b.WriteString("\n")
 
 	b.WriteString("ExecStopPost=/bin/sh -lc ")
-	b.WriteString(systemdQuoted(hookDispatchScript(serviceName, job)))
+	b.WriteString(systemdExecQuoted(hookDispatchScript(serviceName, job)))
 	b.WriteString("\n")
 
 	return b.String()
@@ -367,7 +367,7 @@ func sanitizeUnitComponent(value string) string {
 
 func systemdExecStart(run config.RunCommand) string {
 	if shell, ok := run.Shell(); ok {
-		return "/bin/sh -lc " + systemdQuoted(shell)
+		return "/bin/sh -lc " + systemdExecQuoted(shell)
 	}
 	return systemdExecCommand(run.Argv())
 }
@@ -375,13 +375,19 @@ func systemdExecStart(run config.RunCommand) string {
 func systemdExecCommand(argv []string) string {
 	parts := make([]string, 0, len(argv))
 	for _, arg := range argv {
-		parts = append(parts, systemdQuoted(arg))
+		parts = append(parts, systemdExecQuoted(arg))
 	}
 	return strings.Join(parts, " ")
 }
 
 func shellQuoted(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
+}
+
+func systemdExecQuoted(value string) string {
+	// Exec directives expand dollars even inside quoted arguments. Leave shell
+	// expansion to the shell, and preserve literal dollars in explicit argv.
+	return systemdQuoted(strings.ReplaceAll(value, "$", "$$"))
 }
 
 func systemdQuoted(value string) string {

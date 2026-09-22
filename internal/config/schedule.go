@@ -14,7 +14,7 @@ type ScheduleList []string
 var shorthandOnCalendar = map[string]string{
 	"@hourly":   "*-*-* *:00:00",
 	"@daily":    "*-*-* 00:00:00",
-	"@weekly":   "Mon *-*-* 00:00:00",
+	"@weekly":   "Sun *-*-* 00:00:00",
 	"@monthly":  "*-*-01 00:00:00",
 	"@yearly":   "*-01-01 00:00:00",
 	"@annually": "*-01-01 00:00:00",
@@ -215,17 +215,14 @@ func compileCronExpression(value string) ([]string, error) {
 	weekdayWildcard := cronDayFieldStartsWithStar(parts[4])
 
 	domCalendar := fmt.Sprintf("*-%s-%s %s", monthSpec, dayOfMonthSpec, timeSpec)
-	dowCalendar := fmt.Sprintf("%s *-%s-* %s", weekdaySpec, monthSpec, timeSpec)
-	combinedDayCalendar := fmt.Sprintf("%s *-%s-%s %s", weekdaySpec, monthSpec, dayOfMonthSpec, timeSpec)
-	anyDayCalendar := fmt.Sprintf("*-%s-* %s", monthSpec, timeSpec)
+	weekdayPrefix := ""
+	if len(weekdayValues) != 7 {
+		weekdayPrefix = weekdaySpec + " "
+	}
+	dowCalendar := fmt.Sprintf("%s*-%s-* %s", weekdayPrefix, monthSpec, timeSpec)
+	combinedDayCalendar := weekdayPrefix + domCalendar
 
 	switch {
-	case dayOfMonthWildcard && weekdayWildcard:
-		return []string{anyDayCalendar}, nil
-	case dayOfMonthWildcard && len(dayOfMonthValues) == 31:
-		return []string{dowCalendar}, nil
-	case weekdayWildcard && len(weekdayValues) == 7:
-		return []string{domCalendar}, nil
 	case dayOfMonthWildcard || weekdayWildcard:
 		return []string{combinedDayCalendar}, nil
 	default:
@@ -334,6 +331,10 @@ func expandCronPart(part string, min, max int, resolveToken func(string) (int, e
 	out := make([]int, 0, end-start+1)
 	for v := start; v <= end; v += step {
 		out = append(out, v)
+		// Check before addition so a valid, very large step cannot overflow int.
+		if step > end-v {
+			break
+		}
 	}
 
 	return out, nil

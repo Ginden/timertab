@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"text/tabwriter"
 
@@ -387,6 +388,9 @@ func printStatusAlignedTable(out io.Writer, rows [][]string, gap int) {
 }
 
 func showUnitProperties(ctx context.Context, scope systemctl.Scope, unit string, properties ...string) (map[string]string, bool, error) {
+	if !slices.Contains(properties, "LoadState") {
+		properties = append(append([]string(nil), properties...), "LoadState")
+	}
 	args := make([]string, 0, len(properties)+4)
 	args = append(args, scope.ScopedArgs("show", unit)...)
 	for _, property := range properties {
@@ -418,7 +422,7 @@ func showUnitProperties(ctx context.Context, scope systemctl.Scope, unit string,
 		values[parts[0]] = strings.TrimSpace(parts[1])
 	}
 
-	return values, false, nil
+	return values, values["LoadState"] == "not-found", nil
 }
 
 func collectStatusLogPeek(ctx context.Context, scope systemctl.Scope, serviceName string) string {

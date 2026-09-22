@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -32,6 +33,13 @@ func LoadFromBytes(buf []byte) (*File, error) {
 	rawDecoder := yaml.NewDecoder(bytes.NewReader(buf))
 	if err := rawDecoder.Decode(&raw); err != nil {
 		return nil, fmt.Errorf("parse yaml: %w", err)
+	}
+	var trailing any
+	if err := rawDecoder.Decode(&trailing); err != io.EOF {
+		if err != nil {
+			return nil, fmt.Errorf("parse yaml: %w", err)
+		}
+		return nil, fmt.Errorf("config must contain exactly one YAML document")
 	}
 
 	if err := validateConfigSchema(raw); err != nil {

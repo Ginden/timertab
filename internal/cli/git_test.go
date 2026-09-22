@@ -79,6 +79,7 @@ EOF
 `))
 
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(&bytes.Buffer{})
 	stderr := &bytes.Buffer{}
@@ -141,6 +142,7 @@ func TestEditConfigNoCommitSkipsAutoCommit(t *testing.T) {
 	t.Setenv("EDITOR", "true")
 
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -191,6 +193,7 @@ EOF
 `))
 
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -223,6 +226,7 @@ func TestEditConfigWarnsWhenGitIsUnavailable(t *testing.T) {
 
 	stderr := &bytes.Buffer{}
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(stderr)

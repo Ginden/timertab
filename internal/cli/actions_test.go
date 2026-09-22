@@ -31,6 +31,7 @@ func TestEditConfigApplyRunsSystemctlPipeline(t *testing.T) {
 	t.Setenv("EDITOR", "true")
 
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -69,6 +70,7 @@ func TestEditConfigApplyPrintsChangedOperationsOnly(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
@@ -125,6 +127,7 @@ func TestEditConfigApplyReturnsSystemctlPipelineErrors(t *testing.T) {
 	t.Setenv("EDITOR", "true")
 
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -149,6 +152,7 @@ func TestEditConfigNoApplySkipsSystemctlPipeline(t *testing.T) {
 	t.Setenv("EDITOR", "true")
 
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -177,6 +181,7 @@ jobs:
 	t.Setenv("EDITOR", "true")
 
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -210,6 +215,7 @@ jobs:
 	t.Setenv("EDITOR", "true")
 
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -270,6 +276,7 @@ jobs:
 
 	stdout := &bytes.Buffer{}
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(bytes.NewBuffer(nil))
 	cmd.SetOut(stdout)
 	cmd.SetErr(&bytes.Buffer{})
@@ -366,7 +373,8 @@ EOF
 `))
 
 	cmd := &cobra.Command{}
-	cmd.SetIn(bytes.NewBuffer(nil))
+	cmd.SetContext(context.Background())
+	cmd.SetIn(strings.NewReader("e\n"))
 	cmd.SetOut(&bytes.Buffer{})
 	stderr := &bytes.Buffer{}
 	cmd.SetErr(stderr)
@@ -461,6 +469,7 @@ exit 1
 `))
 
 	cmd := &cobra.Command{}
+	cmd.SetContext(context.Background())
 	cmd.SetIn(strings.NewReader("q\n"))
 	cmd.SetOut(&bytes.Buffer{})
 	stderr := &bytes.Buffer{}

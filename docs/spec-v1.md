@@ -27,7 +27,7 @@ The YAML config file is the source of truth. Generated unit files are derived ar
 
 ## 4. YAML Schema Shape
 
-Top-level is an object (not an array), to support `$schema`:
+The config contains exactly one YAML document. Its top-level is an object (not an array), to support `$schema`:
 
 ```yaml
 $schema: "https://raw.githubusercontent.com/ginden/timertab/v1.1.0/schema/v1.json"
@@ -52,7 +52,7 @@ Top-level optional fields:
 - `instance_id`: string, default logical instance `timertab`
 - when set, `timertab` treats the config as a separate ownership namespace for generated units
 - `git.auto_commit`: boolean, default `true`
-- when enabled, successful `timertab edit` apply runs stage and commit the config file
+- when enabled, successful config-changing commands stage and commit the config file, including `--no-apply` saves
 - if the config directory is not already in a git work tree, `timertab` initializes one before committing
 - `timertab edit --no-commit` disables that behavior for a single run
 
@@ -111,6 +111,10 @@ Supported values:
 - shorthands: `@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly`, `@annually`, `@reboot`
 - 5-field cron expressions
 
+`@weekly` means Sunday at midnight, matching cron. If either day field begins with
+`*`, the day-of-month and weekday restrictions are combined with AND, including
+stepped wildcards; otherwise they use cron's OR semantics.
+
 Unsupported in v1:
 
 - cron seconds/year extensions
@@ -157,6 +161,10 @@ run:
   - -lc
   - echo ok
 ```
+
+Generated command directives escape dollars for systemd so shell expansion happens
+inside the shell and explicit argv retains literal dollars. Commands, environment
+values, working directories, and raw directive values must not contain NUL bytes.
 
 ## 5. Hook Semantics
 

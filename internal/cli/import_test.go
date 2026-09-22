@@ -79,6 +79,20 @@ func TestImportCommandReadsFromStdinAndProducesConfig(t *testing.T) {
 	}
 }
 
+func TestMergeImportedJobsPreservesDistinctTimezones(t *testing.T) {
+	imported, _, err := importCrontab("CRON_TZ=UTC\n0 9 * * * echo daily\nCRON_TZ=America/New_York\n0 9 * * * echo daily\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged := mergeImportedJobs(nil, imported.Jobs)
+	if merged.Added != 2 || merged.Skipped != 0 {
+		t.Fatalf("lost a timezone-specific job: %+v", merged)
+	}
+	if again := mergeImportedJobs(merged.Jobs, imported.Jobs); again.Added != 0 || again.Skipped != 2 {
+		t.Fatalf("same timezone jobs were not deduplicated: %+v", again)
+	}
+}
+
 func TestImportCommandReadsFromCrontabByDefault(t *testing.T) {
 	originalRunCrontabList := runCrontabList
 	t.Cleanup(func() {

@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 
 	"gopkg.in/yaml.v3"
 
@@ -145,9 +146,17 @@ func savePatchedConfig(path string, raw []byte, loaded *config.File, preJobs []c
 			}
 			return patch(jobsNode)
 		})
-		if err == nil {
+		if err == nil && configYAMLMatches(out, loaded) {
 			return writeConfigFile(path, out)
 		}
 	}
 	return saveConfig(path, loaded)
+}
+
+// Editing anchors or removing their defining job can invalidate aliases or change
+// other jobs. Only keep the patched representation when it matches the intended
+// config; otherwise the caller marshals the already validated config instead.
+func configYAMLMatches(raw []byte, expected *config.File) bool {
+	actual, err := config.LoadFromBytes(raw)
+	return err == nil && reflect.DeepEqual(actual, expected)
 }

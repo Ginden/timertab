@@ -37,14 +37,14 @@ If the README/spec drift from the code, follow the code and update docs to match
 - Global verbosity uses `-v`/`-vv`/`-vvv`; version output uses `-V`/`--version`; color uses `--color=auto|always|never`.
 - The repository skill lives at `skills/timertab/SKILL.md`; `timertab --show-ai-skill` prints the bundled copy to stdout.
 - Human-oriented output can use ANSI color and syntax highlighting; machine-readable output stays uncolored.
-- YAML load/schema validation/semantic validation/ID normalization are implemented and covered by tests.
+- YAML load/schema validation/semantic validation/ID normalization are implemented and covered by tests. Configs contain exactly one YAML document.
 - Reconcile is implemented: render desired units, detect existing managed units, build deterministic create/update/keep/remove plans, prune stale managed units, write unit files, `daemon-reload`, and enable/start or disable/stop timers as needed. `@reboot`-only timers are enabled but not started during apply.
-- `edit` preserves user formatting when possible, injects generated IDs back into the original YAML node tree, and auto-commits config changes by default.
+- `edit` preserves user formatting when possible, injects generated IDs back into the original YAML node tree, and auto-commits config changes by default, including `--no-apply` saves. Invalid edit/import sessions abort on EOF.
 - `status` supports both table/JSON summary output and per-job detailed diagnostics.
-- Mutating config commands take a non-blocking config lock and write the config with private `0600` permissions.
-- Per-job `tz` is supported for calendar schedules, and import maps `CRON_TZ` to `tz`.
+- Mutating config commands take a non-blocking config lock and replace the config atomically with private `0600` permissions, preserving config symlinks. YAML patches are checked against the intended config before saving.
+- Per-job `tz` is supported for calendar schedules, and import maps `CRON_TZ` to `tz` and includes it in duplicate detection. `@weekly` follows cron's Sunday midnight schedule.
 - `import` converts crontab input into timertab YAML; `render` produces a review bundle (`timertab.yaml`, rendered units, `REPORT.md`) without touching systemd.
-- `eject` removes timertab ownership markers from existing unit files and removes the job from config without deleting the units; `adopt` restores markers for previously ejected units.
+- `eject` removes timertab ownership markers and edit warnings from existing unit files and removes the job from config without deleting the units; `adopt` restores markers for previously ejected units. Both preflight the pair and reject conflicting ownership or symlinked units.
 - `doctor` reports active, orphaned, ejected/foreign, and other-instance timertab unit files for the current UID.
 
 ## Coding Rules

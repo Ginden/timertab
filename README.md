@@ -39,9 +39,10 @@ on_failure:
 
 Hooks receive rich context: `TIMERTAB_JOB_ID`, `TIMERTAB_UNIT`, `SERVICE_RESULT`, `EXIT_CODE`, `EXIT_STATUS`.
 
-### 🛡️ Atomic reconcile
+### 🛡️ Validation before reconcile
 
-If your config is invalid, **nothing gets written or pruned**. No partial state, no orphaned units. Ever.
+If your config is invalid, **nothing gets written or pruned**. Configs must contain exactly one YAML document; trailing documents are rejected.
+Config saves replace the file atomically. Reconcile operations across multiple unit files and the systemd manager are not a transaction: filesystem or systemd failures can require another apply.
 
 ### 🔀 Multiple schedules per job
 
@@ -80,7 +81,7 @@ including systemd `%` specifiers.
 
 ### 📝 Git auto-commit
 
-Every successful config change (`edit`, `enable`, `disable`, `eject`, `import`) is automatically committed to a local git repo. Full audit trail of every change, with no extra effort. Disable with `--no-commit` or in config.
+Every successful config change (`edit`, `add`, `rm`, `enable`, `disable`, `eject`, `import`, and ID normalization during `apply`) is automatically committed to a local git repo, including saves with `--no-apply`. Full audit trail of every change, with no extra effort. Disable with `--no-commit` or in config.
 
 ## All features
 
@@ -187,6 +188,8 @@ String `run` values are shorthand for `["/bin/sh", "-lc", "..."]`. Use the list 
 Set `tz: "Area/Location"` when a job should follow a specific IANA time zone instead of the machine's local time.
 In generated timertab-owned directives, literal `%` characters in commands, environment values, and `cwd` are escaped for systemd so values such as `date +%F` run as written.
 Raw `systemd:` directive values are not escaped.
+Dollar signs in generated command directives are escaped for systemd: shell variables expand in the shell, and list-form arguments retain literal dollars. Commands, environment values, working directories, and raw directive values cannot contain NUL bytes.
+`@weekly` runs at midnight on Sunday, matching cron. Stepped day fields such as `*/2` retain their restrictions when the other day field is `*`.
 
 ## Usage
 
@@ -302,7 +305,7 @@ When you run `timertab edit` (or `timertab -e`), here's what happens:
 
 If validation fails at step 2, nothing else happens — no partial writes, no orphaned units.
 
-Successful config-changing runs (`edit`, `enable`, `disable`, `eject`, `import`) also auto-commit the config file by default. If the config directory is not already inside a git work tree, `timertab` initializes one first, then stages and commits the config change. Disable that once with `--no-commit`, or persistently in config:
+Successful config-changing runs (`edit`, `add`, `rm`, `enable`, `disable`, `eject`, `import`, and ID normalization during `apply`) also auto-commit the config file by default, including saves with `--no-apply`. If the config directory is not already inside a git work tree, `timertab` initializes one first, then stages and commits the config change. Disable that once with `--no-commit`, or persistently in config:
 
 ```yaml
 git:

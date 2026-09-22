@@ -109,6 +109,11 @@ func (r RunCommand) IsZero() bool {
 }
 
 func (r RunCommand) Validate() error {
+	for _, arg := range r.Argv() {
+		if strings.ContainsRune(arg, '\x00') {
+			return fmt.Errorf("run must not contain NUL bytes")
+		}
+	}
 	if shell, ok := r.Shell(); ok {
 		if strings.TrimSpace(shell) == "" {
 			return fmt.Errorf("run is required")

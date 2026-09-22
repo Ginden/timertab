@@ -90,7 +90,7 @@ func editConfig(cmd *cobra.Command, cfgPath string, noApply, dryRun, noCommit bo
 
 	for {
 		// Run via shell so values like EDITOR=\"code --wait\" work.
-		editCmd := exec.Command("sh", "-lc", `$EDITOR_CMD "$1"`, "timertab-editor", tmpName)
+		editCmd := exec.CommandContext(cmd.Context(), "sh", "-lc", `$EDITOR_CMD "$1"`, "timertab-editor", tmpName)
 		editCmd.Env = append(os.Environ(), "EDITOR_CMD="+editor)
 		// Passing a buffered reader to exec.Cmd causes os/exec to copy (and consume)
 		// it before the editor exits. Keep such input for the invalid-config prompt;
@@ -142,6 +142,9 @@ func editConfig(cmd *cobra.Command, cfgPath string, noApply, dryRun, noCommit bo
 
 		if noApply {
 			cmd.Printf("timertab: saved %s (no apply)\n", cfgPath)
+			if !noCommit {
+				maybeAutoCommitEditedConfig(cmd.Context(), cmd.ErrOrStderr(), cfgPath, beforeConfig, loaded, configChanged)
+			}
 			return nil
 		}
 
@@ -181,7 +184,7 @@ func prepareEditedConfigForSave(raw []byte) (*config.File, []byte, error) {
 	}
 
 	out, err := injectGeneratedIDsIntoYAML(raw, loaded)
-	if err == nil {
+	if err == nil && configYAMLMatches(out, loaded) {
 		return loaded, out, nil
 	}
 
@@ -315,7 +318,7 @@ func promptEditAgain(cmd *cobra.Command) (bool, error) {
 		if _, err := fmt.Fscanln(cmd.InOrStdin(), &answer); err != nil {
 			if errors.Is(err, io.EOF) {
 				_, _ = fmt.Fprintln(cmd.ErrOrStderr())
-				return true, nil
+				return false, nil
 			}
 			return false, err
 		}

@@ -57,6 +57,9 @@ func applyEditedConfig(ctx context.Context, cfg *config.File) (applyReport, erro
 	if cfg == nil {
 		return applyReport{}, fmt.Errorf("config is required")
 	}
+	if err := cfg.Validate(); err != nil {
+		return applyReport{}, err
+	}
 
 	targetUID, err := resolveCurrentUID()
 	if err != nil {

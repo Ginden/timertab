@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"golang.org/x/text/language"
@@ -367,6 +368,9 @@ func preferredGeneratedID(job Job) string {
 }
 
 func validateJob(job Job) error {
+	if utf8.RuneCountInString(job.Name) > 120 {
+		return fmt.Errorf("name must be at most 120 characters")
+	}
 	if job.ID != "" && !validID.MatchString(job.ID) {
 		return fmt.Errorf("id must match %s", validID.String())
 	}
@@ -388,6 +392,9 @@ func validateJob(job Job) error {
 	}
 	if err := validateEnv(job.Env); err != nil {
 		return fmt.Errorf("env: %w", err)
+	}
+	if strings.ContainsRune(job.Cwd, '\x00') {
+		return fmt.Errorf("cwd must not contain NUL bytes")
 	}
 	if err := validateJitter(job.Jitter); err != nil {
 		return fmt.Errorf("jitter: %w", err)
@@ -486,11 +493,17 @@ func validateSystemdDirectiveSet(section string, set *SystemdDirectiveSet) error
 		if strings.ContainsAny(directive.Value, "\n\r") {
 			return fmt.Errorf("%s: directive %q value must not contain newlines", section, directive.Name)
 		}
+		if strings.ContainsRune(directive.Value, '\x00') {
+			return fmt.Errorf("%s: directive %q value must not contain NUL bytes", section, directive.Name)
+		}
 	}
 	return nil
 }
 
 func validateHook(hook Hook) error {
+	if strings.ContainsRune(hook.Command, '\x00') {
+		return fmt.Errorf("command must not contain NUL bytes")
+	}
 	if strings.TrimSpace(hook.Command) == "" {
 		return fmt.Errorf("command is required")
 	}
@@ -501,9 +514,12 @@ func validateHook(hook Hook) error {
 }
 
 func validateEnv(values map[string]string) error {
-	for key := range values {
+	for key, value := range values {
 		if !validEnv.MatchString(key) {
 			return fmt.Errorf("invalid key %q", key)
+		}
+		if strings.ContainsRune(value, '\x00') {
+			return fmt.Errorf("value for %q must not contain NUL bytes", key)
 		}
 	}
 	return nil
